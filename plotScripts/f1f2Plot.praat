@@ -62,11 +62,11 @@ procedure doInputUI
             option: "tab-delimited file"
             option: "CSV file"
 
-        comment: "Grouping Factors / Column Headers"
+        comment: "Grouping factors / column Headers"
         #sentence Main_factor (determines colour)
         #sentence Secondary_factor (used for grouping by sub-category)
-        sentence: "Main factor", outerFactor$
-        boolean: "Include secondary factor", useInnerFactor
+        sentence: "Main factor (determines colour)", outerFactor$
+        boolean: "add secondary factor (sub-category)", useInnerFactor
         sentence: "Secondary factor", innerFactor$
         sentence: "F2 Column", f2Col$
         sentence: "F1 Column", f1Col$
@@ -92,7 +92,7 @@ procedure doInputUI
     if outerFactor$ = innerFactor$
         innerFactor$ = ""
     endif
-    useInnerFactor = include_secondary_factor
+    useInnerFactor = add_secondary_factor
         ... and innerFactor$ != ""
     f1Col$ = f1_Column$
     f2Col$ = f2_Column$
