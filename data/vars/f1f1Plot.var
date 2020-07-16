@@ -1,0 +1,45 @@
+variable	value
+f1f2Version$	1.0.0.0
+plotSize	5
+tableID$	../example/nIEdiphthongs.txt
+outerFactor$	sound
+innerFactor$	element
+useInnerFactor	1
+f1Col$	F1
+f2Col$	F2
+tertiaryFilters	0
+inputUnits	1
+innerBoolean#	{0}
+outerBoolean#	{0}
+arrowRatio	0.75
+prevInputUnit	1
+title$	F1-F2 plot for nIE diphthongs
+outputUnits	2
+minF1	150
+maxF1	1400
+minF2	500
+maxF2	3600
+tokenMarking	7
+showMeans	1
+showArrows	1
+ellipsisSDs	3
+coreLevel	2
+dataPointsOnTop	1
+saveName$	F1F2_Plot.png
+fontXL	10
+fontM	12
+fontL	14
+bulletSize	22
+shading	0.15
+colrAdj#	{0.299,0.587,0.114}
+tableFormat	1
+colrPalFile$	CBQualativeSet1.palette
+legBlockTolerance	0
+bufferZone	2
+showLegend	1
+quality	0
+saveDirectory$	C:\Users\antoi/Desktop/AERoPlot_Images
+changeAddColSch	0
+sorting	1
+lightLine$	{0.8, 0.8, 0.8}
+darkLine$	{0.2, 0.2, 0.2}
