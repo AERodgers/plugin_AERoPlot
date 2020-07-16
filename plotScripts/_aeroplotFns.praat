@@ -136,9 +136,9 @@ procedure checkDirectoryStructure
         createDirectory: "../data/palettes"
         .palName$[1] = "CBQualativeSet1"
         .js$[1] =
-        ... "['rgb(55,126,184)','rgb(255,127,0)','rgb(152,78,163)'," +
-        ... "'rgb(153,153,153)','rgb(228,26,28)','rgb(255,255,51)'," +
-        ... "'rgb(166,86,40)','rgb(247,129,191)','rgb(77,175,74)']"
+        ... "['rgb(228,26,28)','rgb(55,126,184)','rgb(77,175,74)'," +
+        ... "'rgb(152,78,163)','rgb(255,127,0)','rgb(255,255,51)'," +
+        ... "'rgb(166,86,40)','rgb(247,129,191)','rgb(153,153,153)']"
         .colrName$[1] = "Red,Blue,Green,Purple,Orange,Yellow,Brown,Pink,Grey"
 
         .palName$[2] = "CBQualDark2N3"

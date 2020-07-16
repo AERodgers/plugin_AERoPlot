@@ -14,7 +14,7 @@
 #
 # This bank of procedures are used in but are not specific to AERoPlot.
 # They contain a variety of maths functions; file, table, and variable
-# management functions, as well as a wuite of colour management, drawing,
+# management functions, as well as a suite of colour management, drawing,
 # and legend functions.
 #
 # As these procedures can be used in other context, I have provided some expl-
