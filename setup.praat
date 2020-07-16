@@ -1,0 +1,6 @@
+Add menu command: "Objects", "New", "--", "", 0,  ""
+Add menu command: "Objects", "New", "Graphic", "", 0,  ""
+Add menu command: "Objects", "New", "Formant Plot", "Graphic", 1,  "f1f2Plot.praat"
+Add menu command: "Objects", "New", "Formants-over-time Plot", "Graphic", 1,  "fotPlot.praat"
+Add menu command: "Objects", "New", "Ladefoged Formant Plot", "Graphic", 1,  "LadefogedPlot.praat"
+Add menu command: "Objects", "New", "F0-CPP Plot", "Graphic", 1,  "c3pogram.praat"
