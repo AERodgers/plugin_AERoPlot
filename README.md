@@ -1,8 +1,8 @@
 # AERoPlot - a Praat plug-in for plotting data
 
-AERoPlot is a Praat plug in which allows you to generate elegant plots from tables of Phonetics data in [Praat](www.praat.org).
+AERoPlot is a Praat plug in which allows you to generate elegant plots from tables of Phonetics data in Praat.
 
-To use this plugin you need to download Praat onto your computer (www.praat.org).
+To use this plugin you need to [download Praat](https://www.praat.org) onto your computer .
 
 Then:
 1. Click on the **clone or download** button above followed by **download ZIP**.
@@ -14,10 +14,10 @@ Then:
 Once you have installed the plugin, you can access it from **New** > **graphic...** in the objects window.
 
 There are currently four plot types:
-1. F1-F2 plots
-2. Formant plots for showing 2+ formants (called "Ladefoged plots" here)
-3. Formants-over-times, similar to the Ladefoged plots, but with time on the x axis.
-4. C3P-ograms, which plot F0 contours along with a second parameter indicated by line size and colour intensity (CPP, H2-H1 of the differentiate glottal source...)
+1. F1-F2 plots;
+2. Formant plots for showing 2+ formants (called "Ladefoged plots" here);
+3. Formants-over-time plots, similar to the Ladefoged plots, but with time on the x axis;
+4. C3P-o-grams, which plot F0 contours along with a second parameter indicated by line size and colour intensity (CPP, H2-H1 of the differentiate glottal source...)
 
 By default, images are saved to a folder on your desktop called "AERoPlot_Images"
 
