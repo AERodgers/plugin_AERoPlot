@@ -40,8 +40,8 @@ For now,  I recommend you just to muck around with it. And - of course - if you 
 
 Known issues / future plans:
 * The option to display only outliers in the box plot component of the Ladefoged does not function yet.
-* The add / change colour options is not storing changes as intended
-* There will be an easily accessible archive to make facilitate the reproduction and alteration of previous plots
+* The add / change colour options is not storing changes as intended.
+* There will be an easily accessible archive to make facilitate the reproduction and alteration of previous plots.
 * Intelligibilty / intuitiveness of menus will be improved (feedback much appreciated and needed here).
 ___
 
