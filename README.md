@@ -7,7 +7,7 @@ To use this plugin you need to download Praat onto your computer (www.praat.org)
 Then:
 1. Click on the **clone or download** button above followed by **download ZIP**.
 2. Download and unzip the file.
-3. Copy the **plugin_phonetics_practice** folder and *all* its contents into the **Praat preferences directory**.
+3. Copy the **plugin_AERoplot-master** folder and *all* its contents into the **Praat preferences directory**.
 
     ([Click on this link](http://www.fon.hum.uva.nl/praat/manual/preferences_directory.html) for guidelines on how to locate this directory on your computer.)
 
