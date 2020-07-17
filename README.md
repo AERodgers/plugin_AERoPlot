@@ -1,6 +1,6 @@
 # AERoPlot - a Praat plug-in for plotting data
 
-AERoPlot is a Praat plug in which allows you to generate elegant plots from tables of Phonetics data in Praat.
+AERoPlot is a Praat plug which allows you to generate elegant plots from tables of Phonetics data in Praat.
 
 To use this plugin you need to [download Praat](https://www.praat.org) onto your computer .
 
