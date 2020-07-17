@@ -1,22 +1,21 @@
-# AERoplot - a Praat plug-in for plotting data
+# AERoPlot - a Praat plug-in for plotting data
 
-AERoplot is a Praat plug in which allows you to generate elegant plots from tables of Phonetics data in [Praat](www.praat.org).
+AERoPlot allows you to generate elegant plots from data in Praat.
 
-To use this plugin you need to download Praat onto your computer (www.praat.org).
-
-Then:
+To use it, you need to [download Praat](https://www.praat.org) onto your computer. Then:
 1. Click on the **clone or download** button above followed by **download ZIP**.
 2. Download and unzip the file.
 3. Copy the **plugin_AERoplot-master** folder and *all* its contents into the **Praat preferences directory**.
 
     ([Click on this link](http://www.fon.hum.uva.nl/praat/manual/preferences_directory.html) for guidelines on how to locate this directory on your computer.)
 
-Once you have installed the plugin, you can access it from **New** > **graphic...** the objects window.
+Once you have installed the plugin, you can access it from **New** > **graphic...** in the objects window.
 
 There are currently four plot types:
-1. F1-F2 plots
-2. Formant plots for showing 2+ formants (called "Ladefoged plots" here)
-3. Formants-over-times, similar to the Ladefoged plots, but with time on the x axis.
+1. F1-F2 plots;
+2. Formant plots for showing 2+ formants (called "Ladefoged plots" here);
+3. Formants-over-time plots, similar to the Ladefoged plots, but with time on the x axis;
+4. C3P-o-grams, which plot F0 contours along with a second parameter indicated by line size and colour intensity (CPP, H2-H1 of the differentiate glottal source...)
 
 By default, images are saved to a folder on your desktop called "AERoPlot_Images"
 
@@ -34,13 +33,13 @@ There are quite a few for not-so-obvious quality-of-life features and many ways 
 
 There are no detailed instructions yet, but I will produce these in time along with a more comprehensive list of the plugin's functionality.
 
-For now,  I recommend you just to muck around with it. And - of course - if you find any bugs or have any suggestions for improvements, please do let me know.
+For now,  I recommend you just to muck around with it. You can use small the sample datasets provided. Alternatively, if you set the table number / address as 0 in the input settings menu, this will load the Peterson and Barney (1952) data. Use the columns "IPA", "Type", and "Sex" to filter the data. And - of course - if you find any bugs or have any suggestions for improvements, please do let me know. 
 
 
 Known issues / future plans:
 * The option to display only outliers in the box plot component of the Ladefoged does not function yet.
-* The add / change colour options is not storing changes as intended
-* There will be an easily accessible archive to make facilitate the reproduction and alteration of previous plots
+* The add / change colour options is not storing changes as intended.
+* There will be an easily accessible archive to make facilitate the reproduction and alteration of previous plots.
 * Intelligibilty / intuitiveness of menus will be improved (feedback much appreciated and needed here).
 ___
 
