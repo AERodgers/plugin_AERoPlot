@@ -33,7 +33,7 @@ There are quite a few for not-so-obvious quality-of-life features and many ways 
 
 There are no detailed instructions yet, but I will produce these in time along with a more comprehensive list of the plugin's functionality.
 
-For now,  I recommend you just to muck around with it. And - of course - if you find any bugs or have any suggestions for improvements, please do let me know.
+For now,  I recommend you just to muck around with it. You can use small the sample datasets provided. Alternatively, if you set the table number / address as 0 in the input settings menu, this will load the Peterson and Barney (1952) data. Use the columns "IPA", "Type", and "Sex" to filter the data. And - of course - if you find any bugs or have any suggestions for improvements, please do let me know. 
 
 
 Known issues / future plans:
