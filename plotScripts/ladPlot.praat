@@ -16,7 +16,7 @@
 # ref. Ladefoged, P. and Johnson. K., A course in Pnonetics [6th ed.],
 #      Boston MA: Wadsworth Cengage
 
-curLadVersion$ = "1.0.0.0"
+curLadVersion$ = "1.0.0.1"
 @checkPraatVersion
 
 # Main script loop
@@ -72,8 +72,8 @@ procedure doInputUI
 
             comment:  "Grouping Factors / Column Headers"
             comment:  additionalComment$
-            sentence: "Main factor (colour)", outerFactor$
             sentence: "Sequencing factor (x-Axis)", innerFactor$
+            sentence: "Comparison factor (y-axis, colour)", outerFactor$
             sentence: "F1 Column",   f1Col$
             sentence: "F2 Column",   f2Col$
             sentence: "F3 Column",   f3Col$
@@ -92,7 +92,7 @@ procedure doInputUI
             exit
         endif
 
-        outerFactor$ = main_factor$
+        outerFactor$ = comparison_factor$
         innerFactor$ = sequencing_factor$
         for f to 4
             f'f'Col$ = f'f'_Column$
@@ -101,10 +101,10 @@ procedure doInputUI
         headerList$ = "'f1Col$','f2Col$','f3Col$','f4Col$'," +
         ... "'outerFactor$','innerFactor$'"
 
-        inputIncomplete = (main_factor$ == sequencing_factor$)
+        inputIncomplete = (innerFactor$ == outerFactor$)
         additionalComment$ =
         ... "NB: MAIN AND SEQUENCING FACTORS MUST BE DIFFERENT."
-        if main_factor$ = "" or sequencing_factor$ = ""
+        if innerFactor$ = "" or outerFactor$ = ""
             additionalComment$ =
             ... "NB: YOU CANNOT LEAVE FACTORS BLANK."
             inputIncomplete = 1
@@ -200,8 +200,8 @@ procedure processInputUI
             endif
         endif
     endfor
-
 endproc
+
 procedure doOutputUI
     varRoot$ = "inner"
 
@@ -242,6 +242,7 @@ procedure doOutputUI
         boolean: "Show IQR", showIQR
         boolean: "Show tail", showTail
         boolean: "Show arrows", drawArrows
+        boolean: "show formants in legend", legendHasFormants
         @outputUI_generic
 
         myChoice = endPause: "Exit", "Continue", 2, 1
@@ -264,7 +265,7 @@ procedure doOutputUI
     drawArrows = show_arrows
     outputUnits = output_units
     xAxisFactor = mark_X_axis_using
-
+    legendHasFormants = show_formants_in_legend
 endproc
 
 # Main drawing procedure
@@ -564,8 +565,13 @@ procedure drawTailsIQR
                         Draw line: x - 0.1, tEnd, x + 0.1, tEnd
                         Draw line: x - 0.1, tStart, x + 0.1, tStart
                     endif
-                    Colour: oColour$[o, 5 - c * 2]
+
+                    c = (f/2 = round(f/2)) * 0.09
+                    curColr$ = oColour$[o, 3]
+                    @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
+                    Colour: curColr$
                     Line width: 2
+
                     if showIQR
                         Draw rectangle: x - 0.1, x + 0.1, yStart, yEnd
                         Draw line: x - 0.1, yMed, x + 0.1, yMed
@@ -623,9 +629,11 @@ procedure drawArrows
 endproc
 
 procedure drawMeans
-    for f to numFormants
-        @legend: "'f'81", "{1,1,1}", "F'f' mean", pi^0.5 * bulletSize / 4
-    endfor
+    if legendHasFormants
+        for f to numFormants
+            @legend: "'f'81", "{1,1,1}", "F'f' mean", pi^0.5 * bulletSize / 4
+        endfor
+    endif
     for o to outerLevels
         curColour$ = oColour$[o,3]
         for i to innerLevels
@@ -634,11 +642,13 @@ procedure drawMeans
                 curMeanX = i
                 for f to numFormants
                     curMeanF = meanFinPlot[o,i,f]
-                    c = (f/2 = round(f/2))
+                    c = (f/2 = round(f/2)) * 0.09
+                    curColr$ = oColour$[o, 3]
+                    @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
                         @drawOblong:
                         ... curMeanX, curMeanF,
                         ... pi^0.5 * bulletSize / 1.1, pi^0.5 * bulletSize / 4,
-                        ... oColour$[o, 5 - c * 2], f, 8, 1
+                        ... curColr$, f, 8, 1
                 endfor
             endif
         endfor
@@ -646,9 +656,11 @@ procedure drawMeans
 endproc
 
 procedure drawMedians
-    for f to numFormants
-        @legend: "'f'81", "{1,1,1}", "F'f' med.", pi^0.5 * bulletSize / 4
-    endfor
+    if legendHasFormants
+        for f to numFormants
+            @legend: "'f'81", "{1,1,1}", "F'f' med.", pi^0.5 * bulletSize / 4
+        endfor
+    endif
     for o to outerLevels
         curColour$ = oColour$[o,3]
         for i to innerLevels
@@ -657,10 +669,14 @@ procedure drawMedians
                 curMedX = i
                 for f to numFormants
                     curMedF = medFinPlot[o,i,f]
+                    curColr$ = oColour$[o, 3]
+                    @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
+                    curColr# = 'curColr$' - c
+                    curColr$ = "'curColr#''"
                         @drawOblong:
                         ... curMedX, curMedF,
                         ... pi^0.5 * bulletSize / 1.1, pi^0.5 * bulletSize / 4,
-                        ... oColour$[o, 3], f, 8, 1
+                        ... curColr$, f, 8, 1
 
                 endfor
             endif
@@ -782,6 +798,7 @@ procedure createLadVars: .address$
     appendFileLine: .address$, "showIQR", tab$, 1
     appendFileLine: .address$, "showTail", tab$, 1
     appendFileLine: .address$, "drawArrows", tab$, 1
+    appendFileLine: .address$, "legendHasFormants", tab$, 1
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "saveName$", tab$, "LadFormantPlot.png"
 
