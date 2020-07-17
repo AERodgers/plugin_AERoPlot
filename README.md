@@ -1,4 +1,4 @@
-# AERoPlot - a Praat plug-in for plotting data elegantly
+# AERoPlot - a Praat plug-in for plotting data
 
 AERoPlot allows you to generate elegant plots from data in Praat.
 
