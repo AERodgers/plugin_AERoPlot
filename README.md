@@ -11,12 +11,13 @@ Then:
 
     ([Click on this link](http://www.fon.hum.uva.nl/praat/manual/preferences_directory.html) for guidelines on how to locate this directory on your computer.)
 
-Once you have installed the plugin, you can access it from **New** > **graphic...** the objects window.
+Once you have installed the plugin, you can access it from **New** > **graphic...** in the objects window.
 
 There are currently four plot types:
 1. F1-F2 plots
 2. Formant plots for showing 2+ formants (called "Ladefoged plots" here)
 3. Formants-over-times, similar to the Ladefoged plots, but with time on the x axis.
+4. C3P-ograms, which plot F0 contours along with a second parameter indicated by line size and colour intensity (CPP, H2-H1 of the differentiate glottal source...)
 
 By default, images are saved to a folder on your desktop called "AERoPlot_Images"
 
