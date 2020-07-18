@@ -1,5 +1,6 @@
 # General Functions
 # =================
+  genFnBankVersion$ = "1.0.1.0"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
@@ -152,6 +153,14 @@ endproc
 
 procedure writeVars: .dir$, .file$
     # Writes list of variables to TSV .file$ (headers, "variable, "value")
+
+    if variableExists("sorting")
+        sorting = 1
+    endif
+    if variableExists("changeAddColSch")
+        changeAddColSch = 0
+    endif
+
     .prefix$ = left$(.file$, rindex(.file$, ".") - 1)
     .vars = Read Table from tab-separated file: .dir$ + .file$
     for i to '.prefix$'NumVars
@@ -180,8 +189,8 @@ procedure getFactors: .table, .outputVarRoot$
     for i to '.outputVarRoot$'Factors
         '.outputVarRoot$'Factor$[i] = Get column label: i
     endfor
-endproc
 
+endproc
 procedure summariseFactor: .df, .factor$, .rt$
     # Treats table as dataframe, with column headers as factors, and
     # and each unique column entry as a level.
@@ -193,7 +202,11 @@ procedure summariseFactor: .df, .factor$, .rt$
     # Check column exists
     .factor_exists = Get column index: .factor$
     if not .factor_exists
-        exitScript: "Factor (column heading) not found."
+        exitScript: "Factor (column heading) not found in..." + newline$ +
+        ... newline$ + "summariseFactor:" +
+        ... newline$ + tab$ + ".df = " + string$(.df) +
+        ... newline$ + tab$ + ".factor$ = " + """'.factor$'""" +
+        ... newline$ + tab$ + ".rt$ =  " + """'.rt$'"""
     endif
 
     #correct name of output array
@@ -207,51 +220,22 @@ procedure summariseFactor: .df, .factor$, .rt$
     .levelCount$ = replace$(.rt$, "$", "Count", 1)
     .rt$ = replace$(.rt$, "$", "Level$", 1)
 
-    .num_rows = Get number of rows
-    '.levels$' = 1
+    .numRows = Get number of rows
+    '.levels$' = 0
     '.rt$'[1] = Get value: 1, .factor$
 
-    for .i to .num_rows
-        .cur_string$ = Get value: .i, .factor$
-        .string_is_new = 1
-        for j to '.levels$'
-            if .cur_string$ = '.rt$'[j]
-                .string_is_new = 0
-            endif
-        endfor
-        if .string_is_new
-            '.levels$' += 1
-            '.rt$'['.levels$'] = .cur_string$
-        endif
-    endfor
-
-    # look for number of entries for each unique entry value
-    for .i to '.levels$'
-
-        #find first entry for current unique entry value
-        .curRow = Search column: .factor$, '.rt$'[.i]
-
-        # populate first element in each array
-        '.levelCount$'[.i] = 1
-        .curStimMetre$ = '.rt$'[.i]
-
-        # create "done" flag to end array (i.e. end if the last entry was not
-        # one of the unique entries or if there are no more table rows)
-        .done = (.curRow >= .num_rows) or (.curStimMetre$ != '.rt$'[.i])
-
-        # search the table until there done
-        while not .done
-            .curRow += 1
-            if .curRow < .num_rows
-                .curStimMetre$ = Get value: .curRow, .factor$
-                if .curStimMetre$ = '.rt$'[.i]
-                    '.levelCount$'[.i] += 1
-                endif
-            endif
-            .done = (.curRow >= .num_rows) or (.curStimMetre$ != '.rt$'[.i])
-        endwhile
-
-    endfor
+    .firstInst = 1
+    .levels = 0
+    while .firstInst <= .numRows
+        '.levels$' += 1
+        '.rt$'['.levels$'] = Get value: .firstInst, .factor$
+        Reflect rows
+        .lastInst = Search column: .factor$, '.rt$'['.levels$']
+        .lastInst = ((.numRows + 1) - .lastInst)
+        Reflect rows
+        .levelCount['.levels$'] = .lastInst - (.firstInst - 1)
+        .firstInst = .lastInst + 1
+    endwhile
 
     #remove the temp table
     Remove
@@ -845,34 +829,35 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
     endif
 
 
-    @readInColPal: .dir$, .colrPalFileVar$, .colourPalVar$
+    @readInColPal: .dir$, "current.palette", .colourPalVar$
 
     # call extra colour menus
     if changeAddColSch
         @changeAddColSch: .dir$, .colrPalFileVar$
-        @readInColPal: .dir$,  .colrPalFileVar$, .colourPalVar$
+        @readInColPal: .dir$, "current.palette", .colourPalVar$
     endif
 
     if makeNewColSeq
         @makeNewColSeq: "'.colourPalVar$'Name$",
-            ... "'.colourPalVar$'Vector$",
-            ... '.colourPalVar$'Size,
-            ... .dir$,
-            ... '.colrPalFileVar$'
-        @readInColPal: .dir$, .colrPalFileVar$, .colourPalVar$
+        ... "'.colourPalVar$'Vector$",
+        ... '.colourPalVar$'Size,
+        ... .dir$,
+        ... '.colrPalFileVar$'
+        @readInColPal: .dir$, "current.palette", .colourPalVar$
     endif
 
     if maxColDiff
         @seqColrByDist: "../data/palettes/",
-            ... .colrPalFileVar$,
-            ... colrAdj#,
-            ... "curPalette"
+        ... .colrPalFileVar$,
+        ... colrAdj#,
+        ... "curPalette"
     endif
 
     if sortByBrightness
-        @sortByBrightness: curPaletteSize,
-                       ... "curPaletteVector$",
-                       ... "curPaletteName$"
+        @sortByBrightness: .dir$,
+        ... curPaletteSize,
+        ... "curPaletteVector$",
+         ... "curPaletteName$"
     endif
 
     @matchCol2Level: .table,
@@ -881,7 +866,7 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
         ... "outer"
 endproc
 
-procedure sortByBrightness: .size, .vectorV$, .nameV$
+procedure sortByBrightness: .dir$, .size, .vectorV$, .nameV$
     # sorts a given colour palette from darkest to brightest colour
     .tempTable = Create Table with column names:
             ... "temp", .size, "index vector name brightness"
@@ -895,12 +880,22 @@ procedure sortByBrightness: .size, .vectorV$, .nameV$
                        ... mean(.curVector# * colrAdj#)
     endfor
     Sort rows: "brightness"
+     .newNames$ = ""
     for .i to  .size
         '.nameV$'[.i] = Get value: .i, "name"
          '.vectorV$'[.i] = Get value: .i, "vector"
          .index[.i] = Get value: .i, "index"
+         .newNames$ = .newNames$ + '.nameV$'[.i] + ","
     endfor
+    .newNames$ = left$(.newNames$, length(.newNames$) - 1)
     Remove
+
+    @encodeCB_JS_RGB:
+    ... .vectorV$, .size, "sortByBrightness.newJS$"
+
+    writeFileLine: .dir$ + "current.palette", .newJS$
+    appendFileLine: .dir$ + "current.palette", .newNames$
+
 endproc
 
 procedure unsortByBrightness: .size, .vectorV$, .nameV$
@@ -930,71 +925,84 @@ procedure changeAddColSch: .dir$, .fileVar$
     .listOfPalettes =  Create Strings as file list: "Plts", .dir$ + "*.palette"
     .numPalettes = Get number of strings
     .colScheme = .numPalettes + 1
-
     for .i to .numPalettes
         .palette$[.i] = Get string: .i
         .palette$[.i] = replace$(.palette$[.i], ".palette", "", 0)
-        appendInfoLine: .palette$[.i], tab$, .curColrPalName$
         if .palette$[.i] = .curColrPalName$
             .colScheme = .i
         endif
     endfor
-
     removeObject: .listOfPalettes
 
-    # vv--This is a hack to duplicate Info Window and Dialogue Form contents.--v
-    .intro$[1] = "writeInfoLine: ""CHANGE OR ADD DEFAULT COLOUR SCHEME"" + " +
-             ... "newline$ + ""==================================="""
-    .intro$[2] = "beginPause: ""Add or Change colour scheme"""
-    .abbr$[1] = "appendInfoLine:"
-    .abbr$[2] = "comment:"
 
-    for .i to 2
-        .start$ = .intro$[.i]
-        .l$ = .abbr$[.i]
-    '.start$'
-    '.l$' "Choose an available scheme from the ""Colour scheme"" menu."
-    '.l$' "Alternatively, select ""New colour scheme"" and follow these steps:"
-    '.l$' tab$ +  "1. Visit colorbrewer2.org."
-    '.l$' tab$ + "2. Choose a colour scheme."
-    '.l$' tab$ + "3. Select ""Export""."
-    '.l$' tab$ + "4. Change ""HEX"" option to ""RGB""."
-    '.l$' tab$ + "5. Copy all the text from the ""JavaScript"" box."
-    '.l$' tab$ + "6. Paste it in the ""JS array"" dialogue box below."
-    '.l$'  tab$ + "7. List each colour name in order in the ""Colour names"" "
-    '.l$'  tab$ + "   dialogue box. Separate each name with a comma."
-    '.l$'  tab$ + "8. Give the scheme a single-word name in the ""Name"" box."
-    endfor
-    # ^^-----------------------------------------------------------------------^
-    comment: ""
-    optionMenu: "Colour scheme", .colScheme
-        for .i to .numPalettes
-            option: .palette$[.i]
-        endfor
-        option: "New colour scheme"
+    al$ = "appendInfoLine: "
+    writeInfoLine: "CHANGE OR ADD DEFAULT COLOUR SCHEME"
+    'al$' "==================================="
+    'al$' "Choose an available scheme from the ""Colour scheme"" menu."
+    'al$' "Alternatively, select ""New colour scheme"" and:"
+    'al$' tab$ +  "1. Visit colorbrewer2.org."
+    'al$' tab$ + "2. Choose a colour scheme."
+    'al$' tab$ + "3. Select ""Export""."
+    'al$' tab$ + "4. Change the ""HEX"" option to ""RGB""."
+    'al$' tab$ + "5. Copy all the text from the ""JavaScript"" box."
+    'al$' tab$ + "6. Paste it in the ""JS array"" dialogue box below."
+    'al$' tab$ + "7. List each colour name in order, with a comma"
+    'al$' tab$ + "   between each name, in the ""Colour names"" box."
+    'al$' tab$ + "8. Give the scheme a name in the ""Scheme name"" box."
 
-        comment: "New colour scheme parameters"
-        word: "JS array", .curColrStr$
-        sentence: "Colour names", .curColrNameArray$
-        word: "Name", .curColrPalName$
-    myChoice = endPause: "Exit", "Continue", 2, 1
-    .colScheme = colour_scheme
-    writeInfo: ""
+    .comment$ = ""
+    .done = 0
+    while !.done
+        beginPause: "Add or Change colour scheme"
+        comment: .comment$
+        optionMenu: "Colour scheme", .colScheme
+            for .i to .numPalettes
+                option: .palette$[.i]
+            endfor
+            option: "New colour scheme"
 
-    if myChoice = 1
-        if variableExists("table")
-            removeObject: table
+            comment: "New colour scheme parameters"
+            word: "JS array", .curColrStr$
+            sentence: "Colour names", .curColrNameArray$
+            sentence: "Scheme name", .curColrPalName$
+        myChoice = endPause: "Exit", "Continue", 2, 1
+        .colScheme = colour_scheme
+
+
+        if myChoice = 1
+            if variableExists("table")
+                removeObject: table
+            endif
+            exit
         endif
-        exit
-    endif
-    if  jS_array$ = "" or colour_names$ = "" or .colScheme <= .numPalettes
-        .colScheme = (.colScheme - 1) * (.colScheme <= .numPalettes) + 1
-        '.fileVar$' = .palette$[.colScheme] + ".palette"
-    else
-        '.fileVar$' = name$  + ".palette"
-        writeFileLine: .dir$ + '.fileVar$', jS_array$
-        appendFileLine: .dir$ + '.fileVar$', colour_names$
-    endif
+
+        .name$ = replace_regex$(
+        ... replace_regex$(scheme_name$,  "[^A-Za-z0-9]", "_", 0),
+        ...  "^.", "\l&", 1)
+
+        if .colScheme < .numPalettes
+            @readInColPal:
+            ... .dir$,
+            ... .palette$[.colScheme] + ".palette",
+            ... replace$(.fileVar$, ".palette", "", 1)
+            .done = 1
+            jS_array$ = readInColPal.jsArray$
+            colour_names$ = readInColPal.jsColourNames$
+        elsif !(jS_array$ = "" or colour_names$ = "" or .name$ = "") and
+            ... !fileReadable("'.dir$''.name$'.palette")
+            writeFileLine: .dir$ + .name$ + ".palette", jS_array$
+            appendFileLine: .dir$ + .name$ + ".palette", colour_names$
+            .done = 1
+        elsif fileReadable("'.dir$''.name$'.palette")
+            .comment$ = "This name is taken. Please CHOOSE ANOTHER NAME."
+        else
+            .comment$ = "EITHER enter new colour scheme parameters OR " +
+            ... "choose a pre-existing one."
+        endif
+    endwhile
+    writeInfo: ""
+    writeFileLine: .dir$ + "current.palette", jS_array$
+    appendFileLine: .dir$ + "current.palette", colour_names$
 endproc
 
 procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
@@ -1068,30 +1076,32 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
         endif
     endfor
 
-    @encodeCB_JS_RGB: "'.colourVector$'", .arraySize, "makeNewColSeq.vectorString$"
-    writeFileLine:  .dir$ + .fileName$, .vectorString$
-    appendFileLine: .dir$ + .fileName$, .colourString$
+    @encodeCB_JS_RGB:
+    ... .colourVector$,
+    ... .arraySize,
+    ... "makeNewColSeq.vectorString$"
+    writeFileLine: .dir$ + "current.palette", .vectorString$
+    appendFileLine: .dir$ + "current.palette", .colourString$
 endproc
 
-procedure readInColPal: .dir$, .colourPalette$, .root$
+procedure readInColPal: .dir$, .file$, .root$
     # correct variable names
     .root$ = replace$(.root$, "$", "", 0)
     # Get JS RGB colour array string code
-    jsString = Read Strings from raw text file:
-        ... .dir$ + '.colourPalette$'
-    jsArray$ = Get string: 1
-    jsColourNames$ = Get string: 2
+    .jsString = Read Strings from raw text file:
+        ... .dir$ + .file$
+    .jsArray$ = Get string: 1
+    .jsColourNames$ = Get string: 2
     Remove
-    @decodeCB_JS_RGB: jsArray$, "'.root$'Size", "'.root$'Vector$"
-    @csvLine2Array: jsColourNames$, "numColourNames", "'.root$'Name$"
+    @decodeCB_JS_RGB: .jsArray$, "'.root$'Size", "'.root$'Vector$"
+    @csvLine2Array: .jsColourNames$, "numColourNames", "'.root$'Name$"
 
     if '.root$'Size != numColourNames
-        deleteFile: .dir$ + '.colourPalette$' + ".palette"
         if variableExists("table")
             removeObject: table
         endif
-        exitScript: "Current Colour Palette is corrupted." + newline$ +
-            ... "Purging it from memory." + newline$
+        deleteFile: .dir$ + .file$
+        exitScript: "Colour Palette is corrupted." + newline$
     endif
 endproc
 
@@ -1237,16 +1247,25 @@ procedure seqColrByDist: .dir$, .paletteFileVar$, .weighting#, .outputRoot$
     # + 'Vector$'[], + 'Size') which sequence the input palette in such a way
     # that each colour in the sequence is maximally perceptually different from
     # the all the preceding colours.
-    @readInColPal: .dir$, .paletteFileVar$, "newSeq$"
+    @readInColPal: .dir$, "current.palette", "newSeq$"
     @colArr2Tbl: newSeqSize, "newSeqVector$"
     @calcEdges: colArr2Tbl.table, .weighting#, "R,G,B"
     @calcLongWalk: calcEdges.table
 
     '.outputRoot$'Size = newSeqSize
+    .newNames$ = ""
     for .i to newSeqSize
         '.outputRoot$'Vector$[.i] = newSeqVector$[.clr[.i]]
         '.outputRoot$'Name$[.i] = newSeqName$[.clr[.i]]
+        .newNames$ = .newNames$ + '.outputRoot$'Name$[.i] + ","
     endfor
+    .newNames$ = left$(.newNames$, length(.newNames$) - 1)
+
+    @encodeCB_JS_RGB:
+    ... "'.outputRoot$'Vector$", newSeqSize, "seqColrByDist.newJS$"
+
+    writeFileLine: .dir$ + "current.palette", .newJS$
+    appendFileLine: .dir$ + "current.palette", .newNames$
 
     removeObject: colArr2Tbl.table
     removeObject: calcEdges.table
@@ -1282,82 +1301,93 @@ procedure resetDrawSpace: .fontSize
     Helvetica
 endproc
 
-procedure getOutputScales: .table, .cols$, .fMin, .fMax, .fInc, .outUnit,
-                       ... .varRoot$
-    # .outUnit = 1 --> [no change]
-    # .outUnit = 2 --> [Hz -> Bark]
-    # .outUnit = 3 --> [linear -> log]
-    # Fn designed originally for frequency warping, 1 and 3 will work with
-    # any unit of measurement.
+procedure getOutputScales:
+    ... .table, .cols$,
+    ... .fMin, .fMax, .fInc,
+    ... .outUnit, .useKHz, .varRoot$
+    # .outUnit = 1 --> [output on linear scale]
+    # .outUnit = 2 --> [output on bark scale]
+    # .outUnit = 3 --> [output on logarithmic scale]
+    # value to be converted does not need to be a frequency
+
+    # convert min, max and increment to appropriate scale
+
     @csvLine2Array: .cols$,
-        ... "getOutputScales.numCols",
-        ... "getOutputScales.colArray$"
+    ... "getOutputScales.numCols",
+    ... "getOutputScales.colArray$"
+    '.varRoot$'Min = .fMin
+    '.varRoot$'Max = .fMax
+    '.varRoot$'Inc = .fInc
+    if .outUnit = 2
+        @hz2Bark: .varRoot$ + "Max", ""
+        @hz2Bark: .varRoot$ + "Min", ""
+        @hz2Bark: .varRoot$ + "Inc", ""
+    elsif .outUnit = 3
+        # avoid undefined value ln(0)
+        if !.fMax
+            .fMax = 1
+        endif
+        if !.fMin
+            .fMin = 1
+        endif
+        '.varRoot$'Min = 10e10
+        '.varRoot$'Max = ln(.fMax)
+        '.varRoot$'Inc = ln(.fInc)
+    endif
 
     for .curCol to .numCols
         .curCol$ = .colArray$[.curCol]
+        # create Draw value column if it doesn't exist
         selectObject: .table
-        # assume input and output are the same
         .colExists = Get column index: "'.curCol$'DrawValue"
         if ! .colExists
             Append column: "'.curCol$'DrawValue"
-        endif
-        Formula: "'.curCol$'DrawValue", "self[.curCol$]"
-        '.varRoot$'Min = .fMin
-        '.varRoot$'Max = .fMax
-        '.varRoot$'Inc = .fInc
-
-        if .outUnit = 2
-            # get bark scale output for hertz input
-            @hz2Bark: "getOutputScales.table", "'.curCol$'DrawValue"
-            @hz2Bark: .varRoot$ + "Max", ""
-            @hz2Bark: .varRoot$ + "Min", ""
-            @hz2Bark: .varRoot$ + "Inc", ""
-
-        elsif .outUnit = 3
-            # get LogHz output for hertz input
-
-            # avoid undefined value ln(0)
-            if !ln(.fMin)
-                ln(.fMin) = 1
+            Formula: "'.curCol$'DrawValue", "self[.curCol$]"
+            if .outUnit = 2
+                @hz2Bark: "getOutputScales.table", "'.curCol$'DrawValue"
+            elsif .outUnit = 3
+                Formula: "'.curCol$'DrawValue", "ln(self[.curCol$])"
             endif
-            if !ln(.fMax)
-                ln(.fMax) = 1
-            endif
-
-            selectObject: .table
-            Formula: "'.curCol$'DrawValue", "ln(self[.curCol$])"
-            Formula: "'.curCol$'DrawValue", "ln(self[.curCol$])"
-            '.varRoot$'Min = ln(.fMin)
-            '.varRoot$'Max = ln(.fMax)
-            '.varRoot$'Inc = ln(.fInc)
-
-            # If aim was to calculate  increments for input = output = log(Hz),
-            # the increment would be as follows:
-            # (ln(.fMax) - ln(.fMin) - 1) / floor((.fMax - .fMin) / .fInc + 1)
         endif
 
-        # Assume reference draw is original input...
+        # get min val for log output
+        if .outUnit = 3
+            .curMin = Get minimum: "'.curCol$'DrawValue"
+            '.varRoot$'Min =
+            ... (.curMin < '.varRoot$'Min) * .curMin +
+            ... (.curMin >= '.varRoot$'Min) * '.varRoot$'Min
+        endif
+
+    endfor
+
+    '.varRoot$'Min =
+    ... '.varRoot$'Min * (.outUnit != 3) +
+    ... floor (('.varRoot$'Min) * (.outUnit == 3))
+
+    for .curCol to .numCols
+        .curCol$ = .colArray$[.curCol]
         .lowestDraw = ceiling(.fMin /.fInc) * .fInc
-        .highestDraw = floor(.fMax /.fInc) * .fInc
         .fCur = .lowestDraw
 
         '.varRoot$'Lines = 0
 
         while .fCur <= .fMax
             '.varRoot$'Lines += 1
-            '.varRoot$'AxisVal['.varRoot$'Lines] = .fCur
+            '.varRoot$'AxisVal['.varRoot$'Lines] =
+            ... .fCur / (.useKHz*1000 + (!.useKHz))
             # if output scaling is different from input values
 
             if .outUnit = 2
                 # Herz --> Bark
-
                 @hz2Bark: string$(.fCur), ""
                 '.varRoot$'DrawVal['.varRoot$'Lines] = hz2Bark.ans
+
             elsif .outUnit = 3
                 # Herz --> Hertz (Log)
                 '.varRoot$'DrawVal['.varRoot$'Lines] = ln(.fCur)
+
             else
-                # assume output = input
+                # output = input
                 '.varRoot$'DrawVal['.varRoot$'Lines] = .fCur
             endif
             .fCur += .fInc
@@ -1578,12 +1608,17 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     # calculate box dimensions
     Axes: .xLeft, .xRight, .yBottom, .yTop
     .text_width = Text width (world coordinates): .legendWidth$
-    .x_unit = Horizontal mm to world coordinates: 4
+    .sign = (((.xLeft > .xRight) == (.yBottom < .yTop)) - 0.5) * 2
+    .x_unit = Text width (world coordinates): "W"
     .x_start = .xLeft + .x_unit * 0.25
     .x_width = 3.5 * .x_unit + .text_width
     .x_end = .xLeft + .x_width
     .x_buffer = Horizontal mm to world coordinates: .bufferZone
-    .y_unit  = Vertical mm to world coordinates: 4
+    .y_unit = Text width (world coordinates): "W"
+    .y_unit = Horizontal world coordinates to mm: .y_unit
+    .y_unit = Vertical mm to world coordinates: .y_unit
+
+    .y_unit = .y_unit
     .y_start = .yBottom + .y_unit * 0.25
     .y_height = .y_unit * (legend.items + 0.6)
     .y_end = .yBottom + .y_height
@@ -1658,37 +1693,29 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     .y_end = .vertE[.least#[2]]
 
      if .least / .total > .threshold
-        .outerX = Horizontal mm to world coordinates: (19)
-        .outerY = Vertical mm to world coordinates: (11)
-        # shift legend outside the Window (left or right)
-        # if part of legend will still be in window, lower legend
+        Axes: .xLeft, .xRight, .yBottom, .yTop
+        .outerX = Horizontal mm to world coordinates: .fontSize * 1.25
+        .outerY = Vertical mm to world coordinates: .fontSize * 0.75
 
         if .xRight > .xLeft
-
-            if .least#[1] = 1
-                .x_start = .xLeft - (.outerX - (.x_unit / 2))
-                .x_end = .x_start + .x_width
-            else
-                .x_end = .xRight + (.outerX - (.x_unit / 2))
-                .x_start = .x_end - .x_width
-            endif
-
-        elsif .least#[1] = 2
-
-            .x_start = .xLeft - (.outerX - (.x_unit / 2))
-            .x_end = .x_start + .x_width
+            .x_end = .xRight + .outerX
+            .x_start = .x_end - .x_width
         else
-
-            .x_start = .xRight - (.outerX - (.x_unit / 2))
-            .x_end = .x_start - .x_width
-
+            .x_start = .xLeft - .outerX
+            .x_end = .x_start + .x_width
         endif
 
-        .y_start = .yBottom - .outerY * (.least#[2] = 2)
-        .y_end = .y_start + .y_height
+        if .yTop > .yBottom
+            .y_end = .yTop + .outerY / 2
+            .y_start = .y_end - .y_height
+        else
+            .y_start = .yBottom - .outerY
+            .y_end = .y_start + .y_height
+        endif
      endif
 
     # Draw main legend only if percentage of data points hidden < threshold
+    # or
     if .least / .total <= .threshold or .compromise
 
         ### Draw box and frame
