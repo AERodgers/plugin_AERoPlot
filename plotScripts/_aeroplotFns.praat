@@ -120,19 +120,13 @@ endproc
 
 # file and folder functions
 procedure checkDirectoryStructure
-    if !fileReadable("../data/")
-        createDirectory: "../data/"
-    endif
-    if !fileReadable("../data/archive")
-        createDirectory: "../data/archive"
-    endif
-    if !fileReadable("../data/last")
-        createDirectory: "../data/last"
-    endif
-    if !fileReadable("../data/vars")
-        createDirectory: "../data/vars"
-    endif
-    if !fileReadable("../data/palettes")
+
+    createDirectory: "../data/"
+    createDirectory: "../data/archive"
+    createDirectory: "../data/last"
+    createDirectory: "../data/vars"
+
+    if !fileReadable("../data/palettes/current.palette")
         createDirectory: "../data/palettes"
         .palName$[1] = "CBQualativeSet1"
         .js$[1] =
@@ -174,9 +168,30 @@ procedure checkDirectoryStructure
     endif
 endproc
 
-# UI Functions
-procedure outputUI_generic
+# UI and variable Functions
+procedure addShared_UI_1
+    if inputUnits = 1
+        optionMenu: "Output units", outputUnits
+            option: "Hertz"
+            option: "Hertz (displayed re bark scale)"
+            option: "Hertz (displayed logarithmically)"
+            option: "kHz"
+            option: "kHz (displayed re bark scale)"
+            option: "kHz (displayed logarithmically)"
+    else
+        output_units = 7
+    endif
+endproc
+
+procedure addShared_UI_2
     boolean: "Show legend", showLegend
+    optionMenu: "Base font size", (fontM - 8) / 2
+        option: "8"
+        option: "10"
+        option: "12"
+        option: "14"
+        option: "16"
+        option: "18"
 
     comment: "Image saving"
     boolean: "Very high quality", quality
@@ -186,44 +201,59 @@ procedure outputUI_generic
     comment: "Extra colour management options"
     boolean: "Add or change colour scheme", changeAddColSch
 
-    optionMenu: "Colour sequence", sorting
-        option: "Use default sequence"
-        option: "Sort by brightness"
-        option: "Sequence by maximal perceptual difference"
-        option: "Change default colour sequence"
-        option: "Match colours with levels in upcoming plot"
+    optionMenu: "Update order of current colour scheme", sorting
+        option: "No change"
+        option: "Re-sort by brightness"
+        option: "Re-sort by maximal perceptual difference"
+        option: "Manually re-sort"
+        option: "Match levels to colour in next plot only"
 endproc
 
-procedure processOutputUI_generic
+procedure processShared_UIs
+    # process Shared_UI_1
+    outputUnits = output_units
+    # Logical operators are used here in place of if-else statements.
+    useKHz = inputUnits == 1 and  outputUnits > 3
+    doHz2Bark = abs((outputUnits * 2 - 7) / 3) == 1
+    doHz2Log = abs((outputUnits * 2 - 7) / 3) == 1
+    outScaleUnit =
+        ... (round((outputUnits - 1) / 3) == (outputUnits - 1) / 3) +
+        ... (round((outputUnits + 1) / 3) == (outputUnits + 1) / 3) * 2 +
+        ... (round(outputUnits / 3) == (outputUnits / 3)) * 3
+    # outScaleUnit is the 6th argument to the procedure @getOutputScales,
+    # where 1 -> output is linear, 2-> output is (k)Hz plotted in Bark scale,
+    # 3 -> output is (k)Hz plotted logarithmically.
+    # process Shared_UI_2
     showLegend = show_legend
-    sorting = colour_sequence
+    fontS = 6 + base_font_size * 2
+    fontM = 8 + base_font_size * 2
+    fontL = 12 + base_font_size * 2
+    sorting = update_order_of_current_colour_scheme
     sortByBrightness = sorting = 2
     maxColDiff = sorting = 3
     makeNewColSeq = sorting = 4
     altColrMatch = sorting = 5
     sorting = (sorting <= 2) * sorting + (sorting > 2)
-
     saveDirectory$ = save_directory$
     saveName$ = save_name$
     quality = very_high_quality
     changeAddColSch = add_or_change_colour_scheme
 endproc
 
-procedure appendGenericVars: .address$
+procedure appendSharedVars: .address$
     saveDirectory$ = homeDirectory$ + "/Desktop/AERoPlot_Images"
-    appendFileLine: .address$, "fontXL", tab$, 10
-    appendFileLine: .address$, "fontM", tab$, 12
-    appendFileLine: .address$, "fontL", tab$, 14
+    fontM = 14
+    appendFileLine: .address$, "fontM", tab$, fontM
+    appendFileLine: .address$, "fontS", tab$, fontM - 2
+    appendFileLine: .address$, "fontL", tab$, fontM + 4
     appendFileLine: .address$, "bulletSize", tab$, 22
     appendFileLine: .address$, "shading", tab$, 0.15
     appendFileLine: .address$, "colrAdj#", tab$, "{0.299,0.587,0.114}"
-
     appendFileLine: .address$, "tableFormat", tab$, 1
     appendFileLine: .address$, "colrPalFile$", tab$,
-    ... "CBQualativeSet1.palette"
+    ... "current.palette"
     appendFileLine: .address$, "legBlockTolerance", tab$, 0
     appendFileLine: .address$, "bufferZone", tab$, 2
-
     appendFileLine: .address$, "showLegend", tab$, 1
     appendFileLine: .address$, "quality", tab$, 0
     appendFileLine: .address$, "saveDirectory$", tab$, saveDirectory$
@@ -231,4 +261,14 @@ procedure appendGenericVars: .address$
     appendFileLine: .address$, "sorting", tab$, 1
     appendFileLine: .address$, "lightLine$", tab$, "{0.8, 0.8, 0.8}"
     appendFileLine: .address$, "darkLine$", tab$, "{0.2, 0.2, 0.2}"
+endproc
+
+procedure getFreqAxisNames
+    outputUnits$[1] = "Hertz"
+    outputUnits$[2] = "Hertz (bark)"
+    outputUnits$[3] = "Hertz (logarithmic)"
+    outputUnits$[4] = "kHz"
+    outputUnits$[5] = "kHz (bark)"
+    outputUnits$[6] = "kHz (logarithmic)"
+    outputUnits$[7] = "Bark scale"
 endproc
