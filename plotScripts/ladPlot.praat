@@ -16,7 +16,7 @@
 # ref. Ladefoged, P. and Johnson. K., A course in Pnonetics [6th ed.],
 #      Boston MA: Wadsworth Cengage
 
-curLadVersion$ = "1.0.0.1"
+curLadVersion$ = "1.0.0.2"
 @checkPraatVersion
 
 # Main script loop
@@ -29,7 +29,8 @@ while keepGoing
     @processInputUI
 
     @doOutputUI
-    @setupColours: "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
+    @setupColours:
+    ... "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
 
     @doLadPlot
 
@@ -48,16 +49,9 @@ while keepGoing
     ellipsisSDs += 1
     tokenMarking += 1
     showAves += 1
-
-    # forget optional menu flags.
-    changeAddColSch = 0
-    makeNewColSeq = 0
-    altColrMatch = 0
-
+    outputUnits = output_units
     @writeVars: "../data/vars/", "ladPlot.var"
 endwhile
-
-
 
 # UI and input processing procedures
 procedure doInputUI
@@ -67,8 +61,8 @@ procedure doInputUI
         beginPause: "Ladefoged-style Formant Plot: input settings"
             sentence: "Table address or object number", tableID$
             optionMenu: "Table format", tableFormat
-                option: "tab-delimited file"
-                option: "CSV file"
+            option: "tab-delimited file"
+            option: "CSV file"
 
             comment:  "Grouping Factors / Column Headers"
             comment:  additionalComment$
@@ -80,8 +74,8 @@ procedure doInputUI
             sentence: "F4 Column",   f4Col$
             comment: "Formant frequency units in table"
             optionMenu: "Input units", inputUnits
-                option: "Hertz"
-                option: "Bark"
+            option: "Hertz"
+            option: "Bark"
 
             boolean: "Use tertiary filters", tertiaryFilters
         myChoice = endPause: "Exit", "Apply", "OK", 2, 1
@@ -132,8 +126,9 @@ procedure doInputUI
     if inputUnits = 1 and prevInputUnit = 2
         maxFreq = 3800
     elsif inputUnits = 2 and prevInputUnit = 1
-       maxFreq = 15.5
+       maxFreq = 18
     endif
+    prevInputUnit = inputUnits
 endproc
 
 procedure processInputUI
@@ -208,18 +203,11 @@ procedure doOutputUI
     beginPause: "Graphical Output Settings: formants over time"
         comment: "Plot basics"
         sentence: "Title", title$
-        if inputUnits = 1
-            optionMenu: "Output units", outputUnits
-                option: "Hertz"
-                option: "Hertz (displayed re bark scale)"
-                option: "Hertz (displayed logarithmically)"
-        else
-            output_Units = 4
-        endif
+        @addShared_UI_1
         optionMenu: "Mark X axis using", xAxisFactor
-            for i to xAxisOptions
-                option: xAxisOption$[i]
-            endfor
+        for i to xAxisOptions
+            option: xAxisOption$[i]
+        endfor
 
         natural: "Maximum frequency (in "
         ... + inputUnits$[inputUnits] + ".)", maxFreq
@@ -227,23 +215,25 @@ procedure doOutputUI
 
         comment: "Plot layers"
         optionMenu: "Most prominent layer", dataPointsOnTop
-            option: "averages bar / box plot"
-            option: "data points"
-        optionMenu: "Averages bar", showAves
-            option: "Hide averages bar"
-            option: "... shows means"
-            option: "... shows median values"
-        optionMenu: "Data points", tokenMarking
-            option: "Hide data points"
-            option: "Show all individual data points"
-            option: "Show outliers only"
-        boolean: "Add time jitter to data points", addJitter
+        option: "averages bar / box plot"
+        option: "data points"
 
+        optionMenu: "Averages bar", showAves
+        option: "Hide averages bar"
+        option: "... shows means"
+        option: "... shows median values"
+
+        optionMenu: "Data points", tokenMarking
+        option: "Hide data points"
+        option: "Show all individual data points"
+        option: "Show outliers only"
+
+        boolean: "Add time jitter to data points", addJitter
         boolean: "Show IQR", showIQR
         boolean: "Show tail", showTail
         boolean: "Show arrows", drawArrows
         boolean: "show formants in legend", legendHasFormants
-        @outputUI_generic
+        @addShared_UI_2
 
         myChoice = endPause: "Exit", "Continue", 2, 1
         if myChoice = 1
@@ -252,7 +242,7 @@ procedure doOutputUI
         endif
 
     # Process generic outoutUI
-    @processOutputUI_generic
+    @processShared_UIs
     # Process Lad plot-specific graphic UI
     plotHeight = interior_plot_height
     maxFreq = maximum_frequency
@@ -263,7 +253,6 @@ procedure doOutputUI
     showIQR = show_IQR
     showTail = show_tail
     drawArrows = show_arrows
-    outputUnits = output_units
     xAxisFactor = mark_X_axis_using
     legendHasFormants = show_formants_in_legend
 endproc
@@ -282,20 +271,21 @@ procedure doLadPlot
     endif
 
     if dataPointsOnTop
+
         if showIQR or showTail
             @drawTailsIQR
         endif
 
-        if showAves = 1
-            @drawMeans
-        elsif showAves = 2
-            @drawMedians
+        if showAves
+            @drawAves
         endif
 
         if tokenMarking
             @drawDataPoints
         endif
+
     else
+
         if tokenMarking
             @drawDataPoints
         endif
@@ -304,14 +294,11 @@ procedure doLadPlot
             @drawTailsIQR
         endif
 
-        if showAves = 1
-            @drawMeans
-        elsif showAves = 2
-            @drawMedians
+        if showAves
+            @drawAves
         endif
 
     endif
-
 
     if showLegend
         yList$ = ""
@@ -355,20 +342,17 @@ endproc
 
 procedure calcLadAxisVals
     # Get calculate major and minor frequency intervals.
-    @getOutputScales: table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
-    ... 0, maxFreq, minorFreqDist, outputUnits, "minorFreq_"
-    @getOutputScales: table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
-    ... 0, maxFreq, majorFreqDist, outputUnits, "majorFreq_"
+    @getOutputScales:
+    ... table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
+    ... 0, maxFreq, minorFreqDist,
+    ... outScaleUnit, useKHz, "minorFreq_"
+    @getOutputScales:
+    ... table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
+    ... 0, maxFreq, majorFreqDist,
+    ... outScaleUnit, useKHz, "majorFreq_"
 
-    minF = 0
-    maxF = maxFreq
-    if outputUnits = 2
-        @hz2Bark: "minF", ""
-        @hz2Bark: "maxF", ""
-    elsif outputUnits = 3
-        minF = 0
-        maxF = ln(maxF)
-    endif
+    minF = minorFreq_Min
+    maxF = majorFreq_Max
 
     # min and max X placeholders
     minX = 0.5
@@ -481,9 +465,11 @@ procedure calcLadPlotLayers
 endproc
 
 # Plot layer procedures
+
 procedure drawLadAxisLayer
     Select inner viewport: left, right, top, bottom + vertAdjust
     Text bottom: "yes", innerFactor$
+
     Select inner viewport: left, right, top, bottom
     Text left: "yes", "Frequency in " + outputUnits$[outputUnits]
 
@@ -509,14 +495,14 @@ procedure drawLadAxisLayer
             Colour: "Black"
             Text: minX, "right",
             ... majorFreq_DrawVal[line], "Half",
-            ... string$(majorFreq_AxisVal[line])
+            ... fixed$(majorFreq_AxisVal[line], useKHz)
         endif
         endfor
     endfor
 
     for x to innerLevels
         Colour: lineColour$[2]
-        Draw line: x - 0.5, 0,
+        Draw line: x - 0.5, minF,
         ... x - 0.5, maxF
     endfor
     xFactor$ = xAxisOption$[xAxisFactor]
@@ -542,53 +528,37 @@ procedure drawTailsIQR
             if possRows.matrix##[o,i]
                 x = i
                 for f to numFormants
+
                     yMed = medFinPlot[o,i,f]
                     yStart = q1FinPlot[o,i,f]
                     yEnd = q3FinPlot[o,i,f]
-                    c = (f/2 = round(f/2))
-                    Colour: "Black"
-                    Line width: 4
-                    if showIQR
-                        Draw rectangle:  x - 0.1, x + 0.1, yStart, yEnd
-                        Draw line: x - 0.1, yMed, x + 0.1, yMed
-                    endif
-                    if showTail
-                        tEnd = tailEnd[o,i,f]
-                        tStart = tailStart[o,i,f]
+
+                    curColr$[1] = "Black"
+                    c = (f/2 == round(f/2) - 0.5) * 0.15
+                    @modifyColVectr: oColour$[o, 3], "curColr$[2]", "+'c'"
+                    for bgFg to 2
+                        Colour: curColr$[bgFg]
+                        Line width: 6 - bgFg * 2
+
                         if showIQR
-                            Draw line: x, yEnd, x, tEnd
-                            Draw line: x, yStart, x, tStart
+                            Draw rectangle:  x - 0.1, x + 0.1, yStart, yEnd
                             Draw line: x - 0.1, yMed, x + 0.1, yMed
-                        else
-                            Draw line: x, tStart, x, tEnd
                         endif
-                        Draw line: x - 0.1, tEnd, x + 0.1, tEnd
-                        Draw line: x - 0.1, tStart, x + 0.1, tStart
-                    endif
 
-                    c = (f/2 = round(f/2)) * 0.09
-                    curColr$ = oColour$[o, 3]
-                    @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
-                    Colour: curColr$
-                    Line width: 2
-
-                    if showIQR
-                        Draw rectangle: x - 0.1, x + 0.1, yStart, yEnd
-                        Draw line: x - 0.1, yMed, x + 0.1, yMed
-                    endif
-                    if showTail
-                        if showIQR
-                            Draw line: x, yEnd, x, tEnd
-                            Draw line: x, yStart, x, tStart
-                            Draw line: x - 0.1, yMed, x + 0.1, yMed
-                        else
-                            Draw line: x, tStart, x, tEnd
+                        if showTail
+                            tEnd = tailEnd[o,i,f]
+                            tStart = tailStart[o,i,f]
+                            if showIQR
+                                Draw line: x, yEnd, x, tEnd
+                                Draw line: x, yStart, x, tStart
+                                Draw line: x - 0.1, yMed, x + 0.1, yMed
+                            else
+                                Draw line: x, tStart, x, tEnd
+                            endif
+                            Draw line: x - 0.1, tEnd, x + 0.1, tEnd
+                            Draw line: x - 0.1, tStart, x + 0.1, tStart
                         endif
-                        Draw line: x - 0.1, tEnd, x + 0.1, tEnd
-                        Draw line: x - 0.1, tStart, x + 0.1, tStart
-                    endif
-
-
+                    endfor
                 endfor
             endif
         endfor
@@ -600,18 +570,22 @@ procedure drawArrows
         for i from 2 to innerLevels
             # Only draw plots where plot table exists!
             if possRows.matrix##[o,i]
-                curMedX = i
-                prevMedX = i - 1
+                curAveX = i
+                prevAveX = i - 1
                 for f to numFormants
-                    curMedF = medFinPlot[o,i,f]
-                    prevMedF = medFinPlot[o, i - 1, f]
+                    if showAves = 1
+                        ave$ = "med"
+                    else
+                        ave$ = "mean"
+                    endif
+                    curAveF = 'ave$'FinPlot[o,i,f]
+                    prevAveF = 'ave$'FinPlot[o, i - 1, f]
 
                     gap =  1 - lineRatio
-                    xStart = prevMedX + gap / 3 * (curMedX - prevMedX)
-                    yStart = prevMedF + gap / 3 * (curMedF - prevMedF)
-                    xEnd = curMedX - gap / 3 * (curMedX - prevMedX)
-                    yEnd = curMedF - gap / 3 * (curMedF - prevMedF)
-
+                    xStart = prevAveX + gap / 3 * (curAveX - prevAveX)
+                    xEnd = curAveX - gap / 3 * (curAveX - prevAveX)
+                    yStart = prevAveF + gap / 3 * (curAveF - prevAveF)
+                    yEnd = curAveF - gap / 3 * (curAveF - prevAveF)
 
                     @bgColr: oColour$[o,4], oColour$[o,5], oColour$[o,2],
                     ... colrAdj#, 0.19567
@@ -628,56 +602,34 @@ procedure drawArrows
     endfor
 endproc
 
-procedure drawMeans
+procedure drawAves
     if legendHasFormants
         for f to numFormants
             @legend: "'f'81", "{1,1,1}", "F'f' mean", pi^0.5 * bulletSize / 4
         endfor
     endif
+
+    if  showAves = 1
+        ave$ = "med"
+    else
+        ave$ = "mean"
+    endif
+
     for o to outerLevels
         curColour$ = oColour$[o,3]
         for i to innerLevels
             # Only draw plots where plot table exists!
             if possRows.matrix##[o,i]
-                curMeanX = i
+                curAveX = i
                 for f to numFormants
-                    curMeanF = meanFinPlot[o,i,f]
+                    curAveF = 'ave$'FinPlot[o,i,f]
                     c = (f/2 = round(f/2)) * 0.09
                     curColr$ = oColour$[o, 3]
                     @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
                         @drawOblong:
-                        ... curMeanX, curMeanF,
+                        ... curAveX, curAveF,
                         ... pi^0.5 * bulletSize / 1.1, pi^0.5 * bulletSize / 4,
                         ... curColr$, f, 8, 1
-                endfor
-            endif
-        endfor
-    endfor
-endproc
-
-procedure drawMedians
-    if legendHasFormants
-        for f to numFormants
-            @legend: "'f'81", "{1,1,1}", "F'f' med.", pi^0.5 * bulletSize / 4
-        endfor
-    endif
-    for o to outerLevels
-        curColour$ = oColour$[o,3]
-        for i to innerLevels
-            # Only draw plots where plot table exists!
-            if possRows.matrix##[o,i]
-                curMedX = i
-                for f to numFormants
-                    curMedF = medFinPlot[o,i,f]
-                    curColr$ = oColour$[o, 3]
-                    @modifyColVectr: oColour$[o, 3], "curColr$", "+'c'"
-                    curColr# = 'curColr$' - c
-                    curColr$ = "'curColr#''"
-                        @drawOblong:
-                        ... curMedX, curMedF,
-                        ... pi^0.5 * bulletSize / 1.1, pi^0.5 * bulletSize / 4,
-                        ... curColr$, f, 8, 1
-
                 endfor
             endif
         endfor
@@ -692,6 +644,10 @@ procedure drawDataPoints
         curColour$ = oColour$[o, 3]
         curTCol$ = "x"
         for f to numFormants
+            # draw background outline
+            Append column: "XAdj"
+            Append column: "F'f'Adj"
+
             curFCol$ = f'f'Col$ + "DrawValue"
             # Draw scatter plot
             if mean('curColour$' * colrAdj#) / 1000 < 0.19576
@@ -699,32 +655,19 @@ procedure drawDataPoints
             else
                 Colour:  'curColour$' - 0.5
             endif
-            # draw background outline
-            Append column: "XAdj"
-            Append column: "F'f'Adj"
-            for across from -1 to 1
-                for down from -1 to 1
-                    if across^2 + down^2
-                        curve = 2^0.5 * (across == down) + (across != down)
-                        Formula: "XAdj",
-                        ... "self[curTCol$] + across * xDist * 1.3 / curve"
-                        Formula: "F'f'Adj",
-                        ... "self[curFCol$] + down * yDist * 1.3 / curve"
-                        Scatter plot where (mark):
-                        ... "XAdj", minX, maxX,
-                        ... "F'f'Adj", minF, maxF,
-                        ... 1, "no", "o",
-                        ... "self$[outerFactor$] = outerLevel$[o]"
-                    else
-                    endif
-                endfor
-            endfor
-
-            Colour: curColour$
+            Line width: 4
             Scatter plot where (mark):
             ... curTCol$, minX, maxX,
             ... curFCol$, minF, maxF,
-            ... 1, "no", "o",
+            ... fontM / 12, "no", "o",
+            ... "self$[outerFactor$] = outerLevel$[o]"
+
+            Colour: curColour$
+            Line width: 2
+            Scatter plot where (mark):
+            ... curTCol$, minX, maxX,
+            ... curFCol$, minF, maxF,
+            ... fontM / 12, "no", "o",
             ... "self$[outerFactor$] = outerLevel$[o]"
         endfor
     endfor
@@ -745,9 +688,7 @@ procedure defineVars
     else
         prevLoops = 1
     endif
-
     @checkDirectoryStructure
-
     if !fileReadable("../data/vars/ladPlot.var")
         @createLadVars: "../data/vars/ladPlot.var"
     endif
@@ -756,14 +697,7 @@ procedure defineVars
         @createLadVars: "../data/vars/ladPlot.var"
     endif
     @readVars: "../data/vars/", "ladPlot.var"
-
-
-    # OTHER VARIABLE AND FLAGS
-    # axis array
-    outputUnits$[1] = "Hertz"
-    outputUnits$[2] = "Hertz (bark)"
-    outputUnits$[3] = "Hertz (logarithmic)"
-    outputUnits$[4] = "Bark"
+    @getFreqAxisNames
 endproc
 
 procedure createLadVars: .address$
@@ -802,7 +736,7 @@ procedure createLadVars: .address$
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "saveName$", tab$, "LadFormantPlot.png"
 
-    @appendGenericVars: .address$
+    @appendSharedVars: .address$
 endproc
 
 include _aeroplotFns.praat

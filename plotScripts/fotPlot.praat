@@ -49,6 +49,7 @@ while keepGoing
     changeAddColSch = 0
     makeNewColSeq = 0
     altColrMatch = 0
+    outputUnits = output_units
 
     @writeVars: "../data/vars/", "fotPlot.var"
 endwhile
@@ -61,23 +62,24 @@ procedure doInputUI
         beginPause: "Formants over time plot: input settings"
             sentence: "Table address or object number", tableID$
             optionMenu: "Table format", tableFormat
-                option: "tab-delimited file"
-                option: "CSV file"
+            option: "tab-delimited file"
+            option: "CSV file"
 
             comment:  "Grouping Factors / Column Headers"
             comment:  additionalComment$
             sentence: "Heading of repetition column", repFactor$
-            sentence: "Main factor", outerFactor$
-            sentence: "Sequencing factor", innerFactor$
+            sentence: "Main factor (levels compared by colour)", outerFactor$
+            sentence: "Sequencing factor (shown along time axis)", innerFactor$
             sentence: "Time Column", timeCol$
             sentence: "F1 Column",   f1Col$
             sentence: "F2 Column",   f2Col$
             sentence: "F3 Column",   f3Col$
             sentence: "F4 Column",   f4Col$
+
             comment: "Formant frequency units in table"
             optionMenu: "Input units", inputUnits
-                option: "Hertz"
-                option: "Bark"
+            option: "Hertz"
+            option: "Bark"
 
             boolean: "Use tertiary filters", tertiaryFilters
         myChoice = endPause: "Exit", "Apply", "OK", 2, 1
@@ -107,9 +109,7 @@ procedure doInputUI
                         ... "NB: YOU CANNOT LEAVE FACTORS BLANK."
             inputIncomplete = 1
         endif
-
     endwhile
-    # PROCESS DATA TABLE FORM
 
     # simplify input variables
     tableID$ =  table_address_or_object_number$
@@ -192,10 +192,11 @@ procedure makeTimeRelativeMenu
     optText$ = "Make time relative to"
     beginPause: "Choose Reference Element"
         optionMenu: optText$, timeRelativeTo + 1
-            option: "no element"
-            for j to innerLevels
-                option:  innerFactor$ + " " + innerLevel$[j]
-            endfor
+        option: "no element"
+        for j to innerLevels
+            option:  innerFactor$ + " " + innerLevel$[j]
+        endfor
+
         comment: "NOTE"
         comment: "Making time relative to " + outerFactor$ + " will not work " +
              ... "correctly if there are multiple speakers in the table."
@@ -254,14 +255,7 @@ procedure doOutputUI
     beginPause: "Graphical Output Settings: formants over time"
         comment: "Plot basics"
         sentence: "Title", title$
-        if inputUnits = 1
-            optionMenu: "Output units", outputUnits
-                option: "Hertz"
-                option: "Hertz (displayed re bark scale)"
-                option: "Hertz (displayed logarithmically)"
-        else
-            output_Units = 4
-        endif
+        @addShared_UI_1
 
         natural: "Maximum frequency (in "
             ... + inputUnits$[inputUnits] + ".)", maxFreq
@@ -294,7 +288,7 @@ procedure doOutputUI
         boolean: "Show connecting lines", showLines
         boolean: "Add time jitter to tokens at reference time",
             ... addJitter
-        @outputUI_generic
+        @addShared_UI_2
 
         myChoice = endPause: "Exit", "Continue", 2, 1
         if myChoice = 1
@@ -303,7 +297,7 @@ procedure doOutputUI
         endif
 
     # Process generic outoutUI
-    @processOutputUI_generic
+    @processShared_UIs
     # Process FoT plot-specific graphic UI
     plotWidth = interior_plot_width
     plotHeight = interior_plot_height
@@ -313,7 +307,6 @@ procedure doOutputUI
     tokenMarking = mark_individual_data_points_using - 1
     addJitter = add_time_jitter_to_tokens_at_reference_time
     showLines = show_connecting_lines
-    outputUnits = output_units
 
     # Make sensible coreLevel variable!
     coreLevel$ = "core_" +
@@ -348,7 +341,6 @@ procedure doFOTPlot
         endif
         @drawMeans
     endif
-
 
     if showLegend
         yList$ = ""
@@ -392,22 +384,17 @@ endproc
 
 procedure calcFOTAxisVals
     # Get calculate major and minor frequency intervals.
-    @getOutputScales: table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
-            ... 0, maxFreq, minorFreqDist,
-            ... outputUnits, "minorFreq_"
-    @getOutputScales: table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
-            ... 0, maxFreq, majorFreqDist,
-            ... outputUnits, "majorFreq_"
+    @getOutputScales:
+    ... table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
+    ... 0, maxFreq, minorFreqDist,
+    ... outScaleUnit, useKHz, "minorFreq_"
+    @getOutputScales:
+    ... table, "'f1Col$','f2Col$','f3Col$','f4Col$'",
+    ... 0, maxFreq, majorFreqDist,
+    ... outScaleUnit, useKHz, "majorFreq_"
 
-    minF = 0
-    maxF = maxFreq
-    if outputUnits = 2
-        @hz2Bark: "minF", ""
-        @hz2Bark: "maxF", ""
-    elsif outputUnits = 3
-        minF = 0
-        maxF = ln(maxF)
-    endif
+    minF = minorFreq_Min
+    maxF = majorFreq_Max
 
     # Get calculate major and minor time intervals.
     selectObject: table
@@ -416,12 +403,14 @@ procedure calcFOTAxisVals
     # get min and max T to the nearest 10th of a ms +/- space for grid edge
     minT = floor(minT * 10) / 10 - 0.049
     maxT = ceiling(maxT * 50) / 50 + 0.049
-    @getOutputScales: table, "'timeCol$'",
-            ... minT, maxT, minorTimeDist,
-            ... 1, "minorTime_"
-    @getOutputScales: table, "'timeCol$'",
-            ... minT, maxT, majorTimeDist,
-            ... 1, "majorTime_"
+    @getOutputScales:
+    ... table, "'timeCol$'",
+    ... minT, maxT, minorTimeDist,
+    ... 1, 0,  "minorTime_"
+    @getOutputScales:
+    ... table, "'timeCol$'",
+    ... minT, maxT, majorTimeDist,
+    ... 1, 0, "majorTime_"
 endproc
 
 procedure calcFOTPlotLayers
@@ -517,9 +506,9 @@ endproc
 
 # Plot layer procedures
 procedure drawFOTAxisLayer
-
     Select inner viewport: left, right, top, bottom + vertAdjust
     Text bottom: "yes", "Time in ms"
+
     Select inner viewport: left, right, top, bottom
     Text left: "yes", "Frequency in " + outputUnits$[outputUnits]
     Select inner viewport: left, right, top, bottom
@@ -538,8 +527,8 @@ procedure drawFOTAxisLayer
     for minMaj to 2
         Line width: lineSize[minMaj]
         curLIs$ = lineIs$[minMaj]
-        for line to 'curLIs$'Freq_Lines
 
+        for line to 'curLIs$'Freq_Lines
             Colour: lineColour$[minMaj]
             Draw line: 'curLIs$'Time_Min, 'curLIs$'Freq_DrawVal[line],
                    ... 'curLIs$'Time_Max, 'curLIs$'Freq_DrawVal[line]
@@ -547,7 +536,7 @@ procedure drawFOTAxisLayer
                Colour: "Black"
                Text: majorTime_Min, "right",
                  ... majorFreq_DrawVal[line], "Half",
-                 ... string$(majorFreq_AxisVal[line])
+            ... fixed$(majorFreq_AxisVal[line], useKHz)
            endif
         endfor
 
@@ -583,38 +572,32 @@ procedure drawDataPoints
             if mean('curColour$' * colrAdj#) / 1000 < 0.19576
                 Colour: 'curColour$' + 0.8
             else
-                Colour:  'curColour$' - 0.5
+                Colour: 'curColour$' - 0.5
             endif
 
             # draw background outline
             Append column: "TAdj"
             Append column: "F'f'Adj"
-            for across from -1 to 1
-                for down from -1 to 1
-                    if across^2 + down^2
-                        curve = 2^0.5 * (across == down) + (across != down)
-                        Formula: "TAdj",
-                        ... "self[curTCol$] + across * xDist * 1.3 / curve"
-                        Formula: "F'f'Adj",
-                        ... "self[curFCol$] + down * yDist * 1.3 / curve"
-                        if tokenMarking < numFactors
-                            Scatter plot where:
-                            ... "TAdj", minT, maxT,
-                            ... "F'f'Adj", minF, maxF,
-                            ... "token", fontM, "no",
-                            ... "self$[outerFactor$] = outerLevel$[o]"
-                        else
-                            Line width: 5 - i
-                            Scatter plot where (mark):
-                            ... "TAdj", minT, maxT,
-                            ... "F'f'Adj", minF, maxF,
-                            ... fontM / 4, "no", "x",
-                            ... "self$[outerFactor$] = outerLevel$[o]"
-                        endif
-                    else
-                    endif
-                endfor
-            endfor
+            across = 1
+            down = -1
+            Formula: "TAdj",
+            ... "self[curTCol$] + across * xDist * 1.3"
+            Formula: "F'f'Adj",
+            ... "self[curFCol$] + down * yDist * 1.3"
+            if tokenMarking < numFactors
+                Scatter plot where:
+                ... "TAdj", minT, maxT,
+                ... "F'f'Adj", minF, maxF,
+                ... "token", fontM, "no",
+                ... "self$[outerFactor$] = outerLevel$[o]"
+            else
+                Line width: 4
+                Scatter plot where (mark):
+                ... "TAdj", minT, maxT,
+                ... "F'f'Adj", minF, maxF,
+                ... fontM / 12, "no", "x",
+                ... "self$[outerFactor$] = outerLevel$[o]"
+            endif
 
             Colour: curColour$
             if tokenMarking < numFactors
@@ -624,11 +607,11 @@ procedure drawDataPoints
                 ... factorName$[tokenMarking], fontM, "no",
                 ... "self$[outerFactor$] = outerLevel$[o]"
             else
-                Line width: 5 - i
+                Line width: 2
                 Scatter plot where (mark):
                 ... curTCol$, minT, maxT,
                 ... curFCol$, minF, maxF,
-                ... fontM / 4, "no", "x",
+                ... fontM / 12, "no", "x",
                 ... "self$[outerFactor$] = outerLevel$[o]"
             endif
         endfor
@@ -654,18 +637,18 @@ procedure drawEllipses
                         Colour:  oColour$[o,2]
                     endif
                     Draw ellipses where: curTCol$, minT, maxT,
-                                     ... curFCol$, minF, maxF,
-                                     ... outerFactor$,
-                                     ... ellipsisSDs, 0, "no",
-                                     ... "self$[innerFactor$] = curInner$"
+                    ... curFCol$, minF, maxF,
+                    ... outerFactor$,
+                    ... ellipsisSDs, 0, "no",
+                    ... "self$[innerFactor$] = curInner$"
                     curFCol$ = f'f'Col$ + "DrawValue"
                     Line width: 2
                     Colour: oColour$[o,4]
                     Draw ellipses where: curTCol$, minT, maxT,
-                                     ... curFCol$, minF, maxF,
-                                     ... outerFactor$,
-                                     ... ellipsisSDs, 0, "no",
-                                     ... "self$[innerFactor$] = curInner$"
+                    ... curFCol$, minF, maxF,
+                    ... outerFactor$,
+                    ... ellipsisSDs, 0, "no",
+                    ... "self$[innerFactor$] = curInner$"
                 endfor
             endif
         endfor
@@ -696,31 +679,16 @@ procedure drawMeans
                         else
                             Colour:  'curColour$' - 0.67
                         endif
-                        for across from -1 to 1
-                            for down from -1 to 1
-                                if across^2 + down^2
-                                    j = 1 /
-                                    ... (
-                                    ...  2^0.5 * (across == down) +
-                                    ... (across != down)
-                                    ... )
-                                    ... * 1.3
-
-                                    Text:
-                                    ... curMeanT - xDist * (30 + across  * j),
-                                    ... "Right",
-                                    ... curMeanF + yDist * down * j,
-                                    ... "Half",
-                                    ... "##" + "F'f'"
-                                endif
-                            endfor
-                        endfor
+                        across = 1
+                        down = -1
+                        Text:
+                        ... curMeanT - xDist * (30 - across), "Right",
+                        ... curMeanF + yDist * down, "Half",
+                        ... "##" + "F'f'"
                         Colour: 'curColour$'
                         Text:
-                        ... curMeanT - xDist * 30,
-                        ... "Right",
-                        ... curMeanF,
-                        ... "Half",
+                        ... curMeanT - xDist * 30, "Right",
+                        ... curMeanF, "Half",
                         ... "##" + "F'f'"
                     endif
                 endfor
@@ -774,9 +742,7 @@ endproc
 # Initialisation procedures and script inclusions
 procedure defineVars
     # check / fix directory ending
-
     @checkDirectoryStructure
-
     if !fileReadable("../data/vars/fotPlot.var")
         @createFoTVars: "../data/vars/fotPlot.var"
     endif
@@ -785,18 +751,10 @@ procedure defineVars
         @createFoTVars: "../data/vars/fotPlot.var"
     endif
     @readVars: "../data/vars/", "fotPlot.var"
-
-
-    # OTHER VARIABLE AND FLAGS
-    # axis array
-    outputUnits$[1] = "Hertz"
-    outputUnits$[2] = "Hertz (bark)"
-    outputUnits$[3] = "Hertz (logarithmic)"
-    outputUnits$[4] = "Bark"
+    @getFreqAxisNames
 endproc
 
 procedure createFoTVars: .address$
-
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "fotVersion$", tab$, curFoTVersion$
     appendFileLine: .address$, "tableID$", tab$,
@@ -817,12 +775,10 @@ procedure createFoTVars: .address$
     appendFileLine: .address$, "formantFlag#", tab$, "{1, 1, 1, 0}"
     appendFileLine: .address$, "plotWidth", tab$, 3
     appendFileLine: .address$, "plotHeight", tab$, 5
-
     appendFileLine: .address$, "lineRatio", tab$, 0.9
-
     appendFileLine: .address$, "prevInputUnit", tab$, 1
     appendFileLine: .address$, "title$", tab$,
-        ... "Formant-over-time plot for nIE diphthongs"
+        ... "nIE diphthongs moving towards /\ic/"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "maxFreq", tab$, 3800
@@ -832,8 +788,7 @@ procedure createFoTVars: .address$
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "coreLevel", tab$, 2
     appendFileLine: .address$, "saveName$", tab$, "Formants_over_Time.png"
-
-    @appendGenericVars: .address$
+    @appendSharedVars: .address$
 endproc
 
 include _aeroplotFns.praat

@@ -12,14 +12,13 @@
 # twitter:   @phonetic_antoin
 # github:    github.com/AERodgers
 
-curF1f2Version$ = "1.0.0.0"
+curF1f2Version$ = "1.0.0.1"
 @checkPraatVersion
 
 # Main script loop
 keepGoing = 1
 while keepGoing
     @defineVars
-
     @doInputUI
     @validateTable:
         ... tableID$,
@@ -45,6 +44,7 @@ while keepGoing
     tokenMarking += 1
     showMeans += 2
     dataPointsOnTop += 1
+    outputUnits = output_units
 
     # forget optional menu flags.
     changeAddColSch = 0
@@ -167,14 +167,8 @@ procedure doOutputUI
         comment: "Plot basics"
         sentence: "Title", title$
         positive: "Interior plot size (inches)", plotSize
-        if inputUnits = 1
-            optionMenu: "Output units", outputUnits
-                option: "Hertz"
-                option: "Hertz (displayed re bark scale)"
-                option: "Hertz (displayed logarithmically)"
-        else
-            output_Units = 4
-        endif
+        @addShared_UI_1
+
         comment: "F1-F2 formant plot ranges (in "
             ... + inputUnits$[inputUnits] + ".)"
             natural: "F1 minimum", minF1
@@ -214,7 +208,7 @@ procedure doOutputUI
             option: "Two standard deviations"
 
         boolean: "Show arrows", showArrows
-        @outputUI_generic
+        @addShared_UI_2
 
 
         myChoice = endPause: "Exit", "Continue", 2, 1
@@ -224,7 +218,7 @@ procedure doOutputUI
         endif
 
     # Process generic outoutUI
-    @processOutputUI_generic
+    @processShared_UIs
     # PROCESS F1F2 PLOT SPECIFIC PARAMETERS
     dataPointsOnTop = most_prominent_layer - 1
     plotSize = interior_plot_size
@@ -251,8 +245,8 @@ procedure drawf1f2Plot
 
     @resetDrawSpace: fontM
     @calculateAxisIncrements
-    @drawF1F2AxisLayer
-    @drawPlotInterior
+    @doF1F2AxisLayer
+    @doPlotInterior
 
     if showLegend
         @drawLegendLayer: majorT_Max, majorT_Min,
@@ -267,7 +261,6 @@ endproc
 
 # Plot calculation and plot table management procedures
 procedure calculateAxisIncrements
-
     if inputUnits = 1
         minorRDist = 50
         majorRDist = 100
@@ -277,7 +270,6 @@ procedure calculateAxisIncrements
         horAdjust = 0.125
         vertAdjust = 0.15
         titleAdjust = vertAdjust + 0.3
-        legendLeftAdjust = 4.02 - horAdjust
     else
         minorRDist = 0.5
         majorRDist = 2
@@ -287,7 +279,6 @@ procedure calculateAxisIncrements
         horAdjust = 0.25
         vertAdjust = 0
         titleAdjust = vertAdjust + 0.3
-        legendLeftAdjust = 4.02 - horAdjust
     endif
 endproc
 
@@ -329,8 +320,7 @@ procedure removeTables
 endproc
 
 # Plot layer Procedures
-procedure drawF1F2AxisLayer
-
+procedure doF1F2AxisLayer
     # set frame variables
     left = 0.7
     top = 0.92
@@ -346,14 +336,23 @@ procedure drawF1F2AxisLayer
     incCur = minorRDist
     selectObject: table
 
+    @getOutputScales:
+    ...table, "'f1Col$','f2Col$'",
+    ... minF1, maxF1, minorRDist,
+    ... outScaleUnit, useKHz,
+    ... "minorR_"
     @getOutputScales: table, "'f1Col$','f2Col$'",
-        ... minF1, maxF1, minorRDist, outputUnits, "minorR_"
+    ... minF1, maxF1, majorRDist,
+    ... outScaleUnit, useKHz,
+    ... "majorR_"
     @getOutputScales: table, "'f1Col$','f2Col$'",
-        ... minF1, maxF1, majorRDist, outputUnits, "majorR_"
+    ... minF2, maxF2, minorTDist,
+    ... outScaleUnit, useKHz,
+    ... "minorT_"
     @getOutputScales: table, "'f1Col$','f2Col$'",
-        ... minF2, maxF2, minorTDist, outputUnits, "minorT_"
-    @getOutputScales: table, "'f1Col$','f2Col$'",
-        ... minF2, maxF2, majorTDist, outputUnits, "majorT_"
+    ... minF2, maxF2, majorTDist,
+    ... outScaleUnit, useKHz,
+    ... "majorT_"
 
     Axes: majorT_Max, majorT_Min, majorR_Max, majorR_Min
     xDist = Horizontal mm to world coordinates: 0.1
@@ -408,8 +407,7 @@ procedure drawF1F2AxisLayer
     Draw inner box
 endproc
 
-procedure drawPlotInterior
-
+procedure doPlotInterior
     # set up viewport
     Font size: fontM
     Select inner viewport: left, right, top, bottom
@@ -437,29 +435,35 @@ procedure drawPlotInterior
         Formula: "token", """##"" + self$[factorName$[tokenMarking]]"
     endif
 
-    #calculate increments for shading and spacing
+    #create column for shading and spacing
+    Axes: majorT_Max, majorT_Min, majorR_Max, majorR_Min
     xDiff = Horizontal mm to world coordinates: 0.1
-    xDiff = abs(xDiff)
     yDiff = Vertical mm to world coordinates: 0.1
-    yDiff = abs(yDiff)
+    appendInfoLine: xDiff, tab$, yDiff
+    Append column: "F1Adj"
+    Append column: "F2Adj"
+    Formula: "F2Adj",
+        ... "self[""F2DrawValue""] + xDiff"
+    Formula: "F1Adj",
+        ... "self[""F1DrawValue""] - yDiff"
 
     if !useInnerFactor
         innerLevels = 1
     endif
     @createSubTables
-    @drawEllipses
-    @drawArrows
+    @doEllipses
+    @doArrows
     if dataPointsOnTop
-        @drawMeansText
-        @drawScatterplots
+        @doMeansText
+        @doScatterplots
     else
-        @drawScatterplots
-        @drawMeansText
+        @doScatterplots
+        @doMeansText
     endif
     @removeTables
 endproc
 
-procedure drawEllipses
+procedure doEllipses
     for outerLevel to outerLevels
         # set current colours
         curColVector$ = curPaletteVector$[outerColour[outerLevel]]
@@ -506,7 +510,7 @@ procedure drawEllipses
     endfor
 endproc
 
-procedure drawArrows
+procedure doArrows
     for outerLevel to outerLevels
         # set current colours
         curColVector$ = curPaletteVector$[outerColour[outerLevel]]
@@ -553,7 +557,7 @@ procedure drawArrows
     endfor
 endproc
 
-procedure drawScatterplots
+procedure doScatterplots
     for outerLevel to outerLevels
         # set current colours
         curColVector$ = curPaletteVector$[outerColour[outerLevel]]
@@ -584,53 +588,37 @@ procedure drawScatterplots
                     Colour:  'curColour$[2]' - 0.5
                 endif
 
-                Append column: "F2Adj"
-                Append column: "F1Adj"
-                for across from -1 to 1
-                    for down from -1 to 1
-                        if across^2 + down^2
-                            j = 1 /
-                            ... (2^0.5 * (across == down) + (across != down))
-                            ... * 1.3
-                            Formula: "F2Adj",
-                                ... "self[""F2DrawValue""] + across * xDiff * j"
-                            Formula: "F1Adj",
-                                ... "self[""F1DrawValue""] + down * yDiff * j"
-                            if !tokenMarking
-                                Line width: 5 - i
-                                Scatter plot where (mark):
-                                    ... "F2Adj", majorT_Max, majorT_Min,
-                                    ... "F1Adj", majorR_Max, majorR_Min,
-                                    ... fontM / 4, "no", "x", criteria$
-
-                            elsif tokenMarking < numFactors
-                                Scatter plot where: "F2Adj",
-                                    ... majorT_Max, majorT_Min,
-                                    ... "F1Adj", majorR_Max, majorR_Min,
-                                    ... "token", fontM, "no", criteria$
-                            endif
-                        endif
-                    endfor
-                endfor
+                if !tokenMarking
+                    Line width: 4
+                    Scatter plot where (mark):
+                    ... "F2DrawValue", majorT_Max, majorT_Min,
+                    ... "F1DrawValue", majorR_Max, majorR_Min,
+                    ... fontM / 5, "no", "x", criteria$
+                elsif tokenMarking < numFactors
+                    Scatter plot where:
+                    ... "F2Adj", majorT_Max, majorT_Min,
+                    ... "F1Adj", majorR_Max, majorR_Min,
+                    ... "token", fontM, "no", criteria$
+                endif
 
                 Colour: curColour$[1]
                 if !tokenMarking
-                    Line width: 5 - i
+                    Line width: 2
                     Scatter plot where (mark):
-                        ... "F2DrawValue", majorT_Max, majorT_Min,
-                        ... "F1DrawValue", majorR_Max, majorR_Min,
-                        ... fontM / 4, "no", "x", criteria$
+                    ... "F2DrawValue", majorT_Max, majorT_Min,
+                    ... "F1DrawValue", majorR_Max, majorR_Min,
+                    ... fontM / 5, "no", "x", criteria$
                 elsif tokenMarking < numFactors
                     Scatter plot where: "F2DrawValue", majorT_Max, majorT_Min,
-                        ... "F1DrawValue", majorR_Max, majorR_Min,
-                        ... factorName$[tokenMarking], fontM, "no", criteria$
+                    ... "F1DrawValue", majorR_Max, majorR_Min,
+                    ... factorName$[tokenMarking], fontM, "no", criteria$
                 endif
             endif
         endfor
     endfor
 endproc
 
-procedure drawMeansText
+procedure doMeansText
     for outerLevel to outerLevels
 
         # set current colours
@@ -667,16 +655,12 @@ procedure drawMeansText
                     curMeanText$ = Get value: 1, "meansText"
                     18
                     Select inner viewport: left, right, top, bottom
-                    for across from -1 to 1
-                        for down from -1 to 1
-                            Colour: "{0.9, 0.9, 0.9}"
-                            if across and down
-                                Text: curMeanF2 + across * xDiff, "centre",
-                                  ... curMeanF1 + down * yDiff, "bottom",
-                                  ... "##" + curMeanText$
-                            endif
-                        endfor
-                    endfor
+
+                    Colour: "{0.9, 0.9, 0.9}"
+                    Text: curMeanF2 + xDiff, "centre",
+                    ... curMeanF1 - yDiff, "bottom",
+                    ... "##" + curMeanText$
+
                     # draw black text
                     Colour: "Black"
                     Text: curMeanF2, "centre",
@@ -690,7 +674,6 @@ procedure drawMeansText
         endfor
     endfor
 endproc
-
 
 procedure drawTitleLayer
     Select inner viewport: left, right, top - titleAdjust, bottom
@@ -708,13 +691,10 @@ procedure defineVars
     @readVars: "../data/vars/", "f1f1Plot.var"
 
     if f1f2Version$ != curF1f2Version$
-        @createF1F2ars: "../data/vars/f1f1Plot.var"
+        @createF1F2Vars: "../data/vars/f1f1Plot.var"
     endif
     @readVars: "../data/vars/", "f1f1Plot.var"
-    outputUnits$[1] = "Hertz"
-    outputUnits$[2] = "Hertz (bark)"
-    outputUnits$[3] = "Hertz (logarithmic)"
-    outputUnits$[4] = "Bark"
+    @getFreqAxisNames
 endproc
 
 procedure createF1F2Vars:
@@ -743,14 +723,14 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "minF2", tab$, 500
     appendFileLine: .address$, "maxF2", tab$, 3600
     appendFileLine: .address$, "tokenMarking", tab$, 7
-    appendFileLine: .address$, "showMeans", tab$, 1
+    appendFileLine: .address$, "showMeans", tab$, 2
     appendFileLine: .address$, "showArrows", tab$, 1
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "coreLevel", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "saveName$", tab$, "F1F2_Plot.png"
 
-    @appendGenericVars: .address$
+    @appendSharedVars: .address$
 endproc
 
 include _aeroplotFns.praat
