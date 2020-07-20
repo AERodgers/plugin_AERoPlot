@@ -178,7 +178,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
     endif
 
     Font size: 14
-    Text top: "yes", "##" + .title$
+    nowarn Text top: "yes", "##" + .title$
     Font size: 10
 
     selectObject: .vqTable

@@ -17,8 +17,8 @@
 #      Boston MA: Wadsworth Cengage
 
 @checkPraatVersion
-
-curLadVersion$ = "1.2.0.0"
+@purgeTempFiles
+curLadVersion$ = "1.3.0.0"
 plotPrefix$ = "LAD."
 # Main script loop
 keepGoing = 1
@@ -29,6 +29,7 @@ while keepGoing
     endif
     @validateTable: tableID$, headerList$
     @processInputUI
+
     @doOutputUI
     @hideObjs: "table", "../data/temp/", "hiddenTx"
     @setupColours:
@@ -52,9 +53,9 @@ while keepGoing
             endif
         endfor
     endfor
-
     Remove
 
+    # VARIABLE CORRECTION
     # Purge current averages array of all defined values (prevents previously
     # unfiltered data being used to create and draw unwanted arrows).
     for o to oLevels
@@ -64,17 +65,15 @@ while keepGoing
             endfor
         endfor
     endfor
-
     # correct local menu flags
     ellipsisSDs += 1
     showAves += 1
-
     # correct global menu flags
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
-
     keepGoing = plotUses
+
     @writeVars: "../data/vars/", "ladPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
@@ -94,21 +93,20 @@ procedure doInputUI
 
             @addShared_UI_0
 
-            comment:  "Grouping Factors / Column Headers"
+            comment: "GROUPING FACTORS (COLUMN HEADERS)"
             sentence: "Sequencing factor (x-Axis)", iFactor$
             sentence: "Comparison factor (y-axis, colour)", oFactor$
-            sentence: "F1 Column",   f1Col$
-            sentence: "F2 Column",   f2Col$
-            sentence: "F3 Column",   f3Col$
-            sentence: "F4 Column",   f4Col$
+            boolean: "Use tertiary filters (remove unwanted data)",
+            ... tertiaryFilters
 
-            comment: "Formant frequency units in table"
+            comment: "FORMANT COLUMNS"
+            sentence: "Formant A", f1Col$
+            sentence: "Formant B", f2Col$
+            sentence: "Formant C", f3Col$
+            sentence: "Formant D", f4Col$
             optionMenu: "Input units", inputUnits
                 option: "Hertz"
                 option: "Bark"
-
-            boolean: "Use tertiary filters (remove unwanted data)",
-            ... tertiaryFilters
 
             @addShared_UI_1
 
@@ -128,11 +126,11 @@ procedure doInputUI
         ...     sequencing_factor$ = ""
         ...     )
         ... )
-        if (f4_Column$ != "" and
-            ... (f3_Column$ = "" or f2_Column$ = "" or f1_Column$ = ""))
-            ... or (f3_Column$ != "" and (f2_Column$ = "" or f1_Column$ = ""))
-            ... or (f2_Column$ != "" and (f1_Column$ = ""))
-            ... or (f1_Column$) = ""
+        if (formant_D$ != "" and
+            ... (formant_C$ = "" or formant_B$ = "" or formant_A$ = ""))
+            ... or (formant_C$ != "" and (formant_B$ = "" or formant_A$ = ""))
+            ... or (formant_B$ != "" and (formant_A$ = ""))
+            ... or (formant_A$) = ""
             done = 0
         endif
         if oFactor$ == iFactor$
@@ -150,9 +148,10 @@ procedure doInputUI
     tertiaryFilters = use_tertiary_filters
     inputUnits$[1] = "Hertz"
     inputUnits$[2] = "Bark scale"
-    for f to 4
-        f'f'Col$ = f'f'_Column$
-    endfor
+    f1Col$ = formant_A$
+    f2Col$ = formant_B$
+    f3Col$ = formant_C$
+    f4Col$ = formant_D$
     headerList$ = "'f1Col$','f2Col$','f3Col$','f4Col$'," +
     ... "'oFactor$','iFactor$'"
 
@@ -176,10 +175,12 @@ procedure processInputUI
     endfor
 
     # check for rogue F columns called "?"
+    abcd$ = "ABCD"
     for i to 4
         n$ = string$(i)
-        f'n$'_Column$ = replace$(f'n$'_Column$, "?", "", 0)
-        f'n$'Col$ = f'n$'_Column$
+        curABCD$ = mid$(abcd$, i, 1)
+        formant_'curABCD$'$ = replace$(formant_'curABCD$'$, "?", "", 0)
+        f'n$'Col$ = formant_'curABCD$'$
     endfor
 
     # calculate total number of formants to plot and array of formants2plot
@@ -239,22 +240,20 @@ endproc
 
 procedure doOutputUI
     @hideObjs: "table", "../data/temp/", "hiddenTx"
-    beginPause: "Graphical Output Settings: formants over time"
-        comment: "Plot basics"
+    beginPause: "Graphical Output Settings: Ladefoged-style plot"
+        comment: "PLOT BASICS"
         sentence: "Title", title$
 
         @addShared_UI_2
 
+        natural: "Maximum frequency (in "
+        ... + inputUnits$[inputUnits] + ".)", maxFreq
+        positive: "Interior plot height (inches)", plotHeight
         optionMenu: "Mark X axis using", xAxisFactor
         for i to xAxisOptions
             option: xAxisOption$[i]
         endfor
-
-        natural: "Maximum frequency (in "
-        ... + inputUnits$[inputUnits] + ".)", maxFreq
-        positive: "Interior plot height (inches)", plotHeight
-
-        comment: "Plot layers"
+        comment: "PLOT LAYERS"
 
         optionMenu: "Data points", tokenMarking
             option: "Hide data points"
@@ -542,7 +541,7 @@ endproc
 procedure drawLadAxisLayer
 
     Select inner viewport: left, right, top, bottom + vertAdjust
-    Text bottom: "yes", iFactor$
+    nowarn Text bottom: "yes", iFactor$
 
     Select inner viewport: left, right, top, bottom
     Text left: "yes", "Frequency in " + outputUnits$[outputUnits]
@@ -579,7 +578,7 @@ procedure drawLadAxisLayer
     xFactor$ = xAxisOption$[xAxisFactor]
     for level to iLevels
         Colour: "Black"
-        Text:
+        nowarn Text:
         ... level, "centre",
         ... majorFreq_Min, "Top",
         ... "##" +  xAxisLevel$[xAxisFactor, level]
@@ -778,7 +777,7 @@ endproc
 procedure drawTitleLayer
     Select inner viewport: left, right, top, bottom
     Font size: fontL
-    Text top: "yes", "##" + title$
+    nowarn Text top: "yes", "##" + title$
     Font size: fontM
 endproc
 

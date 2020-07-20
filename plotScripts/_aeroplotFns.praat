@@ -16,7 +16,7 @@
 # They are specifically written to work only as part of the the aeroplot plugin
 # and will likely cause problems you try to use them in other contexts.
 #
-# v.1.2.0.0
+# v.1.3.0.0
 
 # Table functions
 procedure validateTable:  .tableID$, .headers$
@@ -112,14 +112,11 @@ endproc
 # Image Functions
 procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
 
-    if !(right$(.dir$, 1) = "/" or right$(.dir$, 1) = "\")
+    if !(right$(.dir$) = "/" or right$(.dir$) = "\")
             ... and .dir$ != ""
-        .dir$ += "/"
+        .dir$ = .dir$ +  "/"
     endif
 
-    if ! fileReadable(.dir$)
-        createDirectory(.dir$)
-    endif
 
     if ! rindex(.savName$, ".")
         .savName$ += ".png"
@@ -157,11 +154,16 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
         Colour: { 0.96, 0.96, 0.96 }
         @date
         @dec2hex: date.index, "saveImage.hexDate$"
-        Viewport text: "Left", "Bottom", 0, "image ref. '.ref$'" +
-        ... .hexDate$ +
-        ... " Created using AeroPlot (github.com/AERodgers/AERoplot)"
+        nowarn Viewport text: "Left", "Bottom", 0,
+        ... "image ref. #'.ref$''.hexDate$' " +
+        ... "Created using AeroPlot (github.com/AERodgers/AERoplot)"
         Font size: .fontSize
         Black
+
+        if ! fileReadable(.dir$)
+            createDirectory(.dir$)
+        endif
+
         if .quality
             Save as 300-dpi PNG file: .dir$ + .newName$
         else
@@ -186,6 +188,16 @@ procedure getGenAxisVars
     axisLine[2] = 2
 endproc
 
+procedure purgeTempFiles
+    # purge temporary file
+    temp = Create Strings as file list: "purgeList", "../data/temp"
+    numStr = Get number of strings
+    for i to numStr
+        curStr$ = Get string: i
+        deleteFile: "../data/temp/'curStr$'"
+    endfor
+    Remove
+endproc
 
 # file and folder functions
 procedure checkDirectoryStructure
@@ -196,33 +208,25 @@ procedure checkDirectoryStructure
     createDirectory: "../data/vars"
     createDirectory: "../data/temp"
 
-    # purge temparary file
-    temp = Create Strings as file list: "purgeList", "../data/temp"
-    numStr = Get number of strings
-    for i to numStr
-        curStr$ = Get string: i
-        deleteFile: "../data/temp/'curStr$'"
-    endfor
-    Remove
 
     if !fileReadable("../data/palettes/current.palette")
         createDirectory: "../data/palettes"
-        .palName$[1] = "CB_Qualative_Set1_9_colours"
+        .palName$[1] = "CB_Qualitative_Set1_9_colours"
         .js$[1] =
         ... "['rgb(228,26,28)','rgb(55,126,184)','rgb(77,175,74)'," +
         ... "'rgb(152,78,163)','rgb(255,127,0)','rgb(255,255,51)'," +
         ... "'rgb(166,86,40)','rgb(247,129,191)','rgb(153,153,153)']"
         .colrName$[1] = "Red,Blue,Green,Purple,Orange,Yellow,Brown,Pink,Grey"
 
-        .palName$[2] = "CB_Qualative_Dark2_colour_blind_friendly_3_colours"
+        .palName$[2] = "CB_Qualitative_Dark2_colour_blind_friendly_3_colours"
         .js$[2] = "['rgb(27,158,119)','rgb(217,95,2)','rgb(117,112,179)']"
         .colrName$[2] = "Mint,Orange,Lavender"
 
         .palName$[3] = "Greyscale_4_shades"
         .js$[3] =
-        ... "['rgb(50,50,50)','rgb(80,80,80)'," +
-        ... "'rgb(110,110,110)','rgb(150,150,150)']"
-        .colrName$[3] = "dark grey, medium grey, light grey, very light grey"
+        ...  "['rgb(16,16,16)','rgb(79,79,79)'," +
+        ... "'rgb(142,142,142)','rgb(206,206,206)']"
+        .colrName$[3] = "dark grey,medium grey,light grey,very light grey"
 
 
         .palName$[4] = "ZXSpectrum_14_colours"
@@ -250,6 +254,7 @@ endproc
 
 # UI and variable Functions
 procedure addShared_UI_0
+    comment: "TABLE / FILE INFORMATION"
     sentence: "Table address or object number", tableID$
     optionMenu: "Table format", tableFormat
         option: "tab-delimited file"
@@ -276,6 +281,14 @@ procedure addShared_UI_1
 endproc
 
 procedure addShared_UI_2
+    boolean: "Show legend", showLegend
+    optionMenu: "Base font size", (fontM - 8) / 2
+        option: "8"
+        option: "10"
+        option: "12"
+        option: "14"
+        option: "16"
+        option: "18"
     if inputUnits = 1
         optionMenu: "Output units", outputUnits
             option: "Hertz"
@@ -290,28 +303,19 @@ procedure addShared_UI_2
 endproc
 
 procedure addShared_UI_3
-    boolean: "Show legend", showLegend
-    optionMenu: "Base font size", (fontM - 8) / 2
-        option: "8"
-        option: "10"
-        option: "12"
-        option: "14"
-        option: "16"
-        option: "18"
-
-    comment: "Image saving"
+    comment: "IMAGE SAVING"
     #boolean: "Very high quality", quality
     sentence: "Save directory", saveDir$
     sentence: "Save name", saveName$
 
-    comment: "Extra colour management options"
+    comment: "COLOUR MANAGEMENT"
     boolean: "Add or change colour scheme", changeAddColSch
 
     optionMenu: "Modify colour scheme", sorting
         option: "No change"
         option: "Re-sort by brightness"
         option: "Re-sort by maximal perceptual difference"
-        option: "Manually re-sort"
+        option: "Re-sort manually"
         option: "Match levels to colour in next plot only"
 endproc
 

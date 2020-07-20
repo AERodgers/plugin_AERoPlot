@@ -1,5 +1,5 @@
 Add menu command: "Objects", "New", "--", "", 0,  ""
-Add menu command: "Objects", "New", "Graphic", "", 0,  ""
+Add menu command: "Objects", "New", "AERoPlot", "", 0,  ""
 Add menu command: "Objects", "New", "F1F2 Plot...", "Graphic", 1,  "plotScripts/f1f2Plot.praat"
 Add menu command: "Objects", "New", "Ladefoged Formant Plot...", "Graphic", 1,  "plotScripts/ladPlot.praat"
 Add menu command: "Objects", "New", "Formants-over-time Plot...", "Graphic", 1,  "plotScripts/fotPlot.praat"

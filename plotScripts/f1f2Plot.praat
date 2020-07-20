@@ -13,8 +13,8 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
-
-curF1f2Version$ = "1.2.0.0"
+@purgeTempFiles
+curF1f2Version$ = "1.3.0.0"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
@@ -27,26 +27,30 @@ while keepGoing
         ... tableID$,
         ... "'oFactor$', 'iFactor$', 'f1Col$', 'f2Col$'"
     @processInputUI
+
     @doOutputUI
+    @hideObjs: "table", "../data/temp/", "hiddenTx"
     @setupColours:
     ... "../data/palettes/", "colrPalFile$",
     ... "curPalette", table, altColrMatch
+    @retrieveObjs: "hiddenTx"
 
     @drawf1f2Plot
 
     removeObject: table
 
+
+    # VARIABLE CORRECTION
     # correct local input flags
     coreLevel += 1
     ellipsisSDs += 1
     showMeans += 2
-
     # correct global menu flags
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
-
     keepGoing = plotUses
+
     @writeVars: "../data/vars/", "f1f1Plot.var"
     viewPort$ =  "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
@@ -63,22 +67,21 @@ procedure doInputUI
 
             @addShared_UI_0
 
-            comment: "Grouping factors / column Headers"
+            comment: "GROUPING FACTORS (COLUMN HEADERS)"
             #sentence Main_factor (determines colour)
             #sentence Secondary_factor (used for grouping by sub-category)
             sentence: "Main factor (determines colour)", oFactor$
             boolean: "Use secondary factor", useInnerFactor
-            sentence: "Secondary factor (sub-category of main factor)", iFactor$
+            sentence: "Secondary factor (sub-category)", iFactor$
+            boolean: "Use tertiary filters (remove unwanted data)",
+            ... tertiaryFilters
+            comment: "FORMANT COLUMNS"
             sentence: "F2 Column", f2Col$
             sentence: "F1 Column", f1Col$
-
-            comment: "Formant frequency units in table"
             optionMenu: "Input units", inputUnits
                 option: "Hertz"
                 option: "Bark"
 
-            boolean: "Use tertiary filters (remove unwanted data)",
-            ... tertiaryFilters
 
             @addShared_UI_1
 
@@ -180,7 +183,7 @@ procedure doOutputUI
 
     @hideObjs: "table", "../data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings"
-        comment: "Plot basics"
+        comment: "PLOT BASICS"
         sentence: "Title", title$
         positive: "Interior plot size (inches)", plotSize
         @addShared_UI_2
@@ -191,7 +194,7 @@ procedure doOutputUI
             natural: "F2 minimum", minF2
             natural: "F2 maximum", maxF2
 
-        comment: "Plot layers"
+        comment: "PLOT LAYERS"
 
         optionMenu: "Mark individual data points using", tokenMarking
             option: "x symbol"
@@ -227,8 +230,8 @@ procedure doOutputUI
     if myChoice = 1
         exit
     endif
-
     @retrieveObjs: "hiddenTx"
+
     # Process generic outoutUI
     @processShared_UIs
     dataPointsOnTop = most_prominent_layer - 1
@@ -601,12 +604,12 @@ procedure doScatterplots
                 endif
                 if !tokenMarking
                     Line width: 4
-                    Scatter plot where (mark):
+                    nowarn Scatter plot where (mark):
                     ... "F2DrawValue", majorT_Max, majorT_Min,
                     ... "F1DrawValue", majorR_Max, majorR_Min,
                     ... fontM / 5, "no", "x", criteria$
                 elsif tokenMarking < numFactors
-                    Scatter plot where:
+                    nowarn Scatter plot where:
                     ... "F2Adj", majorT_Max, majorT_Min,
                     ... "F1Adj", majorR_Max, majorR_Min,
                     ... "token", fontM, "no", criteria$
@@ -614,12 +617,13 @@ procedure doScatterplots
                 Colour: curColour$[1]
                 if !tokenMarking
                     Line width: 2
-                    Scatter plot where (mark):
+                     nowarn Scatter plot where (mark):
                     ... "F2DrawValue", majorT_Max, majorT_Min,
                     ... "F1DrawValue", majorR_Max, majorR_Min,
                     ... fontM / 5, "no", "x", criteria$
                 elsif tokenMarking < numFactors
-                    Scatter plot where: "F2DrawValue", majorT_Max, majorT_Min,
+                    nowarn Scatter plot where: "F2DrawValue",
+                    ... majorT_Max, majorT_Min,
                     ... "F1DrawValue", majorR_Max, majorR_Min,
                     ... factorName$[tokenMarking], fontM, "no", criteria$
                 endif
@@ -683,7 +687,7 @@ endproc
 procedure drawTitleLayer
     Select inner viewport: left, right, top - titleAdjust, bottom
     Font size: fontL
-    Text top: "yes", "##" + title$
+    nowarn Text top: "yes", "##" + title$
     Font size: fontM
 endproc
 

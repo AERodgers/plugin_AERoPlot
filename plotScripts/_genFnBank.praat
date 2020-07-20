@@ -1,6 +1,6 @@
 # General Functions
 # =================
-  genFnBankVersion$ = "1.2.0.0"
+  genFnBankVersion$ = "1.3.0.0"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
@@ -183,9 +183,10 @@ endproc
 procedure hideObjs: .objects$, .dir$, .root$
     # fix variable name and directory
     .root$ = replace$(.root$, "$", "", 1)
-    endif
-    if right$(.dir$) != "/" or right$(.dir$) != "\"
-        .dir$ += "/"
+
+    if !(right$(.dir$) = "/" or right$(.dir$) = "\")
+            ... and .dir$ != ""
+        .dir$ = .dir$ +  "/"
     endif
     '.root$'Dir$ = .dir$
 
@@ -1734,7 +1735,7 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
 
             Font size: .fontSize
             Colour: "Black"
-            Text:
+            nowarn Text:
             ... .x_start + 2.5 * .x_unit, "Left", .y_end - .y_unit * (.i - 0.3),
             ... "Half", "##" + legend.text$[.i]
             Helvetica
@@ -1801,7 +1802,7 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
                 Set string value: 1, "Mrk", legend.style$[.i]
                 Line width: 4
                 Colour: legend.colour$[.i]
-                Scatter plot (mark):
+                nowarn Scatter plot (mark):
                 ... "X", .xLeft, .xRight, "Y",
                 ... .yBottom, .yTop, 2,
                 ... "no", "left$(legend.style$[.i], 1)"

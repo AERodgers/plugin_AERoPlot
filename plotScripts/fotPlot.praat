@@ -13,8 +13,8 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
-
-curFoTVersion$ = "1.2.0.0"
+@purgeTempFiles
+curFoTVersion$ = "1.3.0.0"
 plotPrefix$ = "FOT."
 # Main script loop
 keepGoing = 1
@@ -67,6 +67,7 @@ while keepGoing
 endwhile
 
 
+
 # UI and input processing procedures
 procedure doInputUI
     done = 0
@@ -76,28 +77,29 @@ procedure doInputUI
     endfor
 
     while ! done
+        repFactor$ = replace$(repFactor$, "?", "", 0)
         beginPause: "Formants over time plot: input settings"
             comment:  comment$
 
             @addShared_UI_0
 
-            comment:  "Grouping Factors / Column Headers"
-            sentence: "Heading of repetition column", repFactor$
+            comment: "GROUPING FACTORS (COLUMN HEADERS)"
+            sentence: "Repetition column", repFactor$
             sentence: "Main factor (levels compared by colour)", oFactor$
             sentence: "Sequencing factor (shown along time axis)", iFactor$
-            sentence: "Time Column", timeCol$
-            sentence: "F1 Column",   f1Col$
-            sentence: "F2 Column",   f2Col$
-            sentence: "F3 Column",   f3Col$
-            sentence: "F4 Column",   f4Col$
+            boolean: "Use tertiary filters (remove unwanted data)",
+            ... tertiaryFilters
 
-            comment: "Formant frequency units in table"
+            comment: "FORMANT / TIME COLUMNS"
+            sentence: "Time Column", timeCol$
+            sentence: "Formant A", f1Col$
+            sentence: "Formant B", f2Col$
+            sentence: "Formant C", f3Col$
+            sentence: "Formant D", f4Col$
             optionMenu: "Input units", inputUnits
             option: "Hertz"
             option: "Bark"
 
-            boolean: "Use tertiary filters (remove unwanted data)",
-            ... tertiaryFilters
 
             @addShared_UI_1
 
@@ -114,20 +116,18 @@ procedure doInputUI
         ...     (
         ...     table_address_or_object_number$ = "" or
         ...     time_Column$ = "" or
-        ...     heading_of_repetition_column$ = "" or
         ...     main_factor$ = "" or
         ...     sequencing_factor$ = ""
         ...     )
         ... )
-        if (f4_Column$ != "" and
-            ... (f3_Column$ = "" or f2_Column$ = "" or f1_Column$ = ""))
-            ... or (f3_Column$ != "" and (f2_Column$ = "" or f1_Column$ = ""))
-            ... or (f2_Column$ != "" and (f1_Column$ = ""))
-            ... or (f1_Column$) = ""
+        if (formant_D$ != "" and
+            ... (formant_C$ = "" or formant_B$ = "" or formant_A$ = ""))
+            ... or
+            ... (formant_C$ != "" and (formant_B$ = "" or formant_A$ = ""))
+            ... or (formant_B$ != "" and (formant_A$ = ""))
+            ... or (formant_A$) = ""
             done = 0
         endif
-
-
 
 
         if oFactor$ == iFactor$
@@ -142,7 +142,7 @@ procedure doInputUI
     @processShared_UI_0
     tableID$ =  table_address_or_object_number$
     tableFormat = table_format
-    repFactor$ = heading_of_repetition_column$
+    repFactor$ = repetition_column$
     oFactor$ = main_factor$
     iFactor$ = sequencing_factor$
     timeCol$ = time_Column$
@@ -150,9 +150,10 @@ procedure doInputUI
     inputUnits = input_units
     inputUnits$[1] = "Hertz"
     inputUnits$[2] = "Bark scale"
-    for f to 4
-        f'f'Col$ = f'f'_Column$
-    endfor
+    f1Col$ = formant_A$
+    f2Col$ = formant_B$
+    f3Col$ = formant_C$
+    f4Col$ = formant_D$
     headerList$ = "'timeCol$','f1Col$','f2Col$','f3Col$','f4Col$'," +
               ... "'oFactor$','iFactor$'"
 
@@ -176,10 +177,12 @@ procedure processInputUI
     endfor
 
     # check for rogue F columns called "?"
+    abcd$ = "ABCD"
     for i to 4
         n$ = string$(i)
-        f'n$'_Column$ = replace$(f'n$'_Column$, "?", "", 0)
-        f'n$'Col$ = f'n$'_Column$
+        curABCD$ = mid$(abcd$, i, 1)
+        formant_'curABCD$'$ = replace$(formant_'curABCD$'$, "?", "", 0)
+        f'n$'Col$ = formant_'curABCD$'$
     endfor
 
     # calculate total number of formants to plot and array of formants2plot
@@ -202,9 +205,9 @@ procedure processInputUI
     @summariseFactor:  table, iFactor$, "i"
     @checkMax50: iLevels, table, iFactor$, 1
 
-    if keepGoing = 1
-        @makeTimeRelativeMenu
-    endif
+
+    @makeTimeRelativeMenu
+
 
     @filterLevels: table, iFactor$, "i", "newStateIsOldOne"
     table = filterLevels.table
@@ -222,63 +225,80 @@ procedure processInputUI
 endproc
 
 procedure makeTimeRelativeMenu
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
-    optText$ = "Make time relative to"
-    beginPause: "Choose Reference Element"
-        optionMenu: optText$, timeRelativeTo + 1
-        option: "no element"
-        for j to iLevels
-            option:  iFactor$ + " " + iLevel$[j]
-        endfor
+    if keepGoing = 1
+        @hideObjs: "table", "../data/temp/", "hiddenTx"
+        optText$ = "Make time relative to"
+        beginPause: "Choose Reference Element"
+            optionMenu: optText$, timeRelativeTo + 1
+            option: "no element"
+            for j to iLevels
+                option:  iFactor$ + " " + iLevel$[j]
+            endfor
 
-        comment: "NOTE"
-        comment: "Making time relative to " + oFactor$ + " will not work " +
-             ... "correctly if there are multiple speakers in the table."
-        comment: "In such cases, make sure you adjust the time columns in " +
-             ... "advance of running this script."
-    myChoice = endPause: "Exit", "Continue", 2, 1
+            comment: "NOTE"
+            comment: "Making time relative to " + oFactor$ + " " +
+            ... "will not work correctly if there are multiple " +
+            ... "speakers in the table."
+            comment:
+            ... "In such cases, make sure you adjust the time columns " +
+            ... "in advance of running this script."
+        myChoice = endPause: "Exit", "Continue", 2, 1
 
-    if myChoice = 1
-        exit
-    endif
-    @retrieveObjs: "hiddenTx"
+        if myChoice = 1
+            exit
+        endif
+        @retrieveObjs: "hiddenTx"
 
-    timeRelativeTo = make_time_relative_to - 1
-    if timeRelativeTo
-        timeRelativeTo$ = iLevel$[timeRelativeTo]
 
-        @summariseFactor: table, repFactor$, "rep"
-        selectObject: table
-        Insert column: 1, "tempIndex"
-        Formula: "tempIndex", "row"
-        numRow = Get number of rows
-        curTimeRef = undefined
-        curRow = 0
+        timeRelativeTo = make_time_relative_to - 1
+        if timeRelativeTo
+            timeRelativeTo$ = iLevel$[timeRelativeTo]
 
-        for o to oLevels
-            curOLevel$ = oLevel$[o]
-            selectObject: table
-            tempTable = Extract rows where:
+            if repFactor$ != ""
+                @summariseFactor: table, repFactor$, "rep"
+            endif
+            for o to oLevels
+                curOLevel$ = oLevel$[o]
+                selectObject: table
+                tempTable = Extract rows where:
                 ... "self$[oFactor$] = curOLevel$ and " +
                 ... "self$[iFactor$] = timeRelativeTo$"
-            Rename: curOLevel$
-            numReps[o] = Get number of rows
-            for i to numReps[o]
-                repName$[o,i] = Get value: i, repFactor$
-                refTime[o,i] = Get value: i, timeCol$
+                Rename: curOLevel$
+                numReps[o] = Get number of rows
+                for i to numReps[o]
+                    if repFactor$ = ""
+                        refTime[o,i] = Get value: i, timeCol$
+                    else
+                        repName$[o,i] = Get value: i, repFactor$
+                        refTime[o,i] = Get value: i, timeCol$
+                    endif
+                endfor
+                removeObject: tempTable
             endfor
-            removeObject: tempTable
-        endfor
 
-        selectObject: table
-        for o to oLevels
-            for i to numReps[o]
-                Formula: timeCol$,
-                    ... "if self$[oFactor$] = oLevel$[o] and " +
-                    ... "self$[repFactor$] = repName$[o,i] then " +
-                    ... "fixed$(self - refTime[o,i], 3) else self endif"
+            selectObject: table
+            for o to oLevels
+                for i to numReps[o]
+                    if repFactor$ = ""
+                        Formula: timeCol$,
+                        ... "if self$[oFactor$] = oLevel$[o] then " +
+                        ... "fixed$(self - refTime[o,i], 3) else " +
+                        ... "self endif"
+                    else
+                        Formula: timeCol$,
+                        ... "if self$[oFactor$] = oLevel$[o] and " +
+                        ... "self$[repFactor$] = repName$[o,i] then " +
+                        ... "fixed$(self - refTime[o,i], 3) else " +
+                        ... "self endif"
+                    endif
+                endfor
             endfor
-        endfor
+            Save as binary file: "../data/temp/table.bin"
+        endif
+    elsif plotUses = 2
+        oldTable = Read from file: "../data/temp/table.bin"
+        removeObject: table
+        table = oldTable
     endif
 endproc
 
@@ -286,7 +306,7 @@ procedure doOutputUI
     varRoot$ = "i"
     @hideObjs: "table", "../data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings: formants over time"
-        comment: "Plot basics"
+        comment: "PLOT BASICS"
         sentence: "Title", title$
 
         @addShared_UI_2
@@ -296,7 +316,7 @@ procedure doOutputUI
         positive: "Interior plot width (inches)", plotWidth
         positive: "Interior plot height (inches)", plotHeight
 
-        comment: "Plot layers"
+        comment: "PLOT LAYERS"
         optionMenu: "Mark individual data points using", tokenMarking
             option: "Do not Mark"
             for i to numFactors
@@ -320,7 +340,7 @@ procedure doOutputUI
             option: "Two standard deviations"
 
         boolean: "Show connecting lines", showLines
-        boolean: "Add time jitter to tokens at reference time",
+        boolean: "Add jitter to data points at reference time",
             ... addJitter
 
         @addShared_UI_3
@@ -338,7 +358,7 @@ procedure doOutputUI
     dataPointsOnTop = most_prominent_layer - 1
     ellipsisSDs = draw_ellipses - 1
     tokenMarking = mark_individual_data_points_using - 1
-    addJitter = add_time_jitter_to_tokens_at_reference_time
+    addJitter = add_jitter_to_data_points_at_reference_time
     showLines = show_connecting_lines
 
     # Make sensible coreLevel variable!
@@ -396,7 +416,7 @@ endproc
 # Plot calculation procedures
 procedure calcFOTAxisIncrements
     minorTimeDist = 0.01
-    jitter = 0.003
+    jitter = 0.0015
     majorTimeDist = 0.05
 
     vertAdjust = 0.15
@@ -504,7 +524,8 @@ procedure calcFOTPlotLayers
                     endif
 
                     meanFinPlot[o,i,f] = Get mean: 'curF$' + "DrawValue"
-                    meanFinPlot[o,i,f] = round(meanFinPlot[o,i,f] * 100) / 100
+                    meanFinPlot[o,i,f] =
+                    ... round(meanFinPlot[o,i,f] * 100) / 100
                     meanFAct[o,i,f] = Get mean: 'curF$'
                     meanFAct[o,i,f] = round(meanFAct[o,i,f] * 100) / 100
 
@@ -514,7 +535,8 @@ procedure calcFOTPlotLayers
                         stDevTAct[o,i] = round(stDevTAct[o,i] * 100) / 100
                         stDevFAct[o,i,f] = Get standard deviation:
                             ... 'curF$'
-                        stDevFAct[o,i,f] = round(stDevFAct[o,i,f] * 100) / 100
+                        stDevFAct[o,i,f] =
+                        ... round(stDevFAct[o,i,f] * 100) / 100
                     else
                         stDevTAct[o,i] = undefined
                         stDevFAct[o,i,f] = undefined
@@ -626,33 +648,33 @@ procedure drawDataPoints
             Formula: "F'f'Adj",
             ... "self[curFCol$] + down * yDist * 1.3"
             if tokenMarking < numFactors
-                Scatter plot where:
+                nowarn Scatter plot where:
                 ... "TAdj", minT, maxT,
                 ... "F'f'Adj", minF, maxF,
                 ... "token", fontM, "no",
                 ... "self$[oFactor$] = oLevel$[o]"
             else
                 Line width: 4
-                Scatter plot where (mark):
+                nowarn Scatter plot where (mark):
                 ... "TAdj", minT, maxT,
                 ... "F'f'Adj", minF, maxF,
-                ... fontM / 12, "no", "x",
+                ... fontM / 6, "no", "x",
                 ... "self$[oFactor$] = oLevel$[o]"
             endif
 
             Colour: curColour$
             if tokenMarking < numFactors
-                Scatter plot where:
+                nowarn Scatter plot where:
                 ... curTCol$, minT, maxT,
                 ... curFCol$, minF, maxF,
                 ... factorName$[tokenMarking], fontM, "no",
                 ... "self$[oFactor$] = oLevel$[o]"
             else
                 Line width: 2
-                Scatter plot where (mark):
+                nowarn Scatter plot where (mark):
                 ... curTCol$, minT, maxT,
                 ... curFCol$, minF, maxF,
-                ... fontM / 12, "no", "x",
+                ... fontM / 6, "no", "x",
                 ... "self$[oFactor$] = oLevel$[o]"
             endif
         endfor
@@ -781,7 +803,7 @@ endproc
 procedure drawTitleLayer
     Select inner viewport: left, right, top, bottom
     Font size: fontL
-    Text top: "yes", "##" + title$
+    nowarn Text top: "yes", "##" + title$
     Font size: fontM
 endproc
 
