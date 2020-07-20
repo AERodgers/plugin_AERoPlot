@@ -12,88 +12,102 @@
 # twitter:   @phonetic_antoin
 # github:    github.com/AERodgers
 
-curF1f2Version$ = "1.0.0.1"
 @checkPraatVersion
 
+curF1f2Version$ = "1.2.0.0"
+plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
 while keepGoing
     @defineVars
-    @doInputUI
+    if keepGoing = 1
+        @doInputUI
+    endif
     @validateTable:
         ... tableID$,
-        ... "'outerFactor$', 'innerFactor$', 'f1Col$', 'f2Col$'"
-    @processTable
-
+        ... "'oFactor$', 'iFactor$', 'f1Col$', 'f2Col$'"
+    @processInputUI
     @doOutputUI
-    @setupColours: "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
+    @setupColours:
+    ... "../data/palettes/", "colrPalFile$",
+    ... "curPalette", table, altColrMatch
 
     @drawf1f2Plot
 
-    if sortByBrightness
-        @unsortByBrightness: curPaletteSize,
-                       ... "curPaletteVector$",
-                       ... "curPaletteName$"
-    endif
     removeObject: table
-    viewPort$ =  "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
-    @saveImage: saveDirectory$, saveName$, quality, viewPort$, fontM, "F12."
 
+    # correct local input flags
     coreLevel += 1
     ellipsisSDs += 1
-    tokenMarking += 1
     showMeans += 2
-    dataPointsOnTop += 1
-    outputUnits = output_units
 
-    # forget optional menu flags.
+    # correct global menu flags
     changeAddColSch = 0
+    tokenMarking += 1
+    dataPointsOnTop += 1
 
+    keepGoing = plotUses
     @writeVars: "../data/vars/", "f1f1Plot.var"
-
+    viewPort$ =  "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
+    @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
 endwhile
+
 
 # UI and input processing procedures
 procedure doInputUI
+    done = 0
+    comment$ = ""
+    while ! done
+        beginPause: "F1-F2 plotter: input settings"
+        comment: comment$
 
-    beginPause: "F1-F2 plotter: input settings"
-        sentence: "Table address or object number", tableID$
-        optionMenu: "Table format", tableFormat
-            option: "tab-delimited file"
-            option: "CSV file"
+            @addShared_UI_0
 
-        comment: "Grouping factors / column Headers"
-        #sentence Main_factor (determines colour)
-        #sentence Secondary_factor (used for grouping by sub-category)
-        sentence: "Main factor (determines colour)", outerFactor$
-        boolean: "add secondary factor (sub-category)", useInnerFactor
-        sentence: "Secondary factor", innerFactor$
-        sentence: "F2 Column", f2Col$
-        sentence: "F1 Column", f1Col$
-        comment: "Formant frequency units in table"
-        optionMenu: "Input units", inputUnits
-            option: "Hertz"
-            option: "Bark"
+            comment: "Grouping factors / column Headers"
+            #sentence Main_factor (determines colour)
+            #sentence Secondary_factor (used for grouping by sub-category)
+            sentence: "Main factor (determines colour)", oFactor$
+            boolean: "Use secondary factor", useInnerFactor
+            sentence: "Secondary factor (sub-category of main factor)", iFactor$
+            sentence: "F2 Column", f2Col$
+            sentence: "F1 Column", f1Col$
 
-        boolean: "Use tertiary filters", tertiaryFilters
-    myChoice = endPause: "Exit", "Apply", "OK", 2, 1
+            comment: "Formant frequency units in table"
+            optionMenu: "Input units", inputUnits
+                option: "Hertz"
+                option: "Bark"
 
-    # respond to myChoice
-    keepGoing = myChoice = 2
-    if myChoice = 1
-        exit
+            boolean: "Use tertiary filters (remove unwanted data)",
+            ... tertiaryFilters
+
+            @addShared_UI_1
+
+        myChoice = endPause: "Exit", "Apply", 2, 1
+        # respond to myChoice
+        if myChoice = 1
+            exit
+        endif
+
+        # error handling
+        done =
+        ... !(
+        ... table_address_or_object_number$ = "" or
+        ... main_factor$ = "" or
+        ... (secondary_factor$ = "" and use_secondary_factor) or
+        ... f2_Column$ = "" or f1_Column$ = ""
+        ... )
+        comment$ = "Please ensure you FILL IN all the NECESSARY BOXES."
+    endwhile
+
+    # Simplify input variables
+    @processShared_UI_0
+    oFactor$ = main_factor$
+    iFactor$ = secondary_factor$
+    if oFactor$ = iFactor$
+        iFactor$ = ""
     endif
-
-    # PROCESS DATA TABLE FORM
-    tableID$ =  table_address_or_object_number$
-    tableFormat = table_format
-    outerFactor$ = main_factor$
-    innerFactor$ = secondary_factor$
-    if outerFactor$ = innerFactor$
-        innerFactor$ = ""
-    endif
-    useInnerFactor = add_secondary_factor
-        ... and innerFactor$ != ""
+    useInnerFactor = use_secondary_factor
+        ... and iFactor$ != ""
     f1Col$ = f1_Column$
     f2Col$ = f2_Column$
     tertiaryFilters = use_tertiary_filters
@@ -115,26 +129,29 @@ procedure doInputUI
     endif
 endproc
 
-procedure processTable
+procedure processInputUI
     newStateIsOldOne = x_tableID$ = tableID$ and
-                   ... outerFactor$ = x_outerFactor$
+                   ... oFactor$ = x_oFactor$
 
     selectObject: table
-
     numFactors = Get number of columns
     for i to numFactors
         factorName$[i] = Get column label: i
     endfor
 
     # UI for outer factor
-    # first pass on outerFactor
-    @summariseFactor:  table, outerFactor$, "outer"
-    @filterLevels: table, outerFactor$, "outer", "newStateIsOldOne"
+    # first pass on oFactor
+    @summariseFactor:  table, oFactor$, "o"
+    @checkMax50: oLevels, table, oFactor$, 1
+    @filterLevels: table, oFactor$, "o", "newStateIsOldOne"
+    table = filterLevels.table
 
-    # First pass on innerFactor
+    # First pass on iFactor
     if useInnerFactor
-        @summariseFactor: table, innerFactor$, "inner"
-        @filterLevels: table, outerFactor$, "inner", "newStateIsOldOne"
+        @summariseFactor: table, iFactor$, "i"
+        @checkMax50: iLevels, table, iFactor$, 1
+        @filterLevels: table, oFactor$, "i", "newStateIsOldOne"
+        table = filterLevels.table
     endif
 
     # run tertiary filter UI first to remove unwanted items
@@ -142,33 +159,31 @@ procedure processTable
         @filterTertFactors: table, "factorName$", numFactors,
             ... "../data/vars/",
             ... "fpTertFactor.var",
-            ... "'outerFactor$', 'innerFactor$', 'f1Col$', 'f2Col$'"
+            ... "'oFactor$', 'iFactor$', 'f1Col$', 'f2Col$'"
+        table = filterTertFactors.table
 
         # recalculate outer levels based on purged table
-        @summariseFactor: table, outerFactor$, "outer"
-
+        @summariseFactor: table, oFactor$, "o"
         # recalculate inner levels based on purged table
         if useInnerFactor
-            @summariseFactor: table, innerFactor$, "inner"
+            @summariseFactor: table, iFactor$, "i"
         endif
-
     endif
 endproc
 
 procedure doOutputUI
-
     if useInnerFactor
-        varRoot$ = "inner"
+        varRoot$ = "i"
     else
-        varRoot$ = "outer"
+        varRoot$ = "o"
     endif
 
+    @hideObjs: "table", "../data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings"
         comment: "Plot basics"
         sentence: "Title", title$
         positive: "Interior plot size (inches)", plotSize
-        @addShared_UI_1
-
+        @addShared_UI_2
         comment: "F1-F2 formant plot ranges (in "
             ... + inputUnits$[inputUnits] + ".)"
             natural: "F1 minimum", minF1
@@ -178,17 +193,6 @@ procedure doOutputUI
 
         comment: "Plot layers"
 
-        optionMenu: "Most prominent layer", dataPointsOnTop
-            option: "Mean values"
-            option: "data points"
-
-        optionMenu: "Show means", showMeans
-            option: "Don't show means."
-            option: "... without text"
-            for i to numFactors
-                option: "... with " + factorName$[i] + " text"
-            endfor
-
         optionMenu: "Mark individual data points using", tokenMarking
             option: "x symbol"
             for i to numFactors
@@ -196,30 +200,37 @@ procedure doOutputUI
             endfor
             option: "Nothing"
 
+        optionMenu: "Show means", showMeans
+            option: "Don't show means."
+            option: "... without text"
+                    for i to numFactors
+                option: "... with " + factorName$[i] + " text"
+            endfor
+
         optionMenu: "Core " + 'varRoot$'Factor$, coreLevel
             option: "None"
             for i to 'varRoot$'Levels
                 option: 'varRoot$'Level$[i]
             endfor
 
+        optionMenu: "Most prominent layer", dataPointsOnTop
+            option: "Mean values"
+            option: "data points"
+
         optionMenu: "Draw ellipses", ellipsisSDs
             option: "No Ellipses"
             option: "One standard deviation"
             option: "Two standard deviations"
-
         boolean: "Show arrows", showArrows
-        @addShared_UI_2
+        @addShared_UI_3
+    myChoice = endPause: "Exit", "Continue", 2, 1
+    if myChoice = 1
+        exit
+    endif
 
-
-        myChoice = endPause: "Exit", "Continue", 2, 1
-        if myChoice = 1
-            removeObject: table
-            exit
-        endif
-
+    @retrieveObjs: "hiddenTx"
     # Process generic outoutUI
     @processShared_UIs
-    # PROCESS F1F2 PLOT SPECIFIC PARAMETERS
     dataPointsOnTop = most_prominent_layer - 1
     plotSize = interior_plot_size
     outputUnits = output_units
@@ -227,27 +238,22 @@ procedure doOutputUI
     maxF1 = f1_maximum
     minF2 = f2_minimum
     maxF2 = f2_maximum
-
     showMeans = show_means - 2
     ellipsisSDs = draw_ellipses - 1
     tokenMarking = mark_individual_data_points_using - 1
     showArrows = show_arrows
-
-
-    # Make sensible coreLevel variable!
     coreLevel$ = "core_" +
     ...replace_regex$('varRoot$'Factor$, "[^A-Za-z0-9]", "_", 0)
     coreLevel = 'coreLevel$' - 1
 endproc
 
+
 # Main drawing procedure
 procedure drawf1f2Plot
-
     @resetDrawSpace: fontM
     @calculateAxisIncrements
     @doF1F2AxisLayer
     @doPlotInterior
-
     if showLegend
         @drawLegendLayer: majorT_Max, majorT_Min,
              ... majorR_Max, majorR_Min,
@@ -255,9 +261,9 @@ procedure drawf1f2Plot
              ... table, "F2DrawValue", "F1DrawValue",
              ... legBlockTolerance, bufferZone, 1, 0, -1
     endif
-
     @drawTitleLayer
 endproc
+
 
 # Plot calculation and plot table management procedures
 procedure calculateAxisIncrements
@@ -266,7 +272,6 @@ procedure calculateAxisIncrements
         majorRDist = 100
         minorTDist = 100
         majorTDist = 500
-
         horAdjust = 0.125
         vertAdjust = 0.15
         titleAdjust = vertAdjust + 0.3
@@ -275,7 +280,6 @@ procedure calculateAxisIncrements
         majorRDist = 2
         minorTDist = 0.5
         majorTDist = 2
-
         horAdjust = 0.25
         vertAdjust = 0
         titleAdjust = vertAdjust + 0.3
@@ -283,41 +287,53 @@ procedure calculateAxisIncrements
 endproc
 
 procedure createSubTables
-    for outerLevel to outerLevels
+
+    # calculate potential tables
+    @possRows: table, "o", "i"
+
+    for o to oLevels
         #add to legend arrays
-        curColVector$ = curPaletteVector$[outerColour[outerLevel]]
-        curColName$ = curPaletteName$[outerColour[outerLevel]]
-        @legend: "R", curColVector$, outerLevel$[outerLevel], 4
+        curColVector$ = curPaletteVector$[oColour[o]]
+        curColName$ = curPaletteName$[oColour[o]]
+        @legend: "R", curColVector$, oLevel$[o], 4
         prevMeanF1 = 0
         prevMeanF2 = 0
-        for innerLevel to innerLevels
+        for i to iLevels
             # create sub-table
             if useInnerFactor
-                subInnerFactor$ = innerFactor$
-                subInnerLevel$[innerLevel] = innerLevel$[innerLevel]
-                subOuterFactor$ = outerFactor$
-                subOuterLevel$[outerLevel] = outerLevel$[outerLevel]
+                subInnerFactor$ = iFactor$
+                subiLevel$[i] = iLevel$[i]
+                subOuterFactor$ = oFactor$
+                suboLevel$[o] = oLevel$[o]
             else
-                subInnerFactor$ = outerFactor$
-                subInnerLevel$[innerLevel] = outerLevel$[outerLevel]
-                subOuterFactor$ = outerFactor$
-                subOuterLevel$[outerLevel] = outerLevel$[outerLevel]
+                subInnerFactor$ = oFactor$
+                subiLevel$[i] = oLevel$[o
+                subOuterFactor$ = oFactor$
+                suboLevel$[o] = oLevel$[o]
             endif
-            selectObject: table
-            innerLevelTable[outerLevel, innerLevel] = Extract rows where:
-                ... "self$[subInnerFactor$] = subInnerLevel$[innerLevel] and " +
-                ... "self$[subOuterFactor$] = subOuterLevel$[outerLevel]"
+
+            if possRows.matrix##[o,i]
+                selectObject: table
+                iLevelTable[o, i] = Extract rows where:
+                    ... "self$[subInnerFactor$] = subiLevel$[i] and " +
+                    ... "self$[subOuterFactor$] = suboLevel$[o]"
+            else
+                iLevelTable[o, i] = undefined
+            endif
         endfor
     endfor
 endproc
 
 procedure removeTables
-    for outerLevel to outerLevels
-        for innerLevel to innerLevels
-            removeObject: innerLevelTable[outerLevel, innerLevel]
+    for o to oLevels
+        for i to iLevels
+            if possRows.matrix##[o,i]
+                removeObject: iLevelTable[o, i]
+            endif
         endfor
     endfor
 endproc
+
 
 # Plot layer Procedures
 procedure doF1F2AxisLayer
@@ -335,7 +351,6 @@ procedure doF1F2AxisLayer
 
     incCur = minorRDist
     selectObject: table
-
     @getOutputScales:
     ...table, "'f1Col$','f2Col$'",
     ... minF1, maxF1, minorRDist,
@@ -357,48 +372,45 @@ procedure doF1F2AxisLayer
     Axes: majorT_Max, majorT_Min, majorR_Max, majorR_Min
     xDist = Horizontal mm to world coordinates: 0.1
     yDist = Vertical mm to world coordinates: 0.1
-
     lineColour$[1] = lightLine$
     lineColour$[2] = darkLine$
-    lineSize[1] = 1
-    lineSize[2] = 1
 
     # Draw minor horizontal lines
     Colour: lineColour$[1]
-    Line width: lineSize[1]
+    Line width: axisLine[1]
     for line to minorR_Lines
         Draw line: majorT_Min, minorR_DrawVal[line],
-               ... majorT_Max, minorR_DrawVal[line]
+        ... majorT_Max, minorR_DrawVal[line]
     endfor
     # Draw minor vertical lines
     Colour: lineColour$[1]
-    Line width: lineSize[1]
+    Line width: axisLine[1]
     for line to minorT_Lines
         Draw line: minorT_DrawVal[line], majorR_Min,
                ... minorT_DrawVal[line], majorR_Max
     endfor
     # draw major horizontal lines
     Colour: lineColour$[2]
-    Line width: lineSize[2]
+    Line width: axisLine[2]
     for line to majorR_Lines
         Draw line: majorT_Min, majorR_DrawVal[line],
-               ... majorT_Max, majorR_DrawVal[line]
+        ... majorT_Max, majorR_DrawVal[line]
         Colour: "Black"
         Text: majorT_Min, "left",
-          ... majorR_DrawVal[line], "Half",
-          ... string$(majorR_AxisVal[line])
+        ... majorR_DrawVal[line], "Half",
+        ... string$(majorR_AxisVal[line])
     endfor
     # Draw Major Vertical Lines
     Colour: lineColour$[2]
-    Line width: lineSize[2]
+    Line width: axisLine[2]
     for line to majorT_Lines
         Draw line: majorT_DrawVal[line], majorR_Min,
-               ... majorT_DrawVal[line], majorR_Max
+        ... majorT_DrawVal[line], majorR_Max
         Colour: "Black"
         Text special: majorT_DrawVal[line], "Left",
-                  ... majorR_Min, "Half",
-                  ... "Helvetica", fontM, "90",
-                  ... string$(majorT_AxisVal[line])
+        ... majorR_Min, "Half",
+        ... "Helvetica", fontM, "90",
+        ... string$(majorT_AxisVal[line])
     endfor
 
     # Draw graph frame
@@ -412,7 +424,6 @@ procedure doPlotInterior
     Font size: fontM
     Select inner viewport: left, right, top, bottom
 
-
     # prepare mean text Column
     if showMeans > 0
         selectObject: table
@@ -420,12 +431,12 @@ procedure doPlotInterior
         Formula: "meansText", "self$[factorName$[showMeans]]"
     endif
 
-    # correct arrays if no innerFactor
-    if not useInnerFactor or innerFactor$ = outerFactor$
-        innerLevels = outerLevels
-        innerFactor$ = outerFactor$
-        for i to innerLevels
-            innerLevel$[i] = outerLevel$[i]
+    # correct arrays if no iFactor
+    if not useInnerFactor or iFactor$ = oFactor$
+        iLevels = oLevels
+        iFactor$ = oFactor$
+        for i to iLevels
+            iLevel$[i] = oLevel$[i]
         endfor
     endif
 
@@ -439,16 +450,13 @@ procedure doPlotInterior
     Axes: majorT_Max, majorT_Min, majorR_Max, majorR_Min
     xDiff = Horizontal mm to world coordinates: 0.1
     yDiff = Vertical mm to world coordinates: 0.1
-    appendInfoLine: xDiff, tab$, yDiff
     Append column: "F1Adj"
     Append column: "F2Adj"
-    Formula: "F2Adj",
-        ... "self[""F2DrawValue""] + xDiff"
-    Formula: "F1Adj",
-        ... "self[""F1DrawValue""] - yDiff"
+    Formula: "F2Adj", "self[""F2DrawValue""] + xDiff"
+    Formula: "F1Adj", "self[""F1DrawValue""] - yDiff"
 
     if !useInnerFactor
-        innerLevels = 1
+        iLevels = 1
     endif
     @createSubTables
     @doEllipses
@@ -464,26 +472,27 @@ procedure doPlotInterior
 endproc
 
 procedure doEllipses
-    for outerLevel to outerLevels
+    for o to oLevels
         # set current colours
-        curColVector$ = curPaletteVector$[outerColour[outerLevel]]
-        curColName$ = curPaletteName$[outerColour[outerLevel]]
+        curColVector$ = curPaletteVector$[oColour[o]]
+        curColName$ = curPaletteName$[oColour[o]]
         @modifyColVectr: curColVector$, "curColour$[5]", " + shading * 2"
         @modifyColVectr: curColVector$, "curColour$[4]", " + shading"
         curColour$[3] = curColVector$
         @modifyColVectr: curColVector$, "curColour$[2]", " - shading"
         @modifyColVectr: curColVector$, "curColour$[1]", " - shading"
-        for innerLevel to innerLevels
+        for i to iLevels
+
             # set criteria for drawing ellipses based on useInnerFactor.
             if useInnerFactor
                 criteria$ =
-                ... "self$[subInnerFactor$] = subInnerLevel$[innerLevel]"
+                ... "self$[subInnerFactor$] = subiLevel$[i]"
             else
                 criteria$ = "1"
             endif
-            selectObject: innerLevelTable[outerLevel, innerLevel]
-            hasRows = Get number of rows
-            if hasRows
+
+            if possRows.matrix##[o,i]
+                selectObject: iLevelTable[o, i]
                 curMeanF1 = Get mean: "F1DrawValue"
                 curMeanF2 = Get mean: "F2DrawValue"
                 # draw ellipses
@@ -494,16 +503,18 @@ procedure doEllipses
                     else
                         Colour:  'curColour$[2]'
                     endif
-                    Draw ellipses where: "F2DrawValue", majorT_Max, majorT_Min,
-                                 ... "F1DrawValue", majorR_Max, majorR_Min,
-                                 ... subInnerFactor$,  ellipsisSDs, 0, "no",
-                                 ... criteria$
+                    Draw ellipses where:
+                    ... "F2DrawValue", majorT_Max, majorT_Min,
+                    ... "F1DrawValue", majorR_Max, majorR_Min,
+                    ... subInnerFactor$,  ellipsisSDs, 0, "no",
+                    ... criteria$
                     Line width: 2
                     Colour: curColour$[4]
-                    Draw ellipses where: "F2DrawValue", majorT_Max, majorT_Min,
-                                 ... "F1DrawValue", majorR_Max, majorR_Min,
-                                 ... subInnerFactor$,  ellipsisSDs, 0, "no",
-                                 ... criteria$
+                    Draw ellipses where:
+                    ... "F2DrawValue", majorT_Max, majorT_Min,
+                    ... "F1DrawValue", majorR_Max, majorR_Min,
+                    ... subInnerFactor$,  ellipsisSDs, 0, "no",
+                    ... criteria$
                 endif
             endif
         endfor
@@ -511,10 +522,10 @@ procedure doEllipses
 endproc
 
 procedure doArrows
-    for outerLevel to outerLevels
+    for o to oLevels
         # set current colours
-        curColVector$ = curPaletteVector$[outerColour[outerLevel]]
-        curColName$ = curPaletteName$[outerColour[outerLevel]]
+        curColVector$ = curPaletteVector$[oColour[o]]
+        curColName$ = curPaletteName$[oColour[o]]
         @modifyColVectr: curColVector$, "curColour$[5]", " + shading * 2"
         @modifyColVectr: curColVector$, "curColour$[4]", " + shading"
         curColour$[3] = curColVector$
@@ -522,61 +533,62 @@ procedure doArrows
         @modifyColVectr: curColVector$, "curColour$[1]", " - shading"
         prevMeanF1 = 0
         prevMeanF2 = 0
-        for innerLevel to innerLevels
-            selectObject: innerLevelTable[outerLevel, innerLevel]
-            hasRows = Get number of rows
-            if hasRows
-                curMeanF1 = Get mean: "F1DrawValue"
-                curMeanF2 = Get mean: "F2DrawValue"
-
-                #Draw arrows
-                if showArrows and prevMeanF1
-                    gap =  1 - arrowRatio
-                    xStart = prevMeanF2 + gap / 3 * (curMeanF2 - prevMeanF2)
-                    yStart = prevMeanF1 + gap / 3 * (curMeanF1 - prevMeanF1)
-                    xEnd = curMeanF2 - gap * 2 / 3 * (curMeanF2 - prevMeanF2)
-                    yEnd = curMeanF1 - gap * 2 / 3 * (curMeanF1 - prevMeanF1)
-                    Line width: 4
-                    Arrow size: 1.05
-                    if mean('curColour$[4]' * colrAdj#) < 0.19567
-                        Colour: 'curColour$[5]'
-                    else
-                        Colour:  'curColour$[2]'
+        for i to iLevels
+            if possRows.matrix##[o,i]
+                selectObject: iLevelTable[o, i]
+                hasRows = Get number of rows
+                if hasRows
+                    curMeanF1 = Get mean: "F1DrawValue"
+                    curMeanF2 = Get mean: "F2DrawValue"
+                    #Draw arrows
+                    if showArrows and prevMeanF1
+                        gap =  1 - arrowRatio
+                        xStart = prevMeanF2 + gap / 3 * (curMeanF2 - prevMeanF2)
+                        yStart = prevMeanF1 + gap / 3 * (curMeanF1 - prevMeanF1)
+                        xEnd =
+                        ... curMeanF2 - gap * 2 / 3 * (curMeanF2 - prevMeanF2)
+                        yEnd =
+                        ... curMeanF1 - gap * 2 / 3 * (curMeanF1 - prevMeanF1)
+                        Line width: 4
+                        Arrow size: 1.05
+                        if mean('curColour$[4]' * colrAdj#) < 0.19567
+                            Colour: 'curColour$[5]'
+                        else
+                            Colour:  'curColour$[2]'
+                        endif
+                        Draw arrow: xStart, yStart, xEnd, yEnd
+                        Line width: 2
+                        Arrow size: 1
+                        Colour: curColour$[4]
+                        Draw arrow: xStart, yStart, xEnd, yEnd
                     endif
-                    Draw arrow: xStart, yStart, xEnd, yEnd
-                    Line width: 2
-                    Arrow size: 1
-                    Colour: curColour$[4]
-                    Draw arrow: xStart, yStart, xEnd, yEnd
+                    prevMeanF1 = curMeanF1
+                    prevMeanF2 = curMeanF2
                 endif
-                prevMeanF1 = curMeanF1
-                prevMeanF2 = curMeanF2
             endif
-
         endfor
     endfor
 endproc
 
 procedure doScatterplots
-    for outerLevel to outerLevels
+    for o to oLevels
         # set current colours
-        curColVector$ = curPaletteVector$[outerColour[outerLevel]]
-        curColName$ = curPaletteName$[outerColour[outerLevel]]
+        curColVector$ = curPaletteVector$[oColour[o]]
+        curColName$ = curPaletteName$[oColour[o]]
         @modifyColVectr: curColVector$, "curColour$[5]", " + shading * 2"
         @modifyColVectr: curColVector$, "curColour$[4]", " + shading"
         curColour$[3] = curColVector$
         @modifyColVectr: curColVector$, "curColour$[2]", " - shading"
         @modifyColVectr: curColVector$, "curColour$[1]", " - shading"
-        for innerLevel to innerLevels
+        for i to iLevels
             # set draw criters depending on useInnerFactor
             if useInnerFactor
-                criteria$ = "self$[subInnerFactor$] = subInnerLevel$[innerLevel]"
+                criteria$ = "self$[subInnerFactor$] = subiLevel$[i]"
             else
                 criteria$ = "1"
             endif
-
-            selectObject: innerLevelTable[outerLevel, innerLevel]
-            if hasRows
+            if possRows.matrix##[o,i]
+                selectObject: iLevelTable[o, i]
                 # Draw scatter plot
                 # colour brightness weights based on:
                 # https://www.w3.org/TR/AERT/#color-contrast
@@ -587,7 +599,6 @@ procedure doScatterplots
                 else
                     Colour:  'curColour$[2]' - 0.5
                 endif
-
                 if !tokenMarking
                     Line width: 4
                     Scatter plot where (mark):
@@ -600,7 +611,6 @@ procedure doScatterplots
                     ... "F1Adj", majorR_Max, majorR_Min,
                     ... "token", fontM, "no", criteria$
                 endif
-
                 Colour: curColour$[1]
                 if !tokenMarking
                     Line width: 2
@@ -619,57 +629,52 @@ procedure doScatterplots
 endproc
 
 procedure doMeansText
-    for outerLevel to outerLevels
-
+    for o to oLevels
         # set current colours
-        curColVector$ = curPaletteVector$[outerColour[outerLevel]]
-        curColName$ = curPaletteName$[outerColour[outerLevel]]
+        curColVector$ = curPaletteVector$[oColour[o]]
+        curColName$ = curPaletteName$[oColour[o]]
         @modifyColVectr: curColVector$, "curColour$[5]", " + shading * 2"
         @modifyColVectr: curColVector$, "curColour$[4]", " + shading"
         curColour$[3] = curColVector$
         @modifyColVectr: curColVector$, "curColour$[2]", " - shading"
         @modifyColVectr: curColVector$, "curColour$[1]", " - shading"
 
-        for innerLevel to innerLevels
-            selectObject: innerLevelTable[outerLevel, innerLevel]
-            hasRows = Get number of rows
-
-            if hasRows
-                curMeanF1 = Get mean: "F1DrawValue"
-                curMeanF2 = Get mean: "F2DrawValue"
-
-                # draw mean
-                if showMeans >= 0
-                    outlineColr$ = "Black"
-                    if innerLevel = coreLevel
-                        @drawSquare: curMeanF2, curMeanF1,
-                                 ... curColour$[3], bulletSize
-                    else
-                        @drawCircle: curMeanF2, curMeanF1,
-                                 ... curColour$[3], bulletSize
+        for i to iLevels
+            if possRows.matrix##[o,i]
+                selectObject: iLevelTable[o, i]
+                hasRows = Get number of rows
+                if hasRows
+                    curMeanF1 = Get mean: "F1DrawValue"
+                    curMeanF2 = Get mean: "F2DrawValue"
+                    # draw mean
+                    if showMeans >= 0
+                        outlineColr$ = "Black"
+                        if i = coreLevel
+                            @drawSquare: curMeanF2, curMeanF1,
+                            ... curColour$[3], bulletSize
+                        else
+                            @drawCircle: curMeanF2, curMeanF1,
+                            ... curColour$[3], bulletSize
+                        endif
+                    endif
+                    # write text
+                    if showMeans > 0
+                        curMeanText$ = Get value: 1, "meansText"
+                        18
+                        Select inner viewport: left, right, top, bottom
+                        Colour: "{0.9, 0.9, 0.9}"
+                        Text: curMeanF2 + xDiff, "centre",
+                        ... curMeanF1 - yDiff, "bottom",
+                        ... "##" + curMeanText$
+                        # draw black text
+                        Colour: "Black"
+                        Text: curMeanF2, "centre",
+                        ... curMeanF1, "bottom",
+                        ... "##" + curMeanText$
+                        12
+                        Select inner viewport: left, right, top, bottom
                     endif
                 endif
-
-                # write text
-                if showMeans > 0
-                    curMeanText$ = Get value: 1, "meansText"
-                    18
-                    Select inner viewport: left, right, top, bottom
-
-                    Colour: "{0.9, 0.9, 0.9}"
-                    Text: curMeanF2 + xDiff, "centre",
-                    ... curMeanF1 - yDiff, "bottom",
-                    ... "##" + curMeanText$
-
-                    # draw black text
-                    Colour: "Black"
-                    Text: curMeanF2, "centre",
-                      ... curMeanF1, "bottom",
-                      ... "##" + curMeanText$
-                    12
-                    Select inner viewport: left, right, top, bottom
-                endif
-
             endif
         endfor
     endfor
@@ -681,6 +686,7 @@ procedure drawTitleLayer
     Text top: "yes", "##" + title$
     Font size: fontM
 endproc
+
 
 # Initialisation procedures and script inclusions
 procedure defineVars
@@ -694,7 +700,7 @@ procedure defineVars
         @createF1F2Vars: "../data/vars/f1f1Plot.var"
     endif
     @readVars: "../data/vars/", "f1f1Plot.var"
-    @getFreqAxisNames
+    @getGenAxisVars
 endproc
 
 procedure createF1F2Vars:
@@ -703,20 +709,20 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "f1f2Version$", tab$, curF1f2Version$
     appendFileLine: .address$, "plotSize", tab$, 5
     appendFileLine: .address$, "tableID$", tab$,
-        ... "../example/nIEdiphthongs.txt"
-    appendFileLine: .address$, "outerFactor$", tab$, "sound"
-    appendFileLine: .address$, "innerFactor$", tab$, "element"
+    ... "../example/nIEdiphthongs.txt"
+    appendFileLine: .address$, "oFactor$", tab$, "sound"
+    appendFileLine: .address$, "iFactor$", tab$, "element"
     appendFileLine: .address$, "useInnerFactor", tab$, 1
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"
     appendFileLine: .address$, "tertiaryFilters", tab$, 0
     appendFileLine: .address$, "inputUnits", tab$, 1
-    appendFileLine: .address$, "innerBoolean#", tab$, "{0}"
-    appendFileLine: .address$, "outerBoolean#", tab$, "{0}"
+    appendFileLine: .address$, "iBoolean#", tab$, "{0}"
+    appendFileLine: .address$, "oBoolean#", tab$, "{0}"
     appendFileLine: .address$, "arrowRatio", tab$, 0.75
     appendFileLine: .address$, "prevInputUnit", tab$, 1
     appendFileLine: .address$, "title$", tab$,
-        ... "F1-F2 plot for nIE diphthongs"
+    ... "F1-F2 plot for nIE diphthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "minF1", tab$, 150
     appendFileLine: .address$, "maxF1", tab$, 1400
@@ -729,7 +735,6 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "coreLevel", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "saveName$", tab$, "F1F2_Plot.png"
-
     @appendSharedVars: .address$
 endproc
 

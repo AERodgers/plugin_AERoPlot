@@ -1,6 +1,6 @@
 # General Functions
 # =================
-  genFnBankVersion$ = "1.0.1.0"
+  genFnBankVersion$ = "1.2.0.0"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
@@ -64,15 +64,14 @@ procedure checkPraatVersion
     endif
 endproc
 
+
 # file and variable handling
 procedure csvLine2Array: .csvLine$, .size$, .array$
-
     # correct variable name Strings
     .size$ = replace$(.size$, "$", "", 0)
     if right$(.array$, 1) != "$"
         .array$ += "$"
     endif
-
     # fix input csvLine array
     .csvLine$ = replace$(.csvLine$, ", ", ",", 0)
     while index(.csvLine$, "  ")
@@ -80,7 +79,6 @@ procedure csvLine2Array: .csvLine$, .size$, .array$
     endwhile
     .csvLine$ = replace_regex$ (.csvLine$, "^[ \t\r\n]+|[ \t\r\n]+$", "", 0)
     .csvLine$ += ","
-
     # generate output array
     '.size$' = 0
     while length(.csvLine$) > 0
@@ -107,9 +105,10 @@ procedure vector2Str: .vectorVar$
     '.stringVar$' = left$('.stringVar$', length('.stringVar$') - 1) + "}"
 endproc
 
-# Variable Storage and retrieval
-#    - Accepts scalar, string, vector, and matrix variables.
-#    - stores variables in a TSV file with the headers "variable" and "value"
+
+# Data Storage and retrieval functionsL
+    # - Accepts scalar, string, vector, and matrix variables.
+    # - stores variables in a TSV file with the headers "variable" and "value"
 procedure readVars: .dir$, .file$
     # reads list of variables from TSV .file$ (headers, "variable, "value")
     .vars = Read Table from tab-separated file: "'.dir$''.file$'"
@@ -119,15 +118,15 @@ procedure readVars: .dir$, .file$
         '.prefix$'Var$[.i] = Get value: .i, "variable"
         .curVar$ = '.prefix$'Var$[.i]
         .curValue$ = Get value: .i, "value"
-
         if right$(.curVar$, 1) = "]"
             # extract array
             .leftBracket = index(.curVar$, "[")
             .curArray$ = left$(.curVar$, .leftBracket - 1)
-            .index$ = mid$(.curVar$,
-                       ... .leftBracket + 1,
-                       ... length(.curVar$) - .leftBracket - 1
-                       ... )
+            .index$ = mid$(
+            ... .curVar$,
+            ... .leftBracket + 1,
+            ... length(.curVar$) - .leftBracket - 1
+            ... )
             .curVar$ = .curArray$ + "[" + .index$ + "]"
             if right$(.curArray$, 1) = "$"
                 # cope with string array value
@@ -160,7 +159,6 @@ procedure writeVars: .dir$, .file$
     if variableExists("changeAddColSch")
         changeAddColSch = 0
     endif
-
     .prefix$ = left$(.file$, rindex(.file$, ".") - 1)
     .vars = Read Table from tab-separated file: .dir$ + .file$
     for i to '.prefix$'NumVars
@@ -182,6 +180,55 @@ procedure writeVars: .dir$, .file$
     Remove
 endproc
 
+procedure hideObjs: .objects$, .dir$, .root$
+    # fix variable name and directory
+    .root$ = replace$(.root$, "$", "", 1)
+    endif
+    if right$(.dir$) != "/" or right$(.dir$) != "\"
+        .dir$ += "/"
+    endif
+    '.root$'Dir$ = .dir$
+
+    @csvLine2Array: .objects$, "hideObjs.numObjects", "hideObjs.varList$"
+    @date
+    '.root$'$ = string$(date.index) + fixed$(randomUniform (0, 1) * 10e5, 0)
+    '.root$'numObjects = .numObjects
+
+    .curObj$ = .varList$[1]
+    selectObject: '.curObj$'
+
+    '.root$'objName$[1] =
+    ... replace$(
+    ... selected$(),
+    ... left$(selected$(), index(selected$(), " ")),
+    ... "",
+    ... 1)
+    '.root$'Var$[1] = .varList$[1]
+    for .i from 2 to .numObjects
+        .curObj$ = .varList$[.i]
+        plusObject: '.curObj$'
+        '.root$'objName$[.i] = selected$(-1)
+        '.root$'Var$[.i] = .varList$[.i]
+    endfor
+    Save as binary file: .dir$ + '.root$'$ + ".bin"
+    Remove
+endproc
+
+procedure retrieveObjs: .root$
+    Read from file: '.root$'Dir$ + '.root$'$ + ".bin"
+    deleteFile: '.root$'Dir$ + '.root$'$ + ".bin"
+    for .i to '.root$'numObjects
+        .curVar$ = '.root$'Var$[.i]
+        '.curVar$' = selected(.i)
+    endfor
+    for .i to '.root$'numObjects
+        .curVar$ = '.root$'Var$[.i]
+        selectObject: '.curVar$'
+        Rename: '.root$'objName$[.i]
+    endfor
+endproc
+
+
 # Table metadata and filtering functions
 procedure getFactors: .table, .outputVarRoot$
     selectObject: .table
@@ -189,8 +236,8 @@ procedure getFactors: .table, .outputVarRoot$
     for i to '.outputVarRoot$'Factors
         '.outputVarRoot$'Factor$[i] = Get column label: i
     endfor
-
 endproc
+
 procedure summariseFactor: .df, .factor$, .rt$
     # Treats table as dataframe, with column headers as factors, and
     # and each unique column entry as a level.
@@ -208,22 +255,18 @@ procedure summariseFactor: .df, .factor$, .rt$
         ... newline$ + tab$ + ".factor$ = " + """'.factor$'""" +
         ... newline$ + tab$ + ".rt$ =  " + """'.rt$'"""
     endif
-
     #correct name of output array
     if right$(.rt$, 1) != "$"
         #create variable name for unique count
         .rt$ += "$"
     endif
-
     #create names for output variables
     .levels$ = replace$(.rt$, "$", "Levels", 1)
     .levelCount$ = replace$(.rt$, "$", "Count", 1)
     .rt$ = replace$(.rt$, "$", "Level$", 1)
-
     .numRows = Get number of rows
     '.levels$' = 0
     '.rt$'[1] = Get value: 1, .factor$
-
     .firstInst = 1
     .levels = 0
     while .firstInst <= .numRows
@@ -242,12 +285,12 @@ procedure summariseFactor: .df, .factor$, .rt$
 endproc
 
 procedure filterLevels: .table, .factor$, .rt$, .stateVar$
-    # Check x outerBoolean choices
+    # Check x oBoolean choices
     '.rt$'Boolean# = zero#('.rt$'Levels)
     if '.stateVar$' and
-            ... size('.rt$'Boolean#) = size(x_'.rt$'Boolean#) and
-            ... sum(x_'.rt$'Boolean#)
-         '.rt$'Boolean# = x_'.rt$'Boolean#
+        ... size('.rt$'Boolean#) = size(x_'.rt$'Boolean#) and
+        ... sum(x_'.rt$'Boolean#)
+        '.rt$'Boolean# = x_'.rt$'Boolean#
     else
         # avoid index error first time script is run
         '.stateVar$' = 0
@@ -255,10 +298,10 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
     endif
 
     .varRoot$ = replace_regex$('.rt$'Factor$, "^.", "\l&", 1)
-
     .comment$ = ""
-    .levelsChosen = 0
-    while ! .levelsChosen
+    .done = 0
+    @hideObjs: "filterLevels.table", "../data/temp/", "hiddenTx"
+    while ! .done
         beginPause: "Levels to display in graphic."
             comment:
             ... "Select entries from """ + '.rt$'Factor$ + """  to display:"
@@ -271,15 +314,15 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
         .myChoice = endPause: "Exit", "Continue", 2, 1
         .comment$ = "You must choose AT LEAST ONE level."
         if .myChoice = 1
-            removeObject: .table
             exit
         endif
         for .i to '.rt$'Levels
             .curBoolean$ = '.rt$'Boolean$[.i]
             '.rt$'Boolean#[.i] = '.curBoolean$'
         endfor
-        .levelsChosen = sum('.rt$'Boolean#)
+        .done = sum('.rt$'Boolean#)
     endwhile
+    @retrieveObjs: "hiddenTx"
     # Calculate index and count of outer levels to plot
     '.rt$'LevelsToPlot = 0
     for .i to '.rt$'Levels
@@ -289,7 +332,6 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
             '.rt$'LevelToPlot['.rt$'LevelsToPlot] = .i
         endif
     endfor
-
     # Purge table of outer levels which will not be plotted.
     for .i to '.rt$'Levels
         .deleteMe = 1
@@ -300,12 +342,12 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
         endfor
         if .deleteMe
             .deleteThis$ = '.rt$'Level$[.i]
-            @removeRowsWhereStr: .table,
-                             ... '.rt$'Factor$,
-                             ... " = filterLevels.deleteThis$"
+            @removeRowsWhereStr:
+            ... .table,
+            ... '.rt$'Factor$,
+            ... " = filterLevels.deleteThis$"
         endif
     endfor
-
     # recalculate outer levels based on purged table
     @summariseFactor: filterLevels.table, '.rt$'Factor$, .rt$
 endproc
@@ -313,20 +355,18 @@ endproc
 procedure filterTertFactors: .table, .factorArray$, .numFactors,
     ... .dir$, .file$,
     ... .exclusions$
-    # NB: This functions still uses the global variables:
-    #    - tertiaryFilters
-    #    - x_tertiaryFilters
-    #    - newStateIsOldOne
-
+    # This functions still uses global variables:
+        # - tertiaryFilters
+        # - x_tertiaryFilters
+        # - newStateIsOldOne
     # process exclusions
     @csvLine2Array: .exclusions$,
-        ... "filterTertFactors.numHeaders",
-        ... "filterTertFactors.headerArray$"
+    ... "filterTertFactors.numHeaders",
+    ... "filterTertFactors.headerArray$"
 
     selectObject: .table
     .maxLevels = Get number of rows
     .posTertFactrs = 0
-
     #get list of potential tertiary filtering factors
     for .i to .numFactors
         .validFactor = 1
@@ -337,7 +377,10 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
             endif
         endfor
         if .validFactor
-            @summariseFactor:  .table, '.factorArray$'[.i], "filterTertFactors.curFactr"
+            @summariseFactor:
+            ... .table,
+            ... '.factorArray$'[.i],
+            ... "filterTertFactors.curFactr"
             if .curFactrLevels > 1 and .curFactrLevels < .maxLevels
                 # not possible to filter a factor with only one level
                 # and if num level = max levels, every row is unique
@@ -351,10 +394,11 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
     endfor
 
     if .posTertFactrs
+        newStateIsOldOne =
+        ... newStateIsOldOne and
+        ... fileReadable("'.dir$''.file$'") and
+        ... tertiaryFilters= x_tertiaryFilters
 
-        newStateIsOldOne = newStateIsOldOne and
-                       ... fileReadable("'.dir$''.file$'") and
-                       ... tertiaryFilters= x_tertiaryFilters
         # create set of possible tertiary factor variable flags
         for .i to .posTertFactrs
             .factorVar$[.i] = replace_regex$("factor "  + .posTertFactr$[.i],
@@ -362,13 +406,13 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
             .curVar$ = .factorVar$[.i]
             '.curVar$' = 0
         endfor
-
         #populate possible tertiary factor variable flags
         if newStateIsOldOne
             @readVars: .dir$, .file$
         endif
 
         # UI to select tertiary factors
+        @hideObjs: "filterTertFactors.table", "../data/temp/", "hiddenTx"
         beginPause: "Tertiary Filters"
             comment: "Choose tertiary factors for filtering your data."
             for .i to .posTertFactrs
@@ -378,14 +422,14 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
         .myChoice = endPause: "Exit", "Continue", 2, 1
 
         if .myChoice = 1
-            removeObject: .table
             exit
         endif
+        @retrieveObjs: "hiddenTx"
 
-        writeFileLine: "'.dir$''.file$'", "variable", tab$, "value"
+        writeFileLine: "'.dir$'var.temp", "variable", tab$, "value"
         for .i to .posTertFactrs
             .curVar$ = .factorVar$[.i]
-            appendFileLine: "'.dir$''.file$'", .curVar$, tab$,  '.curVar$'
+            appendFileLine: "'.dir$'var.temp", .curVar$, tab$,  '.curVar$'
             .oldTertIsNewTert[.i] = 0
         endfor
 
@@ -396,37 +440,33 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
             if '.curVar$'
                 .tertFactors += 1
                 .tertFactor$[.tertFactors] = .posTertFactr$[.i]
-                appendFileLine: "'.dir$''.file$'",
-                    ... ".tertFactor$[" + string$(.tertFactors) + "]", tab$,
-                    ... .tertFactor$[.tertFactors]
+                appendFileLine: "'.dir$'var.temp",
+                ... ".tertFactor$[" + string$(.tertFactors) + "]", tab$,
+                ... .tertFactor$[.tertFactors]
                 # check for parity between (potential) old and new factor names.
                 if variableExists("x_.tertFactor$['.tertFactors']")
-                    if x_.tertFactor$[.tertFactors] = .tertFactor$[.tertFactors]
-                        .oldTertIsNewTert[.i] = 1
-                    endif
+                        .oldTertIsNewTert[.tertFactors] = 1
                 endif
-
             endif
         endfor
 
         # Tertiary factor filter UIs
         for .i to .tertFactors
-
             # reassess factor in table
-            @summariseFactor:  .table, .tertFactor$[.i], "filterTertFactors.curFactr"
-
-            if .curFactrLevels > 1
-
+            @summariseFactor:
+            ...  .table, .tertFactor$[.i], "filterTertFactors.curFactr"
+            if .curFactrLevels > 1 and .curFactrLevels <= 50
                 # Some factors may be pruned to 1 level from iterations of loop.
 
                 # level filter UI
+                @hideObjs:
+                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
                 beginPause: "Filter " + .tertFactor$[.i]
                     comment: "Filter """ + .tertFactor$[.i] + """."
-
                     for .j to .curFactrLevels
                         .levelVar$[.j] = replace_regex$(
-                                            ... "value "  + .curFactrLevel$[.j],
-                                            ... "[^A-Za-z0-9]", "_", 0)
+                        ... "value "  + .curFactrLevel$[.j],
+                        ... "[^A-Za-z0-9]", "_", 0)
                         .curVar$ = .levelVar$[.j]
                         if variableExists(.curVar$) and .oldTertIsNewTert[.i]
                             .curBoolean = '.curVar$'
@@ -436,43 +476,63 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                         boolean: .curVar$, .curBoolean
                     endfor
                 .myChoice = endPause: "Exit", "Continue", 2, 1
-
                 if .myChoice = 1
-                    removeObject: .table
                     exit
                 endif
+                @retrieveObjs: "hiddenTx"
 
                 for .j to .curFactrLevels
                     # add .curFactrLevel choices to tertFactor.var
                     .curVar$ = .levelVar$[.j]
                     .curBoolean = '.curVar$'
-                    appendFileLine: "'.dir$''.file$'",
+                    appendFileLine: "'.dir$'var.temp",
                         ... .curVar$, tab$, '.curVar$'
                 endfor
-
                 # purge table of unwanted factor levels
                 for .j to .curFactrLevels
                     .curVar$ = .levelVar$[.j]
                     if !'.curVar$'
                         .curLevel$ = .curFactrLevel$[.j]
-                        @removeRowsWhereStr: .table,
-                                ... .tertFactor$[.i],
-                                ... " = ""'.curLevel$'"""
+                        @removeRowsWhereStr:
+                        ... .table,
+                        ... .tertFactor$[.i],
+                        ... " = ""'.curLevel$'"""
                     endif
                 endfor
-
+            elsif .curFactrLevels == 1
+                @hideObjs:
+                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
+                beginPause: "Filter " + .tertFactor$[.i]
+                comment: .tertFactor$[.i] + " only has one level and cannot " +
+                ... " be pruned."
+                .myChoice = endPause: "Exit", "Continue", 2
+                if .myChoice = 1
+                    exit
+                endif
+                @retrieveObjs: "hiddenTx"
+            else
+                @hideObjs:
+                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
+                beginPause: "Filter " + .tertFactor$[.i]
+                comment: .tertFactor$[.i] + " has '.curFactrLevels' levels. "
+                comment: "Cannot handle factors with more than 50 levels."
+                .myChoice = endPause: "Exit", "Continue", 2
+                if .myChoice = 1
+                    exit
+                endif
+                @retrieveObjs: "hiddenTx"
             endif
-
         endfor
-
+        Read from file: "'.dir$'var.temp"
+        Save as tab-separated file: "'.dir$''.file$'"
+        Remove
+        deleteFile: "'.dir$'var.temp"
     endif
 endproc
 
 procedure removeRowsWhereStr: .table, .col$, .criteria$
-
     selectObject: .table
     .num_rows = Get number of rows
-
     for .i to .num_rows
         .cur_row = .num_rows + 1 - .i
         .cur_value$ = Get value: .cur_row, .col$
@@ -503,53 +563,6 @@ procedure possRows: .table, .outer$, .inner$
     endfor
 endproc
 
-# Useful date function to create unique timestamps in date.index (measured in
-# seconds from  Jan 1, 2020) and date.index$ ("YY.MM.DD.HH.MM.SS" format)
-procedure date
-    .zeros$ = "00"
-    month.num["Jan"] = 1
-    month.num["Feb"] = 2
-    month.num["Mar"] = 3
-    month.num["Apr"] = 4
-    month.num["May"] = 5
-    month.num["Jun"] = 6
-    month.num["Jul"] = 7
-    month.num["Aug"] = 8
-    month.num["Sep"] = 9
-    month.num["Oct"] = 10
-    month.num["Nov"] = 11
-    month.num["Dec"] = 12
-
-    .day$ = left$(date$(),3)
-    .day = number(mid$(date$(),9,2))
-    .day0$ = mid$(date$(),9,2)
-
-    .month$ = mid$(date$(),5, 3)
-    .month = month.num[.month$]
-    .month0$ = left$(.zeros$, 2-length(string$(.month))) +  string$(.month)
-
-    .year$ = right$(date$(),4)
-    .year = number(.year$)
-    .time$ = mid$(date$(), 12, 5)
-    .hour = number(mid$(date$(), 12, 2))
-    .min = number(mid$(date$(), 15, 2))
-    .sec = number(mid$(date$(), 18, 2))
-
-    .index = .sec
-    ... + .min           * 60
-    ... + .hour          * 60 * 60
-    ... + (.day -1)      * 60 * 60 * 24
-    ... + (.month - 1)   * 60 * 60 * 24 * 31
-    ... + (.year - 2020) * 60 * 60 * 24 * 31 * 12
-
-    .index$ = .year$
-    ... + "." + .month0$
-    ... + "." + .day0$
-    ... + "." + mid$(date$(), 12, 2)
-    ... + "." + mid$(date$(), 15, 2)
-    ... + "." + mid$(date$(), 18, 2)
-endproc
-
 # Maths functions
 procedure hz2Bark: .inputObject$, .dummyParam$
     if  right$(.inputObject$, 2) = "##"
@@ -558,22 +571,19 @@ procedure hz2Bark: .inputObject$, .dummyParam$
             for .col to numberOfColumns('.inputObject$')
                 .curNum = '.inputObject$'[.row, .col]
                 '.inputObject$'[.row, .col] = 13 * arctan(7.6e-4 * .curNum) +
-                    ... 3.5 * ((.curNum / 7500)^2)
+                ... 3.5 * ((.curNum / 7500)^2)
             endfor
         endfor
-
     elsif right$(.inputObject$, 1) = "#"
         # Calculate answer for vector
         for .i to size('.inputObject$')
             .curNum = '.inputObject$'[.i]
             '.inputObject$'[.i] = 13 * arctan(7.6e-4 * .curNum) +
-                ... 3.5 * ((.curNum / 7500)^2)
+            ... 3.5 * ((.curNum / 7500)^2)
         endfor
-
     elsif variableExists(.inputObject$) and .dummyParam$ = ""
         '.inputObject$' = 13 * arctan(7.6e-4 * '.inputObject$') +
-                    ... 3.5 * (('.inputObject$' / 7500)^2)
-
+        ... 3.5 * (('.inputObject$' / 7500)^2)
     elsif .dummyParam$ != ""
         # Calculate answer for range of columns in a table.
         .inputVar = '.inputObject$'
@@ -582,40 +592,33 @@ procedure hz2Bark: .inputObject$, .dummyParam$
         .leftMost$ = left$(.dummyParam$, index(.dummyParam$, " ") - 1)
         .rightMost$ = right$(.dummyParam$,
                          ... length(.dummyParam$) - rindex(.dummyParam$, " "))
-
         if .leftMost$ = ""
             .leftMost$ = .rightMost$
         endif
-
         Formula (column range): .leftMost$, .rightMost$,
-            ... "fixed$(13 * arctan(7.6e-4 * self) + " +
-            ... "3.5 * ((self / 7500)^2), 3)"
-
+        ... "fixed$(13 * arctan(7.6e-4 * self) + " +
+        ... "3.5 * ((self / 7500)^2), 3)"
     elsif .inputObject$ = string$(number(.inputObject$)) and .dummyParam$ = ""
         # Calculate answer for number.
-       .ans = 13 * arctan(7.6e-4 *'.inputObject$') +
-          ... 3.5 * (('.inputObject$' / 7500)^2)
+        .ans = 13 * arctan(7.6e-4 *'.inputObject$') +
+        ... 3.5 * (('.inputObject$' / 7500)^2)
+    if variableExists(.inputObject$)
+        '.inputObject$' = .ans
+    endif
+    elsif .dummyParam$ != ""
+        # Calculate answer for range of columns in a table.
+        .inputVar = '.inputObject$'
+        selectObject: .inputVar
 
-       if variableExists(.inputObject$)
-           '.inputObject$' = .ans
-       endif
-
-   elsif .dummyParam$ != ""
-       # Calculate answer for range of columns in a table.
-       .inputVar = '.inputObject$'
-       selectObject: .inputVar
-
-       .leftMost$ = left$(.dummyParam$, index(.dummyParam$, " ") - 1)
-       .rightMost$ = right$(.dummyParam$,
+        .leftMost$ = left$(.dummyParam$, index(.dummyParam$, " ") - 1)
+        .rightMost$ = right$(.dummyParam$,
                         ... length(.dummyParam$) - rindex(.dummyParam$, " "))
-
-       if .leftMost$ = ""
+        if .leftMost$ = ""
            .leftMost$ = .rightMost$
-       endif
-
-       Formula (column range): .leftMost$, .rightMost$,
-           ... "fixed$(13 * arctan(7.6e-4 * self) + " +
-           ... "3.5 * ((self / 7500)^2), 3)"
+        endif
+        Formula (column range): .leftMost$, .rightMost$,
+        ... "fixed$(13 * arctan(7.6e-4 * self) + " +
+        ... "3.5 * ((self / 7500)^2), 3)"
     else
         .ans = undefined
     endif
@@ -655,7 +658,6 @@ procedure dec2hex: .in, .out$
     .hex$[13] = "D"
     .hex$[14] = "E"
     .hex$[15] = "F"
-
     .q = .in
     '.out$' = ""
     while .q > 0
@@ -696,17 +698,15 @@ procedure calcEdges: .inputTable, .weighting#, .dimensions$
             for .curDim to .numDims
                 .curClm#[.curDim] = Get value: .clm, .dim$[.curDim]
             endfor
-
             .curClm# =
             ... (size(.weighting#) == .numDims) * .curClm# * .weighting# +
             ... (size(.weighting#) != .numDims) * .curClm#
-
             .numEdges += 1
-
-        selectObject: .table
-        Set numeric value: .numEdges, "node1", .row
-        Set numeric value: .numEdges, "node2", .clm
-        Set numeric value: .numEdges, "edge", sum((.curClm# - .curRow#)^2)^0.5
+            selectObject: .table
+            Set numeric value: .numEdges, "node1", .row
+            Set numeric value: .numEdges, "node2", .clm
+            Set numeric value:
+            ... .numEdges, "edge", sum((.curClm# - .curRow#)^2)^0.5
         endfor
     endfor
 endproc
@@ -736,16 +736,13 @@ procedure calcLongWalk: .table
     ### main loop
     for .curStop from 2 to .numNodes
         .startAt[.curStop] = .stopAt[.curStop - 1]
-
         # flag current stop as visited#
         .visited#[.startAt[.curStop]] = 1
         .numUnvisited = .numNodes - sum(.visited#)
         .numVisited = sum(.visited#)
-
         # get vector or places to try visiting next and to potentially revisit
         .tryVisiting# = zero#(.numUnvisited)
         .returnTo# = zero#(.numVisited - 1)
-
         .nextVisit = 0
         .alreadyVisited = 0
         for .i to .numNodes
@@ -757,19 +754,18 @@ procedure calcLongWalk: .table
                 .tryVisiting#[.nextVisit] = .i
             endif
         endfor
-
         for .i to .numUnvisited
             selectObject: .table
             .vTempTable = Extract rows where:
-                    ... "self[""node1""] = .tryVisiting#[.i] or " +
-                    ... "self[""node2""] = .tryVisiting#[.i]"
-                .inNode1 = Search column: "node1", string$(.startAt[.curStop])
-                .inNode2 = Search column: "node2", string$(.startAt[.curStop])
-                if .inNode1
-                    .totDistance[.i] = Get value: .inNode1, "edge"
-                else
-                    .totDistance[.i] = Get value: .inNode2, "edge"
-                endif
+            ... "self[""node1""] = .tryVisiting#[.i] or " +
+            ... "self[""node2""] = .tryVisiting#[.i]"
+            .inNode1 = Search column: "node1", string$(.startAt[.curStop])
+            .inNode2 = Search column: "node2", string$(.startAt[.curStop])
+            if .inNode1
+                .totDistance[.i] = Get value: .inNode1, "edge"
+            else
+                .totDistance[.i] = Get value: .inNode2, "edge"
+            endif
             for .j to .numVisited - 1
                 .inNode1 = Search column: "node1", string$(.returnTo#[.j])
                 .inNode2 = Search column: "node2", string$(.returnTo#[.j])
@@ -781,7 +777,6 @@ procedure calcLongWalk: .table
             endfor
             removeObject: .vTempTable
         endfor
-
         # choose longest journey
         .longest = 0
         .stopAt[.curStop] = 0
@@ -791,43 +786,97 @@ procedure calcLongWalk: .table
                 .stopAt[.curStop] = .tryVisiting#[.i]
             endif
         endfor
-
     endfor
-
     # output friendly array name
     for .i to .numNodes
         seqColrByDist.clr[.i] = .startAt[.i]
     endfor
 endproc
 
+
+# Miscellaneous
+procedure date
+    # Useful date function to create unique timestamps in date.index (measured
+    # in seconds from Jan 1, 2020) and date.index$ ("YY.MM.DD.HH.MM.SS" format).
+    .zeros$ = "00"
+    month.num["Jan"] = 1
+    month.num["Feb"] = 2
+    month.num["Mar"] = 3
+    month.num["Apr"] = 4
+    month.num["May"] = 5
+    month.num["Jun"] = 6
+    month.num["Jul"] = 7
+    month.num["Aug"] = 8
+    month.num["Sep"] = 9
+    month.num["Oct"] = 10
+    month.num["Nov"] = 11
+    month.num["Dec"] = 12
+
+    .day$ = left$(date$(),3)
+    .day = number(mid$(date$(),9,2))
+    .day0$ = mid$(date$(),9,2)
+
+    .month$ = mid$(date$(),5, 3)
+    .month = month.num[.month$]
+    .month0$ = left$(.zeros$, 2-length(string$(.month))) +  string$(.month)
+
+    .year$ = right$(date$(),2)
+    .year = number(.year$)
+    .time$ = mid$(date$(), 12, 5)
+    .hour = number(mid$(date$(), 12, 2))
+    .min = number(mid$(date$(), 15, 2))
+    .sec = number(mid$(date$(), 18, 2))
+
+    .index = .sec
+    ... + .min         * 60
+    ... + .hour        * 60 * 60
+    ... + (.day -1)    * 60 * 60 * 24
+    ... + (.month - 1) * 60 * 60 * 24 * 31
+    ... + (.year - 20) * 60 * 60 * 24 * 31 * 12
+
+    .index$ = .year$
+    ... + "." + .month0$
+    ... + "." + .day0$
+    ... + "." + mid$(date$(), 12, 2)
+    ... + "." + mid$(date$(), 15, 2)
+    ... + "." + mid$(date$(), 18, 2)
+endproc
+
+procedure checkMax50: .levels, .table, .factor$, .deleteTable
+    # Sxits script if a factor has more than 50 levels (praat form UI cannot
+    # display more than 50 options in a form.)
+    if .levels > 50
+        if .deleteTable
+            removeObject: .table
+        endif
+        exitScript: "'.factor$' has '.levels' levels." + newline$ +
+        ... "Cannot handle more than 50 levels."
+    endif
+endproc
+
+
 # Colour functions
 # mst of these functions depend on a *.palette file with two rows:
 #    row 1. JS String of RGB colour scheme
 #    row 2. CSV list of colours to match first row
-
 procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
         ... .table, .altColrMatch
 
     if ! variableExists("changeAddColSch")
         changeAddColSch = 0
     endif
-
     if ! variableExists("makeNewColSeq")
         makeNewColSeq = 0
     endif
-
     if ! variableExists("maxColDiff")
         maxColDiff = 0
     endif
-
     if ! variableExists("colrAdj#")
         colrAdj# = {0.299,0.587,0.114}
     endif
-
     if ! variableExists("sortByBrightness")
         sortByBrightness = 0
     endif
-
 
     @readInColPal: .dir$, "current.palette", .colourPalVar$
 
@@ -836,7 +885,6 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
         @changeAddColSch: .dir$, .colrPalFileVar$
         @readInColPal: .dir$, "current.palette", .colourPalVar$
     endif
-
     if makeNewColSeq
         @makeNewColSeq: "'.colourPalVar$'Name$",
         ... "'.colourPalVar$'Vector$",
@@ -845,25 +893,22 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
         ... '.colrPalFileVar$'
         @readInColPal: .dir$, "current.palette", .colourPalVar$
     endif
-
     if maxColDiff
         @seqColrByDist: "../data/palettes/",
         ... .colrPalFileVar$,
         ... colrAdj#,
         ... "curPalette"
     endif
-
     if sortByBrightness
         @sortByBrightness: .dir$,
         ... curPaletteSize,
         ... "curPaletteVector$",
-         ... "curPaletteName$"
+        ... "curPaletteName$"
     endif
-
     @matchCol2Level: .table,
-        ... .altColrMatch,
-        ... .colourPalVar$,
-        ... "outer"
+    ... .altColrMatch,
+    ... .colourPalVar$,
+    ... "o"
 endproc
 
 procedure sortByBrightness: .dir$, .size, .vectorV$, .nameV$
@@ -892,10 +937,8 @@ procedure sortByBrightness: .dir$, .size, .vectorV$, .nameV$
 
     @encodeCB_JS_RGB:
     ... .vectorV$, .size, "sortByBrightness.newJS$"
-
     writeFileLine: .dir$ + "current.palette", .newJS$
     appendFileLine: .dir$ + "current.palette", .newNames$
-
 endproc
 
 procedure unsortByBrightness: .size, .vectorV$, .nameV$
@@ -919,7 +962,7 @@ procedure changeAddColSch: .dir$, .fileVar$
     .curColrStr$ =  Get string: 1
     .curColrNameArray$ =  Get string: 2
     .curColrPalName$ = replace$('.fileVar$', ".palette", "", 0)
-     Remove
+    Remove
 
     # Get array of colour schemes in root folder.
     .listOfPalettes =  Create Strings as file list: "Plts", .dir$ + "*.palette"
@@ -933,7 +976,6 @@ procedure changeAddColSch: .dir$, .fileVar$
         endif
     endfor
     removeObject: .listOfPalettes
-
 
     al$ = "appendInfoLine: "
     writeInfoLine: "CHANGE OR ADD DEFAULT COLOUR SCHEME"
@@ -957,7 +999,7 @@ procedure changeAddColSch: .dir$, .fileVar$
         comment: .comment$
         optionMenu: "Colour scheme", .colScheme
             for .i to .numPalettes
-                option: .palette$[.i]
+                option: replace$(.palette$[.i], "_", " ", 0)
             endfor
             option: "New colour scheme"
 
@@ -966,20 +1008,12 @@ procedure changeAddColSch: .dir$, .fileVar$
             sentence: "Colour names", .curColrNameArray$
             sentence: "Scheme name", .curColrPalName$
         myChoice = endPause: "Exit", "Continue", 2, 1
-        .colScheme = colour_scheme
-
-
         if myChoice = 1
-            if variableExists("table")
-                removeObject: table
-            endif
             exit
         endif
 
-        .name$ = replace_regex$(
-        ... replace_regex$(scheme_name$,  "[^A-Za-z0-9]", "_", 0),
-        ...  "^.", "\l&", 1)
-
+        .name$ = replace_regex$(scheme_name$,  "[^A-Za-z0-9]", "_", 0)
+        .colScheme = colour_scheme
         if .colScheme < .numPalettes
             @readInColPal:
             ... .dir$,
@@ -1017,19 +1051,15 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
     if right$(.colourNames$) != "$"
         .colourNames$ += "$"
     endif
-
     for .i to .arraySize
         .colourOrder[.i] = .i
         .origColOrder[.i] = .i
     endfor
 
     .check# = zero#(.arraySize)
-
     .correct = 0
     .myComment$ = ""
-
     while ! .correct
-
         beginPause: "Reorder Default Colour Sequence"
                 comment: "Choose sequence in which colours will appear."
                 comment: .myComment$
@@ -1040,9 +1070,7 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
                             option: '.colourNames$'[.j]
                         endfor
                 endfor
-
         .myChoice = endPause: "Exit", "Revert to Original", "Continue", 2, 1
-
         if .myChoice = 1
             exit
         elsif .myChoice = 2
@@ -1059,7 +1087,6 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
             endfor
         endif
         .correct = sum(.check#) = .arraySize
-
     endwhile
 
     for .i to .arraySize
@@ -1075,7 +1102,6 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
             .colourString$ += ","
         endif
     endfor
-
     @encodeCB_JS_RGB:
     ... .colourVector$,
     ... .arraySize,
@@ -1089,17 +1115,13 @@ procedure readInColPal: .dir$, .file$, .root$
     .root$ = replace$(.root$, "$", "", 0)
     # Get JS RGB colour array string code
     .jsString = Read Strings from raw text file:
-        ... .dir$ + .file$
+    ... .dir$ + .file$
     .jsArray$ = Get string: 1
     .jsColourNames$ = Get string: 2
     Remove
     @decodeCB_JS_RGB: .jsArray$, "'.root$'Size", "'.root$'Vector$"
     @csvLine2Array: .jsColourNames$, "numColourNames", "'.root$'Name$"
-
     if '.root$'Size != numColourNames
-        if variableExists("table")
-            removeObject: table
-        endif
         deleteFile: .dir$ + .file$
         exitScript: "Colour Palette is corrupted." + newline$
     endif
@@ -1107,20 +1129,18 @@ endproc
 
 procedure matchCol2Level: .table, .altColrMatch, .paletteRt$, .factorRt$
     # Matches colours with values (levels) in an output parameter.
+
     .stdColour = 0
-
     if .altColrMatch
-
         beginPause: "Colours choices for each " + '.factorRt$'Factor$ + "."
         comment: "Choose colour for each " +  '.factorRt$'Factor$ + "."
         for .i to '.factorRt$'Levels
             .stdColour += 1
-
             if .stdColour > '.paletteRt$'Size
                 .stdColour = 1
             endif
             .curFactorLevel$ = replace_regex$('.factorRt$'Level$[.i],
-                ... "[^A-Za-z0-9]", "_", 0)
+            ... "[^A-Za-z0-9]", "_", 0)
             optionMenu: "colour for " + .curFactorLevel$, .stdColour
             for .j to '.paletteRt$'Size
                 option: '.paletteRt$'Name$[.j]
@@ -1128,36 +1148,30 @@ procedure matchCol2Level: .table, .altColrMatch, .paletteRt$, .factorRt$
         endfor
         comment: "NOTE: Avoid using the same colour for different levels."
         .myChoice = endPause: "Exit", "Continue", 2, 1
-
         if .myChoice = 1
-            removeObject: .table
             exit
         endif
-
     else
-
         for .i to '.factorRt$'Levels
             .stdColour += 1
             if .stdColour > '.paletteRt$'Size
                 .stdColour = 1
             endif
             .curFactorLevel$ = replace_regex$('.factorRt$'Level$[.i],
-                                        ... "[^A-Za-z0-9]", "_", 0)
+            ... "[^A-Za-z0-9]", "_", 0)
             colour_for_'.curFactorLevel$' = .stdColour
         endfor
-
     endif
 
     # rationalise array of colour codes re parameter index
     for .i to '.factorRt$'Levels
         .curFactorLevel$ =
-            ...  replace_regex$('.factorRt$'Level$[.i],  "[^A-Za-z0-9]", "_", 0)
+        ...  replace_regex$('.factorRt$'Level$[.i],  "[^A-Za-z0-9]", "_", 0)
         '.factorRt$'Colour[.i] = colour_for_'.curFactorLevel$'
     endfor
 endproc
 
 procedure decodeCB_JS_RGB: .jsArray$, .count$, .array$
-
     # correct variable name Strings
     .count$ = replace$(.count$, "$", "", 0)
     if right$(.array$, 1) != "$"
@@ -1174,7 +1188,6 @@ procedure decodeCB_JS_RGB: .jsArray$, .count$, .array$
     .jsArray$ = replace$(.jsArray$, ";", "{", 1)
     .jsArray$ = replace$(.jsArray$, "}", "", 1)
 
-
     '.count$' = 0
     while length(.jsArray$) > 0
         '.count$' += 1
@@ -1182,16 +1195,15 @@ procedure decodeCB_JS_RGB: .jsArray$, .count$, .array$
         .curVector$ = left$(.jsArray$, .nextVectorEnds)
         .vector# = '.curVector$' / 255
         '.array$'['.count$'] =  "{" +
-            ... fixed$(.vector#[1], 3) + "," +
-            ... fixed$(.vector#[2], 3) + "," +
-            ... fixed$(.vector#[3], 3) +
-            ... "}"
+        ... fixed$(.vector#[1], 3) + "," +
+        ... fixed$(.vector#[2], 3) + "," +
+        ... fixed$(.vector#[3], 3) +
+        ... "}"
         .jsArray$ = replace$(.jsArray$, .curVector$, "", 1)
     endwhile
 endproc
 
 procedure encodeCB_JS_RGB: .vectorVar$, .arraySize, .outputString$
-
         # fix potential variable errors
         if right$(.vectorVar$) != "$"
             .vectorVar$ += "$"
@@ -1205,10 +1217,10 @@ procedure encodeCB_JS_RGB: .vectorVar$, .arraySize, .outputString$
             .curVectorString$ = '.vectorVar$'[.i]
             .curVector# = '.curVectorString$' * 255
             .newString$ +=  "'rgb(" +
-                ... fixed$(.curVector#[1], 0) + "," +
-                ... fixed$(.curVector#[2], 0) + "," +
-                ... fixed$(.curVector#[3], 0) +
-                ... ")'"
+            ... fixed$(.curVector#[1], 0) + "," +
+            ... fixed$(.curVector#[2], 0) + "," +
+            ... fixed$(.curVector#[3], 0) +
+            ... ")'"
             if .i < .arraySize
                 .newString$ += ","
             endif
@@ -1229,16 +1241,19 @@ procedure modifyColVectr: .curCol$, .newCol$, .change$
     endfor
 
     '.newCol$' = "{" + string$(.newCol#[1])
-        ... + ", " + string$(.newCol#[2])
-        ... + ", " + string$(.newCol#[3]) + "}"
+    ... + ", " + string$(.newCol#[2])
+    ... + ", " + string$(.newCol#[3]) + "}"
 endproc
 
-procedure bgColr: .fgColr$, .lghtr$, .drkr$, .colrWgt#, .boundary
+procedure bgColr: .fgColr$, .lgt$, .drk$, .colrWgt#, .boundary
     if mean('.fgColr$' * .colrWgt#) < .boundary
-        Colour: .lghtr$
+        Colour: .lgt$
+        .colr$ = .lgt$
     else
-        Colour: .drkr$
+        Colour: .drk$
+        .colr$ = .drk$
     endif
+
 endproc
 
 procedure seqColrByDist: .dir$, .paletteFileVar$, .weighting#, .outputRoot$
@@ -1247,6 +1262,7 @@ procedure seqColrByDist: .dir$, .paletteFileVar$, .weighting#, .outputRoot$
     # + 'Vector$'[], + 'Size') which sequence the input palette in such a way
     # that each colour in the sequence is maximally perceptually different from
     # the all the preceding colours.
+
     @readInColPal: .dir$, "current.palette", "newSeq$"
     @colArr2Tbl: newSeqSize, "newSeqVector$"
     @calcEdges: colArr2Tbl.table, .weighting#, "R,G,B"
@@ -1274,8 +1290,9 @@ endproc
 procedure colArr2Tbl: .size, .vectorVar$
     # Converts an string array of colour vectors ('.vectorVar$'[]) of .size
     # and converts them into a table.
+
     .table = Create Table with column names:
-            ... "colourTable", .size, "vector brightness"
+    ... "colourTable", .size, "vector brightness"
     Append column: "R"
     Append column: "G"
     Append column: "B"
@@ -1310,8 +1327,9 @@ procedure getOutputScales:
     # .outUnit = 3 --> [output on logarithmic scale]
     # value to be converted does not need to be a frequency
 
-    # convert min, max and increment to appropriate scale
+    .scaleLnUp = 0
 
+    # convert min, max and increment to appropriate scale
     @csvLine2Array: .cols$,
     ... "getOutputScales.numCols",
     ... "getOutputScales.colArray$"
@@ -1328,9 +1346,12 @@ procedure getOutputScales:
             .fMax = 1
         endif
         if !.fMin
+            .scaleLnUp = 1
             .fMin = 1
+            '.varRoot$'Min = 10e10
+        else
+            '.varRoot$'Min = ln(.fMin)
         endif
-        '.varRoot$'Min = 10e10
         '.varRoot$'Max = ln(.fMax)
         '.varRoot$'Inc = ln(.fInc)
     endif
@@ -1349,34 +1370,30 @@ procedure getOutputScales:
                 Formula: "'.curCol$'DrawValue", "ln(self[.curCol$])"
             endif
         endif
-
         # get min val for log output
-        if .outUnit = 3
+        if .outUnit = 3 and .scaleLnUp
             .curMin = Get minimum: "'.curCol$'DrawValue"
             '.varRoot$'Min =
             ... (.curMin < '.varRoot$'Min) * .curMin +
             ... (.curMin >= '.varRoot$'Min) * '.varRoot$'Min
         endif
-
     endfor
 
     '.varRoot$'Min =
-    ... '.varRoot$'Min * (.outUnit != 3) +
-    ... floor (('.varRoot$'Min) * (.outUnit == 3))
+    ... .scaleLnUp * ('.varRoot$'Min - 1) +
+    ... (.scaleLnUp == 0) * ('.varRoot$'Min)
+
 
     for .curCol to .numCols
         .curCol$ = .colArray$[.curCol]
         .lowestDraw = ceiling(.fMin /.fInc) * .fInc
         .fCur = .lowestDraw
-
         '.varRoot$'Lines = 0
-
         while .fCur <= .fMax
             '.varRoot$'Lines += 1
             '.varRoot$'AxisVal['.varRoot$'Lines] =
             ... .fCur / (.useKHz*1000 + (!.useKHz))
             # if output scaling is different from input values
-
             if .outUnit = 2
                 # Herz --> Bark
                 @hz2Bark: string$(.fCur), ""
@@ -1385,7 +1402,6 @@ procedure getOutputScales:
             elsif .outUnit = 3
                 # Herz --> Hertz (Log)
                 '.varRoot$'DrawVal['.varRoot$'Lines] = ln(.fCur)
-
             else
                 # output = input
                 '.varRoot$'DrawVal['.varRoot$'Lines] = .fCur
@@ -1400,21 +1416,18 @@ procedure drawSquare: .x, .y, .colour$, .bulletSize
     .y10thmm = Vertical mm to world coordinates: 0.1
     .width = pi^0.5 * .x10thmm * .bulletSize / 2
     .height = pi^0.5 * .y10thmm * .bulletSize / 2
-    Paint rectangle: "{0.9,0.9,0.9}",
-        ... .x - .width * 1.05,
-        ... .x + .width * 1.05,
-        ... .y - .height * 1.05,
-        ... .y + .height * 1.05
-    Paint rectangle: "Black",
-        ... .x - .width,
-        ... .x + .width,
-        ... .y - .height,
-        ... .y + .height
-    Paint rectangle: .colour$,
-        ... .x -.width / 1.4,
-        ... .x + .width / 1.4,
-        ... .y - .height / 1.4,
-        ... .y + .height / 1.4
+    Paint rectangle:
+    ... "{0.9,0.9,0.9}",
+    ... .x - .width * 1.05, .x + .width * 1.05,
+    ... .y - .height * 1.05, .y + .height * 1.05
+    Paint rectangle:
+    ... "Black",
+    ... .x - .width, .x + .width,
+    ... .y - .height, .y + .height
+    Paint rectangle:
+    ... .colour$,
+    ... .x -.width / 1.4, .x + .width / 1.4,
+    ... .y - .height / 1.4, .y + .height / 1.4
 endproc
 
 procedure drawOblong: .x, .y, .width, .height,
@@ -1426,20 +1439,16 @@ procedure drawOblong: .x, .y, .width, .height,
     .height = .height * .y10thmm
 
     Paint rectangle: "{0.9,0.9,0.9}",
-        ... .x - (.width + .x10thmm * 2),
-        ... .x + (.width + .x10thmm * 2),
-        ... .y - (.height + .y10thmm * 2),
-        ... .y + (.height + .y10thmm * 2)
-    Paint rectangle: "Black",
-        ... .x - .width,
-        ... .x + .width,
-        ... .y - .height,
-        ... .y + .height
-    Paint rectangle: .colour$,
-    ... .x - (.width - .x10thmm * 5),
-    ... .x + (.width - .x10thmm * 5),
-    ... .y - (.height - .y10thmm * 5),
-    ... .y + (.height - .y10thmm * 5)
+    ... .x - (.width + .x10thmm * 2), .x + (.width + .x10thmm * 2),
+    ... .y - (.height + .y10thmm * 2), .y + (.height + .y10thmm * 2)
+    Paint rectangle:
+    ...  "Black",
+    ... .x - .width, .x + .width,
+    ... .y - .height, .y + .height
+    Paint rectangle:
+    ... .colour$,
+    ... .x - (.width - .x10thmm * 5), .x + (.width - .x10thmm * 5),
+    ... .y - (.height - .y10thmm * 5), .y + (.height - .y10thmm * 5)
 
     # draw inner lines
     .yLength = (.height - .y10thmm * 5)
@@ -1447,7 +1456,6 @@ procedure drawOblong: .x, .y, .width, .height,
     .xLength = Horizontal mm to world coordinates: .xLength
     .xLength = abs(.xLength * 2)
     .yLength = abs(.yLength * 2)
-
     .xMin = .x - (.width - .x10thmm * 5)
     .xMax = .x + (.width - .x10thmm * 5)
     .yMin = .y - (.height - .y10thmm * 5)
@@ -1461,7 +1469,6 @@ procedure drawOblong: .x, .y, .width, .height,
         .xStart = .xMin
         .yStart = .yMax
         .xEnd = .xStart - .xLength
-
         while .yStart > .yMin and .xEnd < .xMax
             .yStart = .yMax
             .yEnd = .yMin
@@ -1475,11 +1482,9 @@ procedure drawOblong: .x, .y, .width, .height,
                 .yStart = .yMin - .yLength * (.xEnd - .xStart) / .xLength
                 .yEnd = .yMin
             endif
-
             Draw line:
             ... .xStart, .yStart,
             ... .xEnd, .yEnd
-
             if .xStart < .xMax
                 .xStart += .x10thmm * .scarcity * 2^0.5
                 .xEnd = .xStart - .xLength
@@ -1489,12 +1494,12 @@ procedure drawOblong: .x, .y, .width, .height,
             endif
         endwhile
     endif
+
     # DOWN-RIGHTWARD DIAGONAL LINES
     if .lines = 3 or .lines = 4 or .lines = 7 or .lines = 8
         .xStart = .xMax
         .yStart = .yMax
         .xEnd = .xStart + .xLength
-
         while .yStart > .yMin and .xEnd > .xMin
             .yStart = .yMax
             .yEnd = .yMin
@@ -1508,11 +1513,9 @@ procedure drawOblong: .x, .y, .width, .height,
                 .yStart = .yMin + .yLength * (.xEnd - .xStart) / .xLength
                 .yEnd = .yMin
             endif
-
             Draw line:
             ... .xStart, .yStart,
             ... .xEnd, .yEnd
-
             if .xStart > .xMin
                 .xStart -= .x10thmm * .scarcity * 2^0.5
                 .xEnd = .xStart + .xLength
@@ -1522,6 +1525,7 @@ procedure drawOblong: .x, .y, .width, .height,
             endif
         endwhile
     endif
+
     # VERTICAL LINES
     if .lines = 2 or .lines = 5 or .lines = 7 or .lines = 8
         .curX = .xMin
@@ -1530,6 +1534,7 @@ procedure drawOblong: .x, .y, .width, .height,
             .curX += .x10thmm * .scarcity
         endwhile
     endif
+
     # HORIZONTAL LINES
     if .lines = 5 or .lines = 6 or .lines = 8
         .curY = .yMin
@@ -1548,16 +1553,16 @@ procedure drawCircle: .x, .y, .colour$, .bulletSize
     Paint circle: .colour$, .x, .y, .radius / 1.4
 endproc
 
+
 # Legend functions
 procedure legend: .addStyle$, .addColour$, .addText$, .addSize
-    # This is v.2.0 and is MUCH more flexible than the original.
+    # This is v.2.1 and is MUCH more flexible than the original.
 
     if variableExists ("legend.items")
         .items += 1
     else
         .items = 1
     endif
-
     .style$[.items] =  .addStyle$
     .colour$[.items] = .addColour$
     .text$[.items] = .addText$
@@ -1569,13 +1574,13 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
                        ... .xyTable, .xCol$, .yCol$,
                        ... .threshold, .bufferZone, .compromise
                        ... .innerChange, .frameChange
+   # @drawLegendLayer v.3.0 - copes with CSV string of x and ycols, is much
+   # better optimised for chosing an appropriate draw space, and has several
+   # new legend shape options.
 
     @csvLine2Array: .yCol$, "drawLegendLayer.yCols", "drawLegendLayer.yCols$"
     @csvLine2Array: .xCol$, "drawLegendLayer.xCols", "drawLegendLayer.xCols$"
 
-    # @drawLegendLayer v.3.0 - copes with CSV string of x and ycols, is much
-    # better optimised for chosing an appropriate draw space, and has several
-    # new legend shape options.
     Line width: 1
     Font size: .fontSize
     Solid line
@@ -1587,7 +1592,6 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     else
         .horDir$ = "falling"
     endif
-
     if .yBottom < .yTop
         .vertDir$ = "rising"
     else
@@ -1617,19 +1621,18 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     .y_unit = Text width (world coordinates): "W"
     .y_unit = Horizontal world coordinates to mm: .y_unit
     .y_unit = Vertical mm to world coordinates: .y_unit
-
     .y_unit = .y_unit
     .y_start = .yBottom + .y_unit * 0.25
     .y_height = .y_unit * (legend.items + 0.6)
     .y_end = .yBottom + .y_height
     .y_buffer  = Vertical mm to world coordinates: .bufferZone
+
     # calculate  .hor, .vert, (hor = 0 = left; vert = 0 = bottom)
     # Get stats for coordinates
     .horS[1] = .x_start
     .horE[1] = .x_end
     .horS[2] = .xRight - .x_width
     .horE[2] = .xRight - .x_unit * 0.25
-
     .vertS[1] = .y_start
     .vertE[1] = .y_end
     .vertS[2] = .yTop - .y_height
@@ -1649,15 +1652,13 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
                     for .i to .numRows
                         .curX = Get value: .i, .curXCol$
                         .curY = Get value: .i, .curYCol$
-
                         if .horDir$  ="rising"
                             .insideHor = .curX >= .horS[.lr] - .x_buffer and
-                                ... .curX <= .horE[.lr] + .x_buffer
+                            ... .curX <= .horE[.lr] + .x_buffer
                         else
                             .insideHor = .curX <= .horS[.lr] - .x_buffer and
-                                ... .curX >= .horE[.lr] + .x_buffer
+                            ... .curX >= .horE[.lr] + .x_buffer
                         endif
-
                         if .vertDir$  ="rising"
                             .insideVert = .curY >= .vertS[.bt] - .y_buffer and
                             ... .curY <= .vertE[.bt] + .y_buffer
@@ -1665,7 +1666,6 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
                             .insideVert = .curY <= .vertS[.bt] - .y_buffer and
                             ... .curY >= .vertE[.bt] + .y_buffer
                         endif
-
                         if .insideVert and .insideHor
                             .inZone##[.bt, .lr] = .inZone##[.bt, .lr] + 1
                         endif
@@ -1675,6 +1675,7 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
             endfor
         endfor
     endfor
+
     .least# = {0,0}
     .least = 10^10
     for .lr to 2
@@ -1691,7 +1692,6 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     .x_start = .horS[.least#[1]]
     .y_start = .vertS[.least#[2]]
     .y_end = .vertE[.least#[2]]
-
      if .least / .total > .threshold
         Axes: .xLeft, .xRight, .yBottom, .yTop
         .outerX = Horizontal mm to world coordinates: .fontSize * 1.25
@@ -1715,52 +1715,57 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
      endif
 
     # Draw main legend only if percentage of data points hidden < threshold
-    # or
+    # or .compromise flag is set
     if .least / .total <= .threshold or .compromise
-
         ### Draw box and frame
-        Paint rectangle: 0.9, .x_start, .x_end,
-                     ... .y_start,  .y_end
+        Paint rectangle:
+        ... 0.9,
+        ....x_start, .x_end,
+        ... .y_start,  .y_end
         Colour: "Black"
-        Draw rectangle: .x_start, .x_end,
-                     ... .y_start,  .y_end
+        Draw rectangle:
+        ... .x_start, .x_end,
+        ... .y_start,  .y_end
 
         # Draw Text Lines and icons
         for .order to legend.items
             .i = legend.items - .order + 1
             .i = .order
+
             Font size: .fontSize
-            # use colour text if no box
             Colour: "Black"
-            Text: .x_start + 2.5 * .x_unit , "Left", .y_end  - .y_unit * (.i - 0.3),
-                ... "Half", "##" + legend.text$[.i]
+            Text:
+            ... .x_start + 2.5 * .x_unit, "Left", .y_end - .y_unit * (.i - 0.3),
+            ... "Half", "##" + legend.text$[.i]
             Helvetica
 
             if left$(legend.style$[.i], 1) =
-                    ... "L" or left$(legend.style$[.i], 1) = "l"
+                ... "L" or left$(legend.style$[.i], 1) = "l"
                 Line width: legend.size[.i] + 2
                 Colour: "White"
-                Draw line: .x_start + 0.5 * .x_unit, .y_end  - .y_unit * (.i - 0.3),
-                    ... .x_start + 2 * .x_unit, .y_end  - .y_unit * (.i - 0.3)
+                Draw line:
+                ... .x_start + 0.5 * .x_unit, .y_end  - .y_unit * (.i - 0.3),
+                ... .x_start + 2 * .x_unit, .y_end  - .y_unit * (.i - 0.3)
                 Line width: legend.size[.i]
                 Colour: legend.colour$[.i]
-                Draw line: .x_start + 0.5 * .x_unit, .y_end  - .y_unit * (.i - 0.3),
-                    ... .x_start + 2 * .x_unit, .y_end  - .y_unit * (.i - 0.3)
+                Draw line:
+                ... .x_start + 0.5 * .x_unit, .y_end  - .y_unit * (.i - 0.3),
+                ... .x_start + 2 * .x_unit, .y_end  - .y_unit * (.i - 0.3)
             elsif left$(legend.style$[.i], 1) =
                     ... "R" or left$(legend.style$[.i], 1) = "r"
                 Line width: legend.size[.i]
                 @modifyColVectr: legend.colour$[.i],
-                    ... "drawLegendLayer.innerColour$",
-                    ... "+ drawLegendLayer.innerChange"
+                ... "drawLegendLayer.innerColour$",
+                ... "+ drawLegendLayer.innerChange"
                 @modifyColVectr: legend.colour$[.i],
-                    ... "drawLegendLayer.frameColour$",
-                    ... "+ drawLegendLayer.frameChange"
+                ... "drawLegendLayer.frameColour$",
+                ... "+ drawLegendLayer.frameChange"
                 Colour: .innerColour$
                 Paint rectangle: .innerColour$,
-                    ... .x_start + 0.5 * .x_unit,
-                    ... .x_start + 2 * .x_unit,
-                    ... .y_end  - .y_unit * (.i - 0.3) + .y_unit / 3,
-                    ... .y_end  - .y_unit * (.i - 0.3) - .y_unit / 3
+                ... .x_start + 0.5 * .x_unit,
+                ... .x_start + 2 * .x_unit,
+                ... .y_end  - .y_unit * (.i - 0.3) + .y_unit / 3,
+                ... .y_end  - .y_unit * (.i - 0.3) - .y_unit / 3
                 Line width: legend.size[.i]
                 Colour: .frameColour$
                 Draw rectangle:
@@ -1780,25 +1785,26 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
                     .obWidth = legend.size[.i] * 2
                     .obHeight = legend.size[.i]
                 endif
-
                 @drawOblong:
                 ... .x_start + 1.25 * .x_unit, .y_end  - .y_unit * (.i - 0.3),
                 ... .obWidth, .obHeight,
                 ... legend.colour$[.i], .lineType, .scarcity, .lineWidth
             else
-                .temp = Create Table with column names: "table", 1,
-                                                    ... "X Y Mrk Xs Ys"
+                .temp = Create Table with column names:
+                ... "table", 1, "X Y Mrk Xs Ys"
                 .xS = Horizontal mm to world coordinates: 0.2
                 .yS = Vertical mm to world coordinates: 0.2
-                Set numeric value: 1, "X" , .x_start + 1.25 * .x_unit
-                Set numeric value: 1, "Y" , .y_end  - .y_unit * (.i - 0.3)
-                Set numeric value: 1, "Xs" , .x_start + 1.25 * .x_unit + .xS
-                Set numeric value: 1, "Ys" , .y_end  - .y_unit * (.i - 0.3) - .yS
+                Set numeric value: 1, "X", .x_start + 1.25 * .x_unit
+                Set numeric value: 1, "Y", .y_end  - .y_unit * (.i - 0.3)
+                Set numeric value: 1, "Xs", .x_start + 1.25 * .x_unit + .xS
+                Set numeric value: 1, "Ys" , .y_end - .y_unit * (.i - 0.3) - .yS
                 Set string value: 1, "Mrk", legend.style$[.i]
                 Line width: 4
                 Colour: legend.colour$[.i]
-                Scatter plot (mark): "X", .xLeft, .xRight, "Y",
-                    ... .yBottom, .yTop, 2, "no", "left$(legend.style$[.i], 1)"
+                Scatter plot (mark):
+                ... "X", .xLeft, .xRight, "Y",
+                ... .yBottom, .yTop, 2,
+                ... "no", "left$(legend.style$[.i], 1)"
                 Remove
             endif
         endfor
