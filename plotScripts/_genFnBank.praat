@@ -1016,7 +1016,8 @@ procedure changeAddColSch: .dir$, .fileVar$
 
         .name$ = replace_regex$(scheme_name$,  "[^A-Za-z0-9]", "_", 0)
         .colScheme = colour_scheme
-        if .colScheme < .numPalettes
+        appendInfoLine: .colScheme, tab$, .numPalettes
+        if .colScheme <= .numPalettes
             @readInColPal:
             ... .dir$,
             ... .palette$[.colScheme] + ".palette",

@@ -173,7 +173,6 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
     if myChoice = 2
         exit
     endif
-    endproc
 endproc
 
 procedure getGenAxisVars
@@ -211,14 +210,17 @@ procedure checkDirectoryStructure
 
     if !fileReadable("../data/palettes/current.palette")
         createDirectory: "../data/palettes"
-        .palName$[1] = "CB_Qualitative_Set1_9_colours"
+        .palName$[1] = "Adjusted_CB_Qualitative_Set1"
         .js$[1] =
-        ... "['rgb(228,26,28)','rgb(55,126,184)','rgb(77,175,74)'," +
-        ... "'rgb(152,78,163)','rgb(255,127,0)','rgb(255,255,51)'," +
-        ... "'rgb(166,86,40)','rgb(247,129,191)','rgb(153,153,153)']"
-        .colrName$[1] = "Red,Blue,Green,Purple,Orange,Yellow,Brown,Pink,Grey"
+        ... "['rgb(55,126,184)','rgb(255,127,0)','rgb(228,26,28)'," +
+        ... "'rgb(152,78,163)','rgb(77,175,74)','rgb(153,153,153)'," +
+        ... "'rgb(114,13,14)','rgb(50,50,50)',"+
+        ... "'rgb(247,129,191)','rgb(166,86,40)']"
 
-        .palName$[2] = "CB_Qualitative_Dark2_colour_blind_friendly_3_colours"
+        .colrName$[1] =
+        ... "Blue,Orange,Red,Purple,Green,Grey,Maroon,Dark Grey,Pink,Brown"
+
+        .palName$[2] = "Colour_Blind_Friendly_CB_Qualitative_Dark2_3_colours"
         .js$[2] = "['rgb(27,158,119)','rgb(217,95,2)','rgb(117,112,179)']"
         .colrName$[2] = "Mint,Orange,Lavender"
 
@@ -257,8 +259,8 @@ procedure checkDirectoryStructure
         ... "Navy,Teal,Purple,Olive,Pink,Silver,Grey, Black,"
 
         .palName$[6] = "current"
-        .js$[6] = .js$[5]
-        .colrName$[6] = .colrName$[5]
+        .js$[6] = .js$[1]
+        .colrName$[6] = .colrName$[1]
 
         for .i to 6
             .address$ = "../data/palettes/" + .palName$[.i] + ".palette"
