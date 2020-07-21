@@ -31,15 +31,16 @@ The plugin has functionality, including:
 
 There are quite a few for not-so-obvious quality-of-life features and many ways to customise your plot in terms of content and appearance. However, due to the nature of Praat's UI (or due to my ability to exploit it), I have avoided adding too many, as this would lead to menu bloat. Therefore, some things such as font size are fixed.
 
-There are no detailed instructions yet, but I will produce these in time along with a more comprehensive list of the plugin's functionality.
+~~There are no detailed instructions yet, but I will produce these in time along with a more comprehensive list of the plugin's functionality.~~
+There is now a detailed instruction manual in PDF format.
 
 For now,  I recommend you just to muck around with it. You can use small the sample datasets provided. Alternatively, if you set the table number / address as 0 in the input settings menu, this will load the Peterson and Barney (1952) data. Use the columns "IPA", "Type", and "Sex" to filter the data. And - of course - if you find any bugs or have any suggestions for improvements, please do let me know. 
 
 
 Known issues / future plans:
 * ~~The option to display only outliers in the box plot component of the Ladefoged does not function yet.~~
-* ~~he add / change colour options is not storing changes as intended.~~
-* There will be an easily accessible archive to make facilitate the reproduction and alteration of previous plots.
+* ~~The add / change colour options is not storing changes as intended.~~
+* There will be an easily accessible archive function to make facilitate the reproduction and alteration of previous plots.
 * Intelligibilty / intuitiveness of menus will be improved (feedback much appreciated and needed here).
 ___
 
