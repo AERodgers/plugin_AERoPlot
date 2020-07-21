@@ -997,7 +997,6 @@ procedure changeAddColSch: .dir$, .fileVar$
     .done = 0
     while !.done
         beginPause: "Add or Change colour scheme"
-        comment: .comment$
         optionMenu: "Colour scheme", .colScheme
             for .i to .numPalettes
                 option: replace$(.palette$[.i], "_", " ", 0)
@@ -1008,6 +1007,8 @@ procedure changeAddColSch: .dir$, .fileVar$
             word: "JS array", .curColrStr$
             sentence: "Colour names", .curColrNameArray$
             sentence: "Scheme name", .curColrPalName$
+
+            comment: .comment$
         myChoice = endPause: "Exit", "Continue", 2, 1
         if myChoice = 1
             exit
@@ -1025,11 +1026,31 @@ procedure changeAddColSch: .dir$, .fileVar$
             colour_names$ = readInColPal.jsColourNames$
         elsif !(jS_array$ = "" or colour_names$ = "" or .name$ = "") and
             ... !fileReadable("'.dir$''.name$'.palette")
-            writeFileLine: .dir$ + .name$ + ".palette", jS_array$
-            appendFileLine: .dir$ + .name$ + ".palette", colour_names$
-            .done = 1
+
+            # validate JS string and names array
+            @decodeCB_JS_RGB:
+            ... jS_array$,
+            ... "changeAddColSch.jsCheckCount",
+            ... "changeAddColSch.jsCheckArray$"
+            @csvLine2Array:
+            ...colour_names$,
+            ... "changeAddColSch.checkNamesCount",
+            ... "changeAddColSch.checkNamesArray$"
+            if decodeCB_JS_RGB.error
+                .comment$ = "ERROR: The JS ARRAY entered is INVALID."
+            elsif .checkNamesCount != .jsCheckCount
+                .comment$ = "ERROR: NUMBER of COLOURS in JS ARRAY and in " +
+                ... "COLOUR NAMES are DIFFERENT."
+            else
+                # save new colour scheme if all is AOK.
+                writeFileLine: .dir$ + .name$ + ".palette", jS_array$
+                appendFileLine: .dir$ + .name$ + ".palette", colour_names$
+                .done = 1
+            endif
+
         elsif fileReadable("'.dir$''.name$'.palette")
-            .comment$ = "This name is taken. Please CHOOSE ANOTHER NAME."
+            .comment$ = "ERROR: This name is taken. Please CHOOSE ANOTHER " +
+            ... " NAME or a PRESET SCHEME."
         else
             .comment$ = "EITHER enter new colour scheme parameters OR " +
             ... "choose a pre-existing one."
@@ -1121,10 +1142,24 @@ procedure readInColPal: .dir$, .file$, .root$
     .jsColourNames$ = Get string: 2
     Remove
     @decodeCB_JS_RGB: .jsArray$, "'.root$'Size", "'.root$'Vector$"
+    if decodeCB_JS_RGB.error
+        deleteFile: .dir$ + .file$
+        .file$ = replace$(replace$(.file$, "_", " ", 0), ".palette", "", 1)
+        exitScript: "JS string contains an error." + newline$ +
+        ... """'.file$'"" has been deleted." + newline$ +
+        ... "You must restart the script." + newline$
+
+    endif
     @csvLine2Array: .jsColourNames$, "numColourNames", "'.root$'Name$"
     if '.root$'Size != numColourNames
         deleteFile: .dir$ + .file$
-        exitScript: "Colour Palette is corrupted." + newline$
+        .file$ = replace$(replace$(.file$, "_", " ", 0), ".palette", "", 1)
+        exitScript:
+        ... "Number of colour vectors is different fom the number of names " +
+        ... "in ""'.file$'"" colour scheme." + newline$ + newline$ +
+        ... " The colour scheme has been deleted." + newline$ +
+        ... newline$ +
+        ... "You must restart the script." + newline$
     endif
 endproc
 
@@ -1173,35 +1208,53 @@ procedure matchCol2Level: .table, .altColrMatch, .paletteRt$, .factorRt$
 endproc
 
 procedure decodeCB_JS_RGB: .jsArray$, .count$, .array$
+    .noError = 1
     # correct variable name Strings
     .count$ = replace$(.count$, "$", "", 0)
     if right$(.array$, 1) != "$"
         .array$ += "$"
     endif
 
+    .errorTest$ = replace_regex$(.jsArray$,  "[!^A-Za-z0-9.]", "", 0)
+    .errorTest$ = replace_regex$(.errorTest$,  "('\(,,\)',)|^\[|\]$", "", 0)
+    .noError = (.errorTest$ == "'(,,)'") * .noError
+    .errorTest$ = replace_regex$(.jsArray$,  "[^rgb]", "", 0)
+    .noError =
+    ... (length(.errorTest$)/3 = round(length(.errorTest$)/3)) *
+    ... .noError
+
     # reformat JS RGB array
-    .jsArray$ = replace$(.jsArray$, "[", "", 0)
-    .jsArray$ = replace$(.jsArray$, "]", "", 0)
-    .jsArray$ = replace$(.jsArray$, "'rgb(", "}{", 0)
-    .jsArray$ = replace$(.jsArray$, ")',", "", 0)
-    .jsArray$ = replace$(.jsArray$, ",", ",", 0)
-    .jsArray$ = replace$(.jsArray$, ")'", "}", 0)
-    .jsArray$ = replace$(.jsArray$, ";", "{", 1)
-    .jsArray$ = replace$(.jsArray$, "}", "", 1)
+    if .noError
+        .jsArray$ = replace$(.jsArray$, "[", "", 0)
+        .jsArray$ = replace$(.jsArray$, "]", "", 0)
+        .jsArray$ = replace$(.jsArray$, "'rgb(", "}{", 0)
+        .jsArray$ = replace$(.jsArray$, ")',", "", 0)
+        .jsArray$ = replace$(.jsArray$, ",", ",", 0)
+        .jsArray$ = replace$(.jsArray$, ")'", "}", 0)
+        .jsArray$ = replace$(.jsArray$, ";", "{", 1)
+        .jsArray$ = replace$(.jsArray$, "}", "", 1)
+        .errorTest$ = replace_regex$(.jsArray$,  "[!^A-Za-z0-9.]", "", 0)
+        .noError = (length(.errorTest$)/4 == round(length(.errorTest$)/4)) *
+        ... .noError
+    endif
+
+    .error = ! .noError
 
     '.count$' = 0
-    while length(.jsArray$) > 0
-        '.count$' += 1
-        .nextVectorEnds = index(.jsArray$, "}")
-        .curVector$ = left$(.jsArray$, .nextVectorEnds)
-        .vector# = '.curVector$' / 255
-        '.array$'['.count$'] =  "{" +
-        ... fixed$(.vector#[1], 3) + "," +
-        ... fixed$(.vector#[2], 3) + "," +
-        ... fixed$(.vector#[3], 3) +
-        ... "}"
-        .jsArray$ = replace$(.jsArray$, .curVector$, "", 1)
-    endwhile
+    if .noError
+        while length(.jsArray$) > 0
+            '.count$' += 1
+            .nextVectorEnds = index(.jsArray$, "}")
+            .curVector$ = left$(.jsArray$, .nextVectorEnds)
+            .vector# = '.curVector$' / 255
+            '.array$'['.count$'] =  "{" +
+            ... fixed$(.vector#[1], 3) + "," +
+            ... fixed$(.vector#[2], 3) + "," +
+            ... fixed$(.vector#[3], 3) +
+            ... "}"
+            .jsArray$ = replace$(.jsArray$, .curVector$, "", 1)
+        endwhile
+    endif
 endproc
 
 procedure encodeCB_JS_RGB: .vectorVar$, .arraySize, .outputString$
