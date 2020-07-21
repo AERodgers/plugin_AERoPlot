@@ -240,11 +240,27 @@ procedure checkDirectoryStructure
         ... "Black0,Blue0,Red0,Magenta0,Green0,Cyan0,Yellow0,White0," +
         ... "Blue1,Red1,Magenta1,Green1,Cyan1,Yellow1"
 
-        .palName$[5] = "current"
-        .js$[5] = .js$[1]
-        .colrName$[5] = .colrName$[1]
 
-        for .i to 5
+        .palName$[5] = "Praat_Native_Colours"
+        .js$[5] = "[" +
+        ... "'rgb(220.575,8.67,6.63)','rgb(0,127.5,17.595)'," +
+        ... "'rgb(0,0,211.14)','rgb(2.295,170.595,234.09)'," +
+        ... "'rgb(241.995,8.415,132.345)','rgb(250.92,242.505,5.1)'," +
+        ... "'rgb(127.5,0,0)','rgb(0,255,0)'," +
+        ... "'rgb(0,0,127.5)','rgb(0,127.5,127.5)'," +
+        ... "'rgb(127.5,0,127.5)','rgb(127.5,127.5,0)'," +
+        ... "'rgb(255,191.25,191.25)','rgb(191.25,191.25,191.25)'," +
+        ... "'rgb(127.5,127.5,127.5)','rgb(0,0,0)'" +
+        ... "]"
+        .colrName$[5]=
+        ... "Red,Green,Blue,Cyan,Magenta,Yellow,Maroon,Lime," +
+        ... "Navy,Teal,Purple,Olive,Pink,Silver,Grey, Black,"
+
+        .palName$[6] = "current"
+        .js$[6] = .js$[5]
+        .colrName$[6] = .colrName$[5]
+
+        for .i to 6
             .address$ = "../data/palettes/" + .palName$[.i] + ".palette"
             writeFileLine: .address$, .js$[.i] + newline$ + .colrName$[.i]
         endfor
