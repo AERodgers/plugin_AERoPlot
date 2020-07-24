@@ -149,7 +149,7 @@ procedure doInputUI
     tertiaryFilters = use_tertiary_filters
     inputUnits = input_units
     inputUnits$[1] = "Hertz"
-    inputUnits$[2] = "Bark scale"
+    inputUnits$[2] = "Bark"
     f1Col$ = formant_A$
     f2Col$ = formant_B$
     f3Col$ = formant_C$
@@ -161,8 +161,9 @@ procedure doInputUI
     if inputUnits = 1 and prevInputUnit = 2
         maxFreq = 3800
     elsif inputUnits = 2 and prevInputUnit = 1
-       maxFreq = 15.5
+       maxFreq = 16
     endif
+    prevInputUnit = inputUnits
 endproc
 
 procedure processInputUI

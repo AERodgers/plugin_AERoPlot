@@ -116,7 +116,7 @@ procedure doInputUI
     tertiaryFilters = use_tertiary_filters
     inputUnits = input_units
     inputUnits$[1] = "Hertz"
-    inputUnits$[2] = "Bark scale"
+    inputUnits$[2] = "Bark"
 
     # change default min and max F1, F2 if input scale has changed.
     if inputUnits = 1 and prevInputUnit = 2
@@ -125,11 +125,12 @@ procedure doInputUI
         minF2 = 500
         maxF2 = 3800
     elsif inputUnits = 2 and prevInputUnit = 1
-        minF1 = 1.5
-        maxF1 = 9.5
-        minF2 = 4.5
-        maxF2 = 15.5
+        minF1 = 1
+        maxF1 = 10
+        minF2 = 4
+        maxF2 = 16
     endif
+    prevInputUnit = inputUnits
 endproc
 
 procedure processInputUI

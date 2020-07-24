@@ -147,7 +147,7 @@ procedure doInputUI
     inputUnits = input_units
     tertiaryFilters = use_tertiary_filters
     inputUnits$[1] = "Hertz"
-    inputUnits$[2] = "Bark scale"
+    inputUnits$[2] = "Bark"
     f1Col$ = formant_A$
     f2Col$ = formant_B$
     f3Col$ = formant_C$
