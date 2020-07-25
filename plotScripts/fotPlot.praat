@@ -261,10 +261,12 @@ procedure makeTimeRelativeMenu
             for o to oLevels
                 curOLevel$ = oLevel$[o]
                 selectObject: table
-                tempTable = Extract rows where:
+
+                nowarn Extract rows where:
                 ... "self$[oFactor$] = curOLevel$ and " +
                 ... "self$[iFactor$] = timeRelativeTo$"
                 Rename: curOLevel$
+                tempTable = selected()
                 numReps[o] = Get number of rows
                 for i to numReps[o]
                     if repFactor$ = ""
@@ -281,12 +283,12 @@ procedure makeTimeRelativeMenu
             for o to oLevels
                 for i to numReps[o]
                     if repFactor$ = ""
-                        Formula: timeCol$,
+                        nowarn Formula: timeCol$,
                         ... "if self$[oFactor$] = oLevel$[o] then " +
                         ... "fixed$(self - refTime[o,i], 3) else " +
                         ... "self endif"
                     else
-                        Formula: timeCol$,
+                        nowarn Formula: timeCol$,
                         ... "if self$[oFactor$] = oLevel$[o] and " +
                         ... "self$[repFactor$] = repName$[o,i] then " +
                         ... "fixed$(self - refTime[o,i], 3) else " +
@@ -556,9 +558,11 @@ procedure calcFOTPlotLayers
                 endif
 
             else
-                prevMeanFinPlot[o,i,f] = undefined
                 tempTable[o,i] = undefined
-                meanFinPlot[o,i,f] = undefined
+                for f to numFormants
+                    prevMeanFinPlot[o,i,f] = undefined
+                    meanFinPlot[o,i,f] = undefined
+                endfor
             endif
         endfor
     endfor

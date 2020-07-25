@@ -528,9 +528,11 @@ procedure calcLadPlotLayers
                     endif
                 endfor
             else
-                prevMeanFinPlot[o,i,f] = undefined
                 iTable[o,i] = undefined
-                meanFinPlot[o,i,f] = undefined
+                for f to numFormants
+                    prevMeanFinPlot[o,i,f] = undefined
+                    meanFinPlot[o,i,f] = undefined
+                endfor
             endif
         endfor
     endfor
@@ -737,38 +739,40 @@ procedure drawDataPoints
         curColour$ = oColour$[o, 3]
         curTCol$ = "x"
         for i to iLevels
-            for f to numFormants
-                curFCol$ = f'f'Col$ + "DrawValue"
-                curColr$[1] = "Black"
-                c = (f/2 == round(f/2) - 0.5) * 0.15
-                @modifyColVectr: oColour$[o, 3], "curColr$[2]", "+'c'"
-                for bgFg to 2
-                    Colour: curColr$[bgFg]
-                    if tokenMarking
-                        # draw outliers
-                        Line width: 6 - bgFg
-                        nowarn Scatter plot where (mark):
-                        ... curTCol$, minX, maxX,
-                        ... curFCol$, minF, maxF,
-                        ... fontM / 10, "no", "o",
-                        ... "self$[oFactor$] = oLevel$[o] and " +
-                        ... "!(self[curFCol$] < tailEnd[o,i,f] and " +
-                        ... "self[curFCol$] > tailStart[o,i,f]) and " +
-                        ... "self$[iFactor$] = iLevel$[i]"
-                        if tokenMarking = 1
-                            # draw non-outliers
+            if variableExists("tailEnd['o','i',1]")
+                for f to numFormants
+                    curFCol$ = f'f'Col$ + "DrawValue"
+                    curColr$[1] = "Black"
+                    c = (f/2 == round(f/2) - 0.5) * 0.15
+                    @modifyColVectr: oColour$[o, 3], "curColr$[2]", "+'c'"
+                    for bgFg to 2
+                        Colour: curColr$[bgFg]
+                        if tokenMarking
+                            # draw outliers
+                            Line width: 6 - bgFg
                             nowarn Scatter plot where (mark):
                             ... curTCol$, minX, maxX,
                             ... curFCol$, minF, maxF,
-                            ... fontM / 10, "no", "x",
+                            ... fontM / 10, "no", "o",
                             ... "self$[oFactor$] = oLevel$[o] and " +
-                            ... "self[curFCol$] < tailEnd[o,i,f] and " +
-                            ... "self[curFCol$] > tailStart[o,i,f] and " +
+                            ... "!(self[curFCol$] < tailEnd[o,i,f] and " +
+                            ... "self[curFCol$] > tailStart[o,i,f]) and " +
                             ... "self$[iFactor$] = iLevel$[i]"
-                        endif
-                    endfor
-                endif
-            endfor
+                            if tokenMarking = 1
+                                # draw non-outliers
+                                nowarn Scatter plot where (mark):
+                                ... curTCol$, minX, maxX,
+                                ... curFCol$, minF, maxF,
+                                ... fontM / 10, "no", "x",
+                                ... "self$[oFactor$] = oLevel$[o] and " +
+                                ... "self[curFCol$] < tailEnd[o,i,f] and " +
+                                ... "self[curFCol$] > tailStart[o,i,f] and " +
+                                ... "self$[iFactor$] = iLevel$[i]"
+                            endif
+                        endfor
+                    endif
+                endfor
+            endif
         endfor
     endfor
     Line width: 1
