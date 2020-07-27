@@ -13,7 +13,7 @@
 # github:    github.com/AERodgers
 #
 # Named after style of figure in Ladefoged and Johnson (2011:193)
-# ref. Ladefoged, P. and Johnson. K., A course in Pnonetics [6th ed.],
+# ref. Ladefoged, P. and Johnson. K., A course in Phonetics [6th ed.],
 #      Boston MA: Wadsworth Cengage
 
 @checkPraatVersion
