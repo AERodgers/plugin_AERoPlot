@@ -428,7 +428,7 @@ procedure getFormants:
             endif
 
             selectObject: .table
-            if .scale$ = "bark"
+            if .scale$ = "Bark"
                 .decPlaces  = 3
             else
                 .decPlaces  = 0
