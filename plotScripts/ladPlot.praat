@@ -17,8 +17,8 @@
 #      Boston MA: Wadsworth Cengage
 
 @checkPraatVersion
-@purgeTempFiles
-curLadVersion$ = "1.3.0.0"
+@purgeDirFiles: "../data/temp"
+curLadVersion$ = "1.3.0.1"
 plotPrefix$ = "LAD."
 # Main script loop
 keepGoing = 1
@@ -809,14 +809,14 @@ procedure createLadVars: .address$
 
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "ladVersion$", tab$, curLadVersion$
-    appendFileLine: .address$, "tableID$", tab$, "../example/nIEdiphthongs.txt"
+    appendFileLine: .address$, "tableID$", tab$, "../example/AER_NI_I.txt"
     appendFileLine: .address$, "xAxisFactor", tab$, 1
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"
     appendFileLine: .address$, "f3Col$", tab$, "F3"
     appendFileLine: .address$, "f4Col$", tab$, ""
-    appendFileLine: .address$, "oFactor$", tab$, "sound"
-    appendFileLine: .address$, "iFactor$", tab$, "element"
+    appendFileLine: .address$, "oFactor$", tab$, "Context"
+    appendFileLine: .address$, "iFactor$", tab$, "Element"
     appendFileLine: .address$, "tertiaryFilters", tab$, 0
     appendFileLine: .address$, "inputUnits", tab$, 1
     appendFileLine: .address$, "timeRelativeTo", tab$, 1
@@ -826,7 +826,7 @@ procedure createLadVars: .address$
     appendFileLine: .address$, "plotHeight", tab$, 5
     appendFileLine: .address$, "lineRatio", tab$, 0.5
     appendFileLine: .address$, "prevInputUnit", tab$, 1
-    appendFileLine: .address$, "title$", tab$, "nIE diphthongs"
+    appendFileLine: .address$, "title$", tab$, "Example nIE vowel and dipthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "maxFreq", tab$, 4000

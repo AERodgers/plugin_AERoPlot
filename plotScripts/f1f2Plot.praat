@@ -13,8 +13,8 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
-@purgeTempFiles
-curF1f2Version$ = "1.3.0.0"
+@purgeDirFiles: "../data/temp"
+curF1f2Version$ = "1.3.0.1"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
@@ -714,9 +714,9 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "f1f2Version$", tab$, curF1f2Version$
     appendFileLine: .address$, "plotSize", tab$, 5
     appendFileLine: .address$, "tableID$", tab$,
-    ... "../example/nIEdiphthongs.txt"
-    appendFileLine: .address$, "oFactor$", tab$, "sound"
-    appendFileLine: .address$, "iFactor$", tab$, "element"
+    ... "../example/AER_NI_I.txt"
+    appendFileLine: .address$, "oFactor$", tab$, "Context"
+    appendFileLine: .address$, "iFactor$", tab$, "Element"
     appendFileLine: .address$, "useInnerFactor", tab$, 1
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"
@@ -727,14 +727,14 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "arrowRatio", tab$, 0.75
     appendFileLine: .address$, "prevInputUnit", tab$, 1
     appendFileLine: .address$, "title$", tab$,
-    ... "F1-F2 plot for nIE diphthongs"
+    ... "Example nIE vowel and dipthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "minF1", tab$, 150
     appendFileLine: .address$, "maxF1", tab$, 1400
     appendFileLine: .address$, "minF2", tab$, 500
     appendFileLine: .address$, "maxF2", tab$, 3600
-    appendFileLine: .address$, "tokenMarking", tab$, 7
-    appendFileLine: .address$, "showMeans", tab$, 2
+    appendFileLine: .address$, "tokenMarking", tab$, 11
+    appendFileLine: .address$, "showMeans", tab$, 12
     appendFileLine: .address$, "showArrows", tab$, 1
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "coreLevel", tab$, 2

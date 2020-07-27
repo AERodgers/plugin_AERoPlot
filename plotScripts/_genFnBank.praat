@@ -1,6 +1,6 @@
 # General Functions
 # =================
-  genFnBankVersion$ = "1.3.0.0"
+  genFnBankVersion$ = "1.3.0.1"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
@@ -105,6 +105,21 @@ procedure vector2Str: .vectorVar$
     '.stringVar$' = left$('.stringVar$', length('.stringVar$') - 1) + "}"
 endproc
 
+procedure purgeDirFiles: .dir$
+    # check .dir$
+    if (right$(.dir$) != "/" or right$(.dir$) != "\") and .dir$ != ""
+        .dir$ = .dir$ + "/"
+    endif
+
+    # purge temporary file
+    temp = Create Strings as file list: "purgeList", .dir$
+    numStr = Get number of strings
+    for i to numStr
+        curStr$ = Get string: i
+        deleteFile: "'.dir$''curStr$'"
+    endfor
+    Remove
+endproc
 
 # Data Storage and retrieval functionsL
     # - Accepts scalar, string, vector, and matrix variables.
@@ -184,8 +199,8 @@ procedure hideObjs: .objects$, .dir$, .root$
     # fix variable name and directory
     .root$ = replace$(.root$, "$", "", 1)
 
-    if !(right$(.dir$) = "/" or right$(.dir$) = "\")
-            ... and .dir$ != ""
+    if !(right$(.dir$) = "/" or right$(.dir$) = "\") and
+        ... .dir$ != ""
         .dir$ = .dir$ +  "/"
     endif
     '.root$'Dir$ = .dir$
@@ -897,7 +912,7 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
     if maxColDiff
         @seqColrByDist: "../data/palettes/",
         ... .colrPalFileVar$,
-        ... colrAdj#,
+        ... {0,0,0},
         ... "curPalette"
     endif
     if sortByBrightness

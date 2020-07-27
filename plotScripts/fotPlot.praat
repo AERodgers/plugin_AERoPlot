@@ -13,8 +13,8 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
-@purgeTempFiles
-curFoTVersion$ = "1.3.0.0"
+@purgeDirFiles: "../data/temp"
+curFoTVersion$ = "1.3.0.1"
 plotPrefix$ = "FOT."
 # Main script loop
 keepGoing = 1
@@ -59,6 +59,7 @@ while keepGoing
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
+    timeRelativeTo -= (tableID$ == "../example/AER_NI_I.txt")
 
     keepGoing = plotUses
     @writeVars: "../data/vars/", "fotPlot.var"
@@ -227,6 +228,8 @@ endproc
 
 procedure makeTimeRelativeMenu
     if keepGoing = 1
+        timeRelativeTo = timeRelativeTo +
+        ... (tableID$ == "../example/AER_NI_I.txt")
         @hideObjs: "table", "../data/temp/", "hiddenTx"
         optText$ = "Make time relative to"
         beginPause: "Choose Reference Element"
@@ -832,15 +835,15 @@ procedure createFoTVars: .address$
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "fotVersion$", tab$, curFoTVersion$
     appendFileLine: .address$, "tableID$", tab$,
-        ... "../example/nIEdiphthongs.txt"
-    appendFileLine: .address$, "timeCol$", tab$, "time"
+        ... "../example/AER_NI_I.txt"
+    appendFileLine: .address$, "timeCol$", tab$, "Element_t"
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"
     appendFileLine: .address$, "f3Col$", tab$, "F3"
     appendFileLine: .address$, "f4Col$", tab$, ""
-    appendFileLine: .address$, "repFactor$", tab$, "rep"
-    appendFileLine: .address$, "oFactor$", tab$, "sound"
-    appendFileLine: .address$, "iFactor$", tab$, "element"
+    appendFileLine: .address$, "repFactor$", tab$, "Rep"
+    appendFileLine: .address$, "oFactor$", tab$, "Context"
+    appendFileLine: .address$, "iFactor$", tab$, "Element"
     appendFileLine: .address$, "tertiaryFilters", tab$, 0
     appendFileLine: .address$, "inputUnits", tab$, 1
     appendFileLine: .address$, "timeRelativeTo", tab$, 1
@@ -852,7 +855,7 @@ procedure createFoTVars: .address$
     appendFileLine: .address$, "lineRatio", tab$, 0.9
     appendFileLine: .address$, "prevInputUnit", tab$, 1
     appendFileLine: .address$, "title$", tab$,
-        ... "nIE diphthongs moving towards /\ic/"
+        ... "Example nIE vowel and dipthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "maxFreq", tab$, 3800

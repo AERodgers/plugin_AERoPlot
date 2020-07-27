@@ -16,7 +16,7 @@
 # They are specifically written to work only as part of the the aeroplot plugin
 # and will likely cause problems you try to use them in other contexts.
 #
-# v.1.3.0.0
+# v.1.3.0.1
 
 # Table functions
 procedure validateTable:  .tableID$, .headers$
@@ -185,17 +185,6 @@ procedure getGenAxisVars
     outputUnits$[7] = "Bark scale"
     axisLine[1] = 2
     axisLine[2] = 2
-endproc
-
-procedure purgeTempFiles
-    # purge temporary file
-    temp = Create Strings as file list: "purgeList", "../data/temp"
-    numStr = Get number of strings
-    for i to numStr
-        curStr$ = Get string: i
-        deleteFile: "../data/temp/'curStr$'"
-    endfor
-    Remove
 endproc
 
 # file and folder functions
