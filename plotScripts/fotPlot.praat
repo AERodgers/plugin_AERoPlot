@@ -483,7 +483,7 @@ procedure calcFOTPlotLayers
         Formula: "token", """##"" + self$[factorName$[tokenMarking]]"
     endif
 
-    @possRows: table, "o", "i"
+    @possRows: table, "o", "i", 1
 
     for o to oLevels
         curOLevel$ = oLevel$[o]

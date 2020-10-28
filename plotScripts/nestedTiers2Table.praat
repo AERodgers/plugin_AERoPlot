@@ -30,14 +30,14 @@ procedure main
     ...  ui.output$
 
     # decide time columns for
-    if ui.getFormants
+    if ui.formants2tabulate
         if tiers2Table.isIntTier[1]
             .tColTiers$ = "'ui.lowestTier$'_tmin,'ui.lowestTier$'_tmax"
         else
             .tColTiers$ = "'ui.lowestTier$'_t"
         endif
-        @getFormants: .sound, 'ui.output$', .tColTiers$,
-        ... ui.timeStep, ui.maxNumFormants, ui.maxF5Hz, ui.windowLen, ui.preEmph,
+        @formantsSought: .sound, 'ui.output$', .tColTiers$,
+        ... ui.timeStep, ui.maxNumFormants, ui.maxFormantHz, ui.numFormants, ui.windowLen, ui.preEmph,
         ... .scale$[ui.scale]
     endif
 
@@ -54,7 +54,7 @@ procedure ui
     .done = 0
     .comment$ = ""
 
-    while ! .done
+    while !.done
         beginPause: "Convert nested textgrid tiers to data table"
 
             comment: "TEXTGRID INFORMATION"
@@ -68,7 +68,7 @@ procedure ui
             ... .otherTiers$
 
             comment: "OPTIONAL FORMANT PROCESSING"
-            optionMenu: "Get formants", .getFormants
+            optionMenu: "Formants to tabulate", .formants2tabulate
                 option: "None"
                 option: "F1"
                 option: "F1 and F2"
@@ -83,7 +83,9 @@ procedure ui
 
             comment: "Parameters for ""To Formant (Burg)..."""
             real: "Time step (s)", .timeStep
-            natural: "Maximum F5 (Hz)", .maxF5Hz
+            natural: "Maximum formant (Hz)", .maxFormantHz
+            positive: "Number of formants (for formant estimation)",
+            ... .numFormants
             positive: "Window length (s)", .windowLen
             positive: "Pre emphasis from (Hz)", .preEmph
 
@@ -103,8 +105,8 @@ procedure ui
         ... ) and
         ... (
         ...     (sound_file_address_or_object_number$ != "") *
-        ...     (get_formants > 1) +
-        ...     (get_formants == 1)
+        ...     (formants_to_tabulate > 1) +
+        ...     (formants_to_tabulate == 1)
         ... ) and
         ... .myChoice != 2
 
@@ -119,14 +121,16 @@ procedure ui
     .gridID$ = textgrid_address_or_object_number$
     .lowestTier$ = base_tier$
     .otherTiers$ = other_tiers_to_process$
-    .output$ = new_table_name$
+    .output$ = replace_regex$(new_table_name$, "^.*", "\l&", 1)
+    .output$ = replace_regex$(.output$, "^[0-9].*", "num_&", 1)
     .soundID$ = sound_file_address_or_object_number$
-    .getFormants = get_formants
-    .maxNumFormants = .getFormants - 1
+    .formants2tabulate = formants_to_tabulate
+    .maxNumFormants = .formants2tabulate - 1
     .scale = frequency_scale
 
     .timeStep = time_step
-    .maxF5Hz = maximum_F5
+    .maxFormantHz = maximum_formant
+    .numFormants = number_of_formants
     .windowLen = window_length
     .preEmph = pre_emphasis_from
 endproc
@@ -367,16 +371,16 @@ procedure tiers2Table:
 endproc
 
 ## FORMANT ESTIMATION
-procedure getFormants:
+procedure formantsSought:
     ... .sound, .table, .timeCols$,
-    ... .timeStep, .maxForm, .maxF5Hz, .windowLen, .preEmph,
+    ... .timeStep, .maxFormantsSought, .maxFormantHz, .numFormants, .windowLen, .preEmph,
     ... .scale$
 
     if .timeStep = 0
         .timeStep = .windowLen * 0.25
     endif
 
-    @csvLine2Array: .timeCols$, "getFormants.numCols", "getFormants.colArray$"
+    @csvLine2Array: .timeCols$, "formantsSought.numCols", "formantsSought.colArray$"
     .firstT$ = .colArray$[1]
     if .numCols = 1
         .lastT$ = .firstT$
@@ -387,14 +391,14 @@ procedure getFormants:
     selectObject: .sound
     noprogress To Formant (burg):
     ... .timeStep,
-    ... 5,
-    ... .maxF5Hz,
+    ... .numFormants,
+    ... .maxFormantHz,
     ... .windowLen,
     ... .preEmph
     .formantObj = selected()
 
     selectObject: .table
-    for .f to .maxForm
+    for .f to .maxFormantsSought
         Append column: "F'.f'"
     endfor
 
@@ -404,7 +408,7 @@ procedure getFormants:
         .startTP = Get value: .curRow, .firstT$
         .endTP = Get value: .curRow, .lastT$
 
-        for .f to .maxForm
+        for .f to .maxFormantsSought
             selectObject: .formantObj
 
             # Formant extraction must work for both point and interval tiers.
@@ -467,10 +471,11 @@ procedure initialiseVars: .address$
     ... "Speaker,Sex,Type,Context,Rep,IPA,Segment"
     appendFileLine: .address$, "ui.output$", tab$, "ni_vowels"
     appendFileLine: .address$, "ui.soundID$", tab$, "../example/AER_NI_I.wav"
-    appendFileLine: .address$, "ui.getFormants", tab$, 4
+    appendFileLine: .address$, "ui.formants2tabulate", tab$, 4
+    appendFileLine: .address$, "ui.numFormants", tab$, 5
     appendFileLine: .address$, "ui.scale", tab$, 1
     appendFileLine: .address$, "ui.timeStep", tab$, 0
-    appendFileLine: .address$, "ui.maxF5Hz", tab$, 5000
+    appendFileLine: .address$, "ui.maxFormantHz", tab$, 5000
     appendFileLine: .address$, "ui.windowLen", tab$, 0.025
     appendFileLine: .address$, "ui.preEmph", tab$, 50
 endproc

@@ -133,6 +133,9 @@ procedure readVars: .dir$, .file$
         '.prefix$'Var$[.i] = Get value: .i, "variable"
         .curVar$ = '.prefix$'Var$[.i]
         .curValue$ = Get value: .i, "value"
+        if .curValue$ = "?"
+            .curValue$ = ""
+        endif
         if right$(.curVar$, 1) = "]"
             # extract array
             .leftBracket = index(.curVar$, "[")
@@ -287,17 +290,39 @@ procedure summariseFactor: .df, .factor$, .rt$
     .levels = 0
     while .firstInst <= .numRows
         '.levels$' += 1
-        '.rt$'['.levels$'] = Get value: .firstInst, .factor$
+        temp'.rt$'['.levels$'] = Get value: .firstInst, .factor$
         Reflect rows
-        .lastInst = Search column: .factor$, '.rt$'['.levels$']
+        .lastInst = Search column: .factor$, temp'.rt$'['.levels$']
         .lastInst = ((.numRows + 1) - .lastInst)
         Reflect rows
-        .levelCount['.levels$'] = .lastInst - (.firstInst - 1)
+        .levelCountTemp['.levels$'] = .lastInst - (.firstInst - 1)
         .firstInst = .lastInst + 1
     endwhile
 
+
+    # Get index order based on when levels first occur in original table
+    .order = Create Table with column names:
+    ... "temp", '.levels$', "index occurrence"
+    for .i to '.levels$'
+        selectObject: .df
+        .firstOccurrence = Search column: .factor$, temp'.rt$'[.i]
+        selectObject: .order
+        Set numeric value: .i, "index", .i
+        Set numeric value: .i, "occurrence", .firstOccurrence
+    endfor
+    Sort rows: "occurrence"
+    for .i to '.levels$'
+        .correctOrder[.i] = Get value: .i, "index"
+    endfor
+    removeObject: .order
+
+    # Put levels in correct order
+    for .i to '.levels$'
+        '.rt$'[.i] = temp'.rt$'[.correctOrder[.i]]
+    endfor
+
     #remove the temp table
-    Remove
+    removeObject: .tempTable
 endproc
 
 procedure filterLevels: .table, .factor$, .rt$, .stateVar$
@@ -558,7 +583,7 @@ procedure removeRowsWhereStr: .table, .col$, .criteria$
     endfor
 endproc
 
-procedure possRows: .table, .outer$, .inner$
+procedure possRows: .table, .outer$, .inner$, .useInner
     # creates a matrix## of table sizes for tables which might be generated
     # by column filtering.
     selectObject: .table
@@ -567,10 +592,19 @@ procedure possRows: .table, .outer$, .inner$
     for .o to '.outer$'Levels
         .curOLvl$ = '.outer$'Level$[.o]
         for .i to '.inner$'Levels
-            .curILvl$ = '.inner$'Level$[.i]
+            if .useInner
+                .curILvl$ = '.inner$'Level$[.i]
+            else
+                .curILvl$ = "N/A"
+            endif
+
             for .curRow to .numRows
                 .curOVal$ = Get value: .curRow, '.outer$'Factor$
-                .curIVal$ = Get value: .curRow, '.inner$'Factor$
+                if .useInner
+                    .curIVal$ = Get value: .curRow, '.inner$'Factor$
+                else
+                    .curIVal$ = "N/A"
+                endif
                 if .curOVal$ = .curOLvl$ and .curIVal$ = .curILvl$
                     .matrix##[.o,.i] = .matrix##[.o,.i] + 1
                 endif

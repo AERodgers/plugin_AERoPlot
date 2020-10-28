@@ -36,11 +36,6 @@ while keepGoing
     ... "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
     @retrieveObjs: "hiddenTx"
 
-    if showAves = 1
-        ave$ = "med"
-    else
-        ave$ = "mean"
-    endif
     @doLadPlot
 
     # remove remaining tables
@@ -73,6 +68,9 @@ while keepGoing
     tokenMarking += 1
     dataPointsOnTop += 1
     keepGoing = plotUses
+    if oFactor$ = "dummyInner"
+        oFactor$ = ""
+    endif
 
     @writeVars: "../data/vars/", "ladPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
@@ -96,6 +94,8 @@ procedure doInputUI
             comment: "GROUPING FACTORS (COLUMN HEADERS)"
             sentence: "Sequencing factor (x-Axis)", iFactor$
             sentence: "Comparison factor (y-axis, colour)", oFactor$
+            comment: "Leave ""Comparison factor"" blank if you don't need to " +
+            ... "compare the same sound under differnt conditions."
             boolean: "Use tertiary filters (remove unwanted data)",
             ... tertiaryFilters
 
@@ -122,7 +122,6 @@ procedure doInputUI
         ... (comparison_factor$ == sequencing_factor$) or
         ...     (
         ...     table_address_or_object_number$ = "" or
-        ...     comparison_factor$ = "" or
         ...     sequencing_factor$ = ""
         ...     )
         ... )
@@ -168,6 +167,11 @@ procedure processInputUI
     newStateIsOldOne = x_tableID$ = tableID$ and
     ... oFactor$ = x_oFactor$
 
+    if oFactor$ = ""
+        selectObject: table
+        Append column: "dummyInner"
+        oFactor$ = "dummyInner"
+    endif
     selectObject: table
     numFactors = Get number of columns
     for i to numFactors
@@ -199,13 +203,17 @@ procedure processInputUI
     if !(keepGoing > 1 and plotUses = 3)
         @summariseFactor:  table, iFactor$, "i"
         @checkMax50: iLevels, table, iFactor$, 1
-        @filterLevels: table, iFactor$, "i", "newStateIsOldOne"
-        table = filterLevels.table
+        if iLevels > 1
+            @filterLevels: table, iFactor$, "i", "newStateIsOldOne"
+            table = filterLevels.table
+        endif
     endif
     @summariseFactor:  table, oFactor$, "o"
     @checkMax50: oLevels, table, oFactor$, 1
-    @filterLevels: table, oFactor$, "o", "newStateIsOldOne"
-    table = filterLevels.table
+    if oLevels > 2
+        @filterLevels: table, oFactor$, "o", "newStateIsOldOne"
+        table = filterLevels.table
+    endif
 
     # run tertiary filter UI first to remove unwanted items
     if tertiaryFilters
@@ -272,7 +280,11 @@ procedure doOutputUI
         optionMenu: "Most prominent layer", dataPointsOnTop
             option: "averages bar / box plot"
             option: "data points"
-        boolean: "Distribute ALL factors along the X axis", staggerO
+        if oLevels > 1
+            boolean: "Distribute ALL factors along the X axis", staggerO
+        else
+            distribute_ALL_factors_along_the_X_axis = 0
+        endif
         boolean: "Show boxplots", showIQR
         boolean: "Show arrows", drawArrows
         boolean: "show formants in legend", legendHasFormants
@@ -292,6 +304,11 @@ procedure doOutputUI
     dataPointsOnTop = most_prominent_layer - 1
     tokenMarking = data_points - 1
     showAves = averages_bar - 1
+    if showAves = 1
+        ave$ = "mean"
+    elsif showAves = 2
+        ave$ = "med"
+    endif
     showAveVals = display_'iUnit$'_values_above_averages_bar
     staggerO = distribute_ALL_factors_along_the_X_axis
     stagger = staggerO * 1 / oLevels
@@ -420,6 +437,9 @@ procedure calcLadPlotLayers
         iLevel[iLevel$[i]] = i
     endfor
 
+
+    # set flag which assumes there is only one token for each {o,i} level
+    singleValue = 1
     selectObject: table
     # add columns for plot drawing
     Append column: "x"
@@ -444,14 +464,16 @@ procedure calcLadPlotLayers
     endif
     # calculate size of potenial tables filtered by
     # levels of outer and inner factors
-    @possRows: table, "o", "i"
+    @possRows: table, "o", "i", 1
     for o to oLevels
 
         curOLevel$ = oLevel$[o]
         # create LegendElement for oLevel[o] colour
         curColVector$ = curPaletteVector$[oColour[o]]
         curColName$ = curPaletteName$[oColour[o]]
-        @legend: "R", curColVector$, oLevel$[o], 4
+        if oLevels > 1
+            @legend: "R", curColVector$, oLevel$[o], 4
+        endif
 
         # make o colourShades
         @modifyColVectr: curColVector$, "oColour$['o',5]", " + shading * 2"
@@ -477,6 +499,11 @@ procedure calcLadPlotLayers
                 ... "self$[iFactor$] = curILevel$"
                 Rename: curOLevel$ + "_" + curILevel$
                 tempNumRows = Get number of rows
+
+                if tempNumRows > 1
+                    singleValue = 0
+                endif
+
                 meanTInPlot[o,i] = Get mean: "x"
                 # get mean formant values for current sub-table
                 for f to numFormants
@@ -682,17 +709,6 @@ procedure drawArrows
 endproc
 
 procedure drawAves
-    if legendHasFormants
-        for f to numFormants
-            @legend: "'f'81", "{1,1,1}", "F'f' mean", pi^0.5 * bulletSize / 4
-        endfor
-    endif
-
-    if  showAves = 1
-        ave$ = "med"
-    else
-        ave$ = "mean"
-    endif
 
     for o to oLevels
         curColour$ = oColour$[o,3]
@@ -730,6 +746,21 @@ procedure drawAves
             endif
         endfor
     endfor
+
+    # correct ave$ if there is only a single value for each level
+    aveText$ = " " + ave$
+
+    if singleValue
+        aveText$ = ""
+    endif
+
+    if legendHasFormants
+        for f to numFormants
+            @legend:
+            ... "'f'81", "{1,1,1}", "F'f''aveText$'", pi^0.5 * bulletSize / 4
+        endfor
+    endif
+
 endproc
 
 procedure drawDataPoints
@@ -803,6 +834,7 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "ladPlot.var"
     @getGenAxisVars
+
 endproc
 
 procedure createLadVars: .address$
@@ -815,8 +847,8 @@ procedure createLadVars: .address$
     appendFileLine: .address$, "f2Col$", tab$, "F2"
     appendFileLine: .address$, "f3Col$", tab$, "F3"
     appendFileLine: .address$, "f4Col$", tab$, ""
-    appendFileLine: .address$, "oFactor$", tab$, "Context"
-    appendFileLine: .address$, "iFactor$", tab$, "Element"
+    appendFileLine: .address$, "oFactor$", tab$, "Element"
+    appendFileLine: .address$, "iFactor$", tab$, "Context"
     appendFileLine: .address$, "tertiaryFilters", tab$, 0
     appendFileLine: .address$, "inputUnits", tab$, 1
     appendFileLine: .address$, "timeRelativeTo", tab$, 1

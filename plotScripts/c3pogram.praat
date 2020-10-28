@@ -1,4 +1,5 @@
-# C3POGRAM   V.1.1.1
+
+# C3POGRAM   V.1.2.0
 # ==================
 # Written for Praat 6.0.40 or later
 #
@@ -29,14 +30,19 @@
     # Script and procedures are published under the GNU GENERAL PUBLIC LICENSE.
     #
     # REFERENCE
-    # Albert, A., Cangemi, F., & Grice, M. (2019). Can you draw me a question? International
-    #     Congress of Phonetic Sciences. doi.org/10.13140/RG.2.2.15700.14729
+    # Albert, A., Cangemi, F., & Grice, M. (2019). Can you draw me a question?
+    #     International Congress of Phonetic Sciences. doi.org/10.13140
+    #     /RG.2.2.15700.14729
     #
     # UPDATES
-    # 1.1.0    - 20.10.19 - Textgrid no longer required (leave grid or tier field as 0)
-    # 1.1.1    - 21.10.19 - Added table2array procedure and indicated procedure dependencies at
-    #                       start of each procedure to make it easier to incpororate them into other
-    #                       scripts.
+    # 1.1.0    - 20.10.19 - Textgrid no longer required (leave grid or tier
+    #                       field as 0)
+    # 1.1.1    - 21.10.19 - Added table2array procedure and indicated procedure
+    #                       dependencies at
+    #                       start of each procedure to make it easier to
+    #                       incpororate them into other scripts.
+    # 1.2.-    - 28.10.20 - added ability to display intensity curve
+    #                     - added window width function.
 
 form c3pogram
     sentence image_title
@@ -46,12 +52,16 @@ form c3pogram
     comment Enter number of textgrid tier for display (sets min and max time of output display)
     integer tier 0 (=  no textgrid)
     boolean Paint_spectrogram 1
+    natural Window_width 8
     comment Enter parameter settings
     natural minF0 60
     natural maxF0 400
-    choice pitch_scale 2
+    real mindB 30
+    real maxdB 90
+    choice scale 2
         button Hertz
         button Semitones re 1 Hz
+        button Intensity
     choice Parameter_two 1
         button Cepstral Peak Prominence
         button Residual of intensity (linear regression)
@@ -64,10 +74,12 @@ form c3pogram
 endform
 title$ = image_title$
 
-@c3pogram: parameter_two, pitch_scale, paint_spectrogram, title$, grid, sound, tier, minF0, maxF0
+@c3pogram: parameter_two, scale, paint_spectrogram, title$, grid, sound, tier,
+    ... minF0, maxF0, mindB, maxdB, window_width
 
 # C3POGRAM FUNCTIONS
-procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier, .minF0, .maxF0
+procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
+    ...  .tier, .minF0, .maxF0, .mindB, .maxdB, .vpWidth
 
     # adjust sound intensity
     selectObject: .sound
@@ -93,13 +105,13 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
     10
     Solid line
     Courier
-    Select outer viewport: 0, 6, 0, 3.35
+    Select outer viewport: 0, .vpWidth, 0, 3.35
 
     # draw spectrogram
     if .paintSpect
         selectObject: .sound
         specky = To Spectrogram: 0.005, 5000, 0.002, 20, "Gaussian"
-        Paint: .minT, .maxT, 0, 0, 100, "yes", 50, 6, 0, "no"
+        Paint: .minT, .maxT, 0, 0, 100, "yes", 50, .vpWidth, 0, "no"
         Marks right every: 1, 200, "no", "yes", "no"
         Line width: 2
         Marks right every: 1000, 1, "yes", "yes", "no"
@@ -111,9 +123,9 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
 
     if .grid * .tier > 0
         # draw text grid text and lines
-        Select outer viewport: 0, 6, 0, 4
+        Select outer viewport: 0, .vpWidth, 0, 4
         selectObject: .refTier
-        Draw: .minT, .maxT, "yes", "yes", "no"
+        Draw: .minT, .maxT, "no", "yes", "no"
         Line width: 1
         Draw inner box
     endif
@@ -152,11 +164,18 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
     endif
     .vqTable = '.name$'.table
 
+
     # draw cp3ogram
-    @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0, .maxF0, .param2, .hz_ST
+    #intensity hack
+    if .hz_ST != 3
+        @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
+        ... .maxF0, .param2, .hz_ST, .vpWidth
+    else
+        @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+    endif
 
     # add pitch axis information
-    Select outer viewport: 0, 6, 0, 3.35
+    Select outer viewport: 0, .vpWidth, 0, 3.35
     if .hz_ST = 2
         .leftMajor = 5
         .leftText$ = "F0 (ST re 1 Hz)"
@@ -164,17 +183,25 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
         .leftMajor = 50
         .leftText$ = "F0 (Hz)"
     endif
-    Line width: 2
-    Marks left every: 1, .leftMajor, "yes", "yes", "no"
-    Line width: 1
-    Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
-    Text left: "yes", .leftText$
+    if .hz_ST < 3
+        Line width: 2
+        Marks left every: 1, .leftMajor, "yes", "yes", "no"
+        Line width: 1
+        Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
+        Text left: "yes", .leftText$
+    else
+        Line width: 2
+        Marks left every: 1, 10, "yes", "yes", "no"
+        Line width: 1
+        Marks left every: 1, 2, "no", "yes", "no"
+        Text left: "yes", "Intensity (dB)"
+    endif
 
     # add title
     if .grid * .tier > 0
-        Select outer viewport: 0, 6, 0, 4
+        Select outer viewport: 0, .vpWidth, 0, 4
     else
-        Select outer viewport: 0, 6, 0, 3.35
+        Select outer viewport: 0, .vpWidth, 0, 3.35
     endif
 
     Font size: 14
@@ -190,7 +217,8 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound, .tier,
     Remove
 endproc
 
-procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0, .maxF0, .type, .hz_ST
+procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
+    ... .maxF0, .type, .hz_ST, .vpWidth
     selectObject: .pitchTable
     # adjust F0 if pitch scale set to semitones
     if .hz_ST = 2
@@ -207,7 +235,7 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0, .maxF0,
     Formula: "shade", "1 - (self[""value""] - .minPar2) / (.maxPar2 - .minPar2)"
 
     # set picture window
-    Select outer viewport: 0, 6, 0, 3.35
+    Select outer viewport: 0, .vpWidth, 0, 3.35
     Axes: .minT, .maxT, .minF0, .maxF0
     .di = Horizontal mm to world coordinates: 0.9
     Font size: 10
@@ -226,7 +254,8 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0, .maxF0,
         .sh = Get value: nearestVal.index, "shade"
         .shT = Get value: nearestVal.index, "time"
         if not(abs(.shT - .curT)*1000 > 5.5555)
-            Paint circle: "{'.sh','.sh',1-0.8*'.sh'}", .curT, .curF0, .di * 0.1 + .di * (1 - .sh)
+            Paint circle: "{'.sh','.sh',1-0.8*'.sh'}", .curT, .curF0,
+            ... .di * 0.1 + .di * (1 - .sh)
             Colour: "blue"
             Line width: 0.5
             Draw circle: .curT, .curF0, .di * 0.1 + .di * (1 - .sh)
@@ -239,10 +268,34 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0, .maxF0,
     endfor
 endproc
 
+
+procedure drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+    selectObject: .sound
+    .intensity = To Intensity: .minF0, 0, "yes"
+
+    # set picture window
+    Select outer viewport: 0, .vpWidth, 0, 3.35
+    Axes: .minT, .maxT, .mindB, .maxdB
+
+    Font size: 10
+    Courier
+    Solid line
+    Line width: 7
+    Black
+    Draw: .minT, .maxT, .mindB, .maxdB, "no"
+    Line width: 4
+    Green
+    Draw: .minT, .maxT, .mindB, .maxdB, "no"
+    Line width: 1
+
+    removeObject: .intensity
+endproc
+
 # PARAMETER EXTRACTION FUNCTIONS
 procedure pitch: .sound, .minF0, .maxF0
     selectObject: .sound
-    .obj = To Pitch (ac): 0, .minF0, 15, "no", 0.03, 0.45, 0.01, 0.35, 0.14, .maxF0
+    .obj = To Pitch (ac):
+    ... 0, .minF0, 15, "no", 0.03, 0.45, 0.01, 0.35, 0.14, .maxF0
 endproc
 
 procedure h1h2: .sound, .pitchTable

@@ -14,7 +14,7 @@
 
 @checkPraatVersion
 @purgeDirFiles: "../data/temp"
-curF1f2Version$ = "1.3.0.1"
+curF1f2Version$ = "1.3.0.2"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
@@ -99,7 +99,8 @@ procedure doInputUI
         ... (secondary_factor$ = "" and use_secondary_factor) or
         ... f2_Column$ = "" or f1_Column$ = ""
         ... )
-        comment$ = "Please ensure you FILL IN all the NECESSARY BOXES."
+        comment$ =
+        ... "Please ensure you FILL IN all the NECESSARY BOXES."
     endwhile
 
     # Simplify input variables
@@ -293,7 +294,7 @@ endproc
 procedure createSubTables
 
     # calculate potential tables
-    @possRows: table, "o", "i"
+    @possRows: table, "o", "i", useInnerFactor
 
     for o to oLevels
         #add to legend arrays
@@ -311,7 +312,7 @@ procedure createSubTables
                 suboLevel$[o] = oLevel$[o]
             else
                 subInnerFactor$ = oFactor$
-                subiLevel$[i] = oLevel$[o
+                subiLevel$[i] = oLevel$[o]
                 subOuterFactor$ = oFactor$
                 suboLevel$[o] = oLevel$[o]
             endif
@@ -643,7 +644,6 @@ procedure doMeansText
         curColour$[3] = curColVector$
         @modifyColVectr: curColVector$, "curColour$[2]", " - shading"
         @modifyColVectr: curColVector$, "curColour$[1]", " - shading"
-
         for i to iLevels
             if possRows.matrix##[o,i]
                 selectObject: iLevelTable[o, i]
