@@ -1,6 +1,6 @@
 # General Functions
 # =================
-  genFnBankVersion$ = "1.3.0.1"
+  genFnBankVersion$ = "1.3.2.1"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
@@ -1419,7 +1419,7 @@ procedure resetDrawSpace: .fontSize
     Line width: 1
     Colour: "Black"
     Solid line
-    Helvetica
+    'font$'
 endproc
 
 procedure getOutputScales:
@@ -1841,7 +1841,7 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
             nowarn Text:
             ... .x_start + 2.5 * .x_unit, "Left", .y_end - .y_unit * (.i - 0.3),
             ... "Half", "##" + legend.text$[.i]
-            Helvetica
+            'font$'
 
             if left$(legend.style$[.i], 1) =
                 ... "L" or left$(legend.style$[.i], 1) = "l"
