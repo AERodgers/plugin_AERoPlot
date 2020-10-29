@@ -25,12 +25,6 @@ Add menu command: "Objects", "New",
 ... 1,  "plotScripts/fotPlot.praat"
 
 Add menu command: "Objects", "New",
-... "F0-CPP Plot...",
-... "AERoPlot",
-... 1,  "plotScripts/c3pogram.praat"
-
-
-Add menu command: "Objects", "New",
 ... "--",
 ... "AERoPlot",
 ... 1, ""
