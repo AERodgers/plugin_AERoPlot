@@ -261,8 +261,9 @@ endproc
 
 # UI and variable Functions
 procedure addShared_UI_0
+
     comment: "TABLE / FILE INFORMATION"
-    sentence: "Table address or object number", tableID$
+    sentence: "Object number or file path", tableID$
     optionMenu: "Table format", tableFormat
         option: "tab-delimited file"
         option: "CSV file"
@@ -273,7 +274,7 @@ procedure addShared_UI_0
 endproc
 
 procedure processShared_UI_0
-    tableID$ =  table_address_or_object_number$
+    tableID$ =  object_number_or_file_path$
     tableFormat = table_format
     plotUses = each_plot_will_use
 endproc
@@ -289,6 +290,11 @@ endproc
 
 procedure addShared_UI_2
     boolean: "Show legend", showLegend
+    optionMenu: "Font choice", font_choice
+        option: "Helvetica"
+        option: "Times"
+        option: "Courier"
+        option: "Palatino"
     optionMenu: "Base font size", (fontM - 8) / 2
         option: "8"
         option: "10"
@@ -342,6 +348,15 @@ procedure processShared_UIs
     # 3 -> output is (k)Hz plotted logarithmically.
     # process Shared_UI_2
     showLegend = show_legend
+    if font_choice = 1
+        font$ = "Helvetica"
+    elsif font_choice = 2
+        font$ = "Times"
+    elsif font_choice = 3
+        font$ = "Courier"
+    else
+        font$ = "Palatino"
+    endif
     fontS = 6 + base_font_size * 2
     fontM = 8 + base_font_size * 2
     fontL = 12 + base_font_size * 2
@@ -360,6 +375,8 @@ endproc
 procedure appendSharedVars: .address$
     saveDir$ = homeDirectory$ + "/Desktop/AERoPlot_Images"
     fontM = 14
+    appendFileLine: .address$, "font$", tab$, "Helvetica"
+    appendFileLine: .address$, "font_choice", tab$, 1
     appendFileLine: .address$, "fontS", tab$, fontM - 2
     appendFileLine: .address$, "fontM", tab$, fontM
     appendFileLine: .address$, "fontL", tab$, fontM + 4
@@ -379,4 +396,45 @@ procedure appendSharedVars: .address$
     appendFileLine: .address$, "lightLine$", tab$, "{0.8, 0.8, 0.8}"
     appendFileLine: .address$, "darkLine$", tab$, "{0.2, 0.2, 0.2}"
     appendFileLine: .address$, "pbInfo", tab$, 0
+endproc
+
+# Functions to Check for Dynamic Menu Object Numbers
+# NB: These procedure will only work if there is one instance of each object
+#     type in the selected objects list.
+
+procedure objsSelected: .types$, .vars$
+    # .types$ = csv list of object types
+    # .vars$ = csv list of object variables (as string)
+    @csvLine2Array:
+    ... .types$,
+    ... "objsSelected.typeSize",
+    ... "objsSelected.typeArray$"
+    @csvLine2Array:
+    ... .vars$,
+    ... "objsSelected.varSize",
+    ... "objsSelected.varArray$"
+
+    .curSelected# = selected#()
+    if size(.curSelected#) = .typeSize
+        for .i to .typeSize
+            .override$ = ""
+            for .j to .typeSize
+                if .typeArray$[.i] = extractWord$(selected$(.j), "")
+                    .override$[.i] = string$(selected(.j))
+                endif
+            endfor
+        endfor
+    endif
+endproc
+
+procedure overrideObjIDs
+    #check that @objsSelected has been run already.
+    if variableExists("objsSelected.types$")
+        for .i to objsSelected.typeSize
+            if objsSelected.override$[.i] != ""
+                .curVar$ = objsSelected.varArray$ [.i]
+                '.curVar$' = objsSelected.override$[.i]
+            endif
+        endfor
+    endif
 endproc
