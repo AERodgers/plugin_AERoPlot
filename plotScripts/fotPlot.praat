@@ -13,6 +13,7 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
+@objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
 curFoTVersion$ = "1.3.0.1"
 plotPrefix$ = "FOT."
@@ -115,7 +116,7 @@ procedure doInputUI
         ... !(
         ... (main_factor$ == sequencing_factor$) or
         ...     (
-        ...     table_address_or_object_number$ = "" or
+        ...     object_number_or_file_path$ = "" or
         ...     time_Column$ = "" or
         ...     main_factor$ = "" or
         ...     sequencing_factor$ = ""
@@ -141,7 +142,7 @@ procedure doInputUI
 
     # simplify input variables
     @processShared_UI_0
-    tableID$ =  table_address_or_object_number$
+    tableID$ =  object_number_or_file_path$
     tableFormat = table_format
     repFactor$ = repetition_column$
     oFactor$ = main_factor$
@@ -402,7 +403,7 @@ procedure doFOTPlot
         @drawMeans
     endif
 
-    if showLegend
+    if showLegend and variableExists("legend.items")
         yList$ = ""
         for i to 4
             if f'i'Col$ != ""
@@ -618,7 +619,7 @@ procedure drawFOTAxisLayer
                    Colour: "Black"
                    Text special: majorTime_DrawVal[line], "Right",
                     ... majorFreq_Min, "Half",
-                    ... "Helvetica", fontM, "90",
+                    ... font$, fontM, "90",
                     ... string$(round(majorTime_AxisVal[line] * 1000))
                 endif
             endif
@@ -829,6 +830,7 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "fotPlot.var"
     @getGenAxisVars
+    @overrideObjIDs
 endproc
 
 procedure createFoTVars: .address$

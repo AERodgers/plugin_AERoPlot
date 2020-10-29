@@ -17,6 +17,7 @@
 #      Boston MA: Wadsworth Cengage
 
 @checkPraatVersion
+@objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
 curLadVersion$ = "1.3.0.1"
 plotPrefix$ = "LAD."
@@ -92,10 +93,10 @@ procedure doInputUI
             @addShared_UI_0
 
             comment: "GROUPING FACTORS (COLUMN HEADERS)"
+            comment: "Leave ""Comparison factor"" blank if you don't need to " +
+            ... "compare the same sound under different conditions."
             sentence: "Sequencing factor (x-Axis)", iFactor$
             sentence: "Comparison factor (y-axis, colour)", oFactor$
-            comment: "Leave ""Comparison factor"" blank if you don't need to " +
-            ... "compare the same sound under differnt conditions."
             boolean: "Use tertiary filters (remove unwanted data)",
             ... tertiaryFilters
 
@@ -121,7 +122,7 @@ procedure doInputUI
         ... !(
         ... (comparison_factor$ == sequencing_factor$) or
         ...     (
-        ...     table_address_or_object_number$ = "" or
+        ...     object_number_or_file_path$ = "" or
         ...     sequencing_factor$ = ""
         ...     )
         ... )
@@ -364,7 +365,7 @@ procedure doLadPlot
 
     endif
 
-    if showLegend
+    if showLegend and variableExists("legend.items")
         yList$ = ""
         for i to 4
             if f'i'Col$ != ""
@@ -732,13 +733,13 @@ procedure drawAves
                             Text special:
                             ... curAveX + xDist * 1.5, "centre",
                             ... curAveF - yDist * 1.5, "Bottom",
-                            ... "Helvetica", fontS, "0",
+                            ... font$, fontS, "0",
                             ... "##" + fixed$('ave$'FAct[o,i,f], inputUnits = 2)
                             Colour: "Black"
                             Text special:
                             ... curAveX, "centre",
                             ... curAveF, "Bottom",
-                            ... "Helvetica", fontS, "0",
+                            ... font$, fontS, "0",
                             ... "##" + fixed$('ave$'FAct[o,i,f], inputUnits = 2)
                         endif
 
@@ -834,7 +835,7 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "ladPlot.var"
     @getGenAxisVars
-
+    @overrideObjIDs
 endproc
 
 procedure createLadVars: .address$

@@ -13,6 +13,7 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
+@objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
 @purgeDirFiles: "../data/temp"
 @main
 
@@ -459,6 +460,7 @@ procedure defineVars
         @initialiseVars: "../data/vars/tier2Table.var"
     endif
     @readVars: "../data/vars/", "tier2Table.var"
+    @overrideObjIDs
 endproc
 
 procedure initialiseVars: .address$
@@ -481,3 +483,4 @@ procedure initialiseVars: .address$
 endproc
 
 include _genFnBank.praat
+include _aeroplotFns.praat

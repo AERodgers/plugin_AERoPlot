@@ -13,8 +13,10 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
+@objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
-curF1f2Version$ = "1.3.0.2"
+
+curF1f2Version$ = "1.3.1.0"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
@@ -94,7 +96,7 @@ procedure doInputUI
         # error handling
         done =
         ... !(
-        ... table_address_or_object_number$ = "" or
+        ... object_number_or_file_path$ = "" or
         ... main_factor$ = "" or
         ... (secondary_factor$ = "" and use_secondary_factor) or
         ... f2_Column$ = "" or f1_Column$ = ""
@@ -259,7 +261,7 @@ procedure drawf1f2Plot
     @calculateAxisIncrements
     @doF1F2AxisLayer
     @doPlotInterior
-    if showLegend
+    if showLegend and variableExists("legend.items")
         @drawLegendLayer: majorT_Max, majorT_Min,
              ... majorR_Max, majorR_Min,
              ... fontM, "left, right, top, bottom",
@@ -414,7 +416,7 @@ procedure doF1F2AxisLayer
         Colour: "Black"
         Text special: majorT_DrawVal[line], "Left",
         ... majorR_Min, "Half",
-        ... "Helvetica", fontM, "90",
+        ... font$, fontM, "90",
         ... string$(majorT_AxisVal[line])
     endfor
 
@@ -696,6 +698,8 @@ endproc
 # Initialisation procedures and script inclusions
 procedure defineVars
     @checkDirectoryStructure
+
+
     if !fileReadable("../data/vars/f1f1Plot.var")
         @createF1F2Vars
     endif
@@ -706,6 +710,7 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "f1f1Plot.var"
     @getGenAxisVars
+    @overrideObjIDs
 endproc
 
 procedure createF1F2Vars:
