@@ -121,6 +121,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
     Erase all
     Black
     10
+    Line width: 1
     Solid line
     Courier
     Select outer viewport: 0, .vpWidth, 0, 3.35
