@@ -271,10 +271,14 @@ endproc
 
 
 # UI and variable Functions
-procedure addShared_UI_0
+procedure addShared_UI_0:  .oFactorDefault$, .iFactorDefault$
     each_plot_will_use = 2
     object_number_or_file_path$ = tableID$
     table_format = 1
+    isExample = 0
+
+    # present object selection options only if the user has not already selected
+    # appropriate objects from the objects window.
     if !overwriteVars.all
         comment: "TABLE / FILE INFORMATION"
         sentence: "Object number or file path", tableID$
@@ -285,6 +289,9 @@ procedure addShared_UI_0
             option: "A different table."
             option: "The same table."
             #option: "The same table and sequencing factor"
+    else
+    @isExampleTable: tableID$, .oFactorDefault$, .iFactorDefault$
+    isExample = isExampleTable.true
     endif
 endproc
 
@@ -474,5 +481,17 @@ procedure overwriteVars
         title$ = ""
         oFactor$ = ""
         iFactor$ = ""
+    endif
+endproc
+
+
+procedure isExampleTable: .tableID$, .oFactorName$, .iFactorName$
+    # Set UI menu elements if user has selected example objects.
+    selectObject: '.tableID$'
+    .true = extractLine$ (selected$(1), " ") == "aer_ni_i"
+    if .true
+        oFactor$ =.oFactorName$
+        iFactor$ = .iFactorName$
+        title$ = "Example nIE vowel and dipthongs"
     endif
 endproc

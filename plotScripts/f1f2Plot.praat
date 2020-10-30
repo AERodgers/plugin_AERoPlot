@@ -75,7 +75,7 @@ procedure doInputUI
         beginPause: "F1-F2 plotter: input settings"
         comment: comment$
 
-            @addShared_UI_0
+            @addShared_UI_0: "Context", "Element"
 
             comment: "GROUPING FACTORS (COLUMN HEADERS)"
             #sentence Main_factor (determines colour)

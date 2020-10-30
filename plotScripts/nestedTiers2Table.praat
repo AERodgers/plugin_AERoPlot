@@ -22,6 +22,7 @@ procedure main
     @defineVars
 
     @ui
+
     @getObject: ui.gridID$, "textGrid", "main"
     @getObject: ui.soundID$, "sound", "main"
 
@@ -59,15 +60,21 @@ procedure ui
     while !.done
         textgrid_address_or_object_number$ = .gridID$
         sound_file_address_or_object_number$ = .soundID$
-        beginPause: "Convert nested textgrid tiers to data table"
 
+        beginPause: "Convert nested textgrid tiers to data table"
+            # present object selection options only if the user has not already
+            # selected appropriate objects from the objects window.
             if !overwriteVars.all
                 comment: "TEXTGRID INFORMATION"
                 sentence: "Textgrid address or object number", .gridID$
                 sentence: "Sound file address or object number", .soundID$
-            endif
-            sentence: "New table name", .output$
+            else
+                # Set variables if user is using example files
+                @check4ExampleObjs: .gridID$, .soundID$
 
+            endif
+
+            sentence: "New table name", .output$
             sentence: "Base tier", .lowestTier$
             sentence: "Other tiers to process (separated by commas)",
             ... .otherTiers$
@@ -129,6 +136,7 @@ procedure ui
     .otherTiers$ = other_tiers_to_process$
     .output$ = replace_regex$(new_table_name$, "^.*", "\l&", 1)
     .output$ = replace_regex$(.output$, "^[0-9].*", "num_&", 1)
+    .output$ = replace_regex$(.output$, "[^a-zA-Z0-9]", "_", 0)
     .soundID$ = sound_file_address_or_object_number$
     .formants2tabulate = formants_to_tabulate
     .maxNumFormants = .formants2tabulate - 1
@@ -268,7 +276,6 @@ procedure tiers2Table:
 
     # Create database table with innermost factor in tier hierarchy
     selectObject: .textGrid
-
     .gridTable = Down to Table: "no", 3, "yes", "no"
     '.output$' = Extract rows where column (text):
         ... "tier",
@@ -483,7 +490,7 @@ procedure initialiseVars: .address$
     appendFileLine: .address$, "ui.lowestTier$", tab$, "Element"
     appendFileLine: .address$, "ui.otherTiers$", tab$,
     ... "Speaker,Sex,Type,Context,Rep,IPA,Segment"
-    appendFileLine: .address$, "ui.output$", tab$, "ni_vowels"
+    appendFileLine: .address$, "ui.output$", tab$, "aer_ni_i"
     appendFileLine: .address$, "ui.soundID$", tab$, "../example/AER_NI_I.wav"
     appendFileLine: .address$, "ui.formants2tabulate", tab$, 4
     appendFileLine: .address$, "ui.numFormants", tab$, 5
@@ -493,6 +500,23 @@ procedure initialiseVars: .address$
     appendFileLine: .address$, "ui.windowLen", tab$, 0.025
     appendFileLine: .address$, "ui.preEmph", tab$, 50
     appendFileLine: .address$, "firstPass", tab$, 1
+endproc
+
+
+procedure check4ExampleObjs: .gridID$, .soundID$
+    # Set UI menu elements if user has selected example objects.
+    selectObject: '.gridID$'
+    plusObject: '.soundID$'
+    if extractLine$ (selected$(1), " ") = "AER_NI_I" and
+        ... extractLine$ (selected$(2), " ") = "AER_NI_I"
+
+        ui.output$ = "aer_ni_i"
+        ui.lowestTier$ = "Element"
+        ui.otherTiers$ = "Speaker,Sex,Type,Context,Rep,IPA,Segment"
+        ui.formants2tabulate = 4
+
+    endif
+
 endproc
 
 include _genFnBank.praat
