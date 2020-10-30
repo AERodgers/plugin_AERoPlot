@@ -19,7 +19,7 @@
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
-curLadVersion$ = "1.3.0.1"
+curLadVersion$ = "1.3.2.0"
 plotPrefix$ = "LAD."
 # Main script loop
 keepGoing = 1
@@ -73,9 +73,15 @@ while keepGoing
         oFactor$ = ""
     endif
 
+    firstPass = 0
     @writeVars: "../data/vars/", "ladPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
+    if variableExists("tableID$")
+        if string$(number(tableID$)) = tableID$
+            selectObject: 'tableID$'
+        endif
+    endif
 endwhile
 
 
@@ -114,6 +120,7 @@ procedure doInputUI
         myChoice = endPause: "Exit", "Apply", 2, 1
         # respond to myChoice
         if myChoice = 1
+            @selectTableID
             exit
         endif
 
@@ -249,6 +256,7 @@ endproc
 
 procedure doOutputUI
     @hideObjs: "table", "../data/temp/", "hiddenTx"
+
     beginPause: "Graphical Output Settings: Ladefoged-style plot"
         comment: "PLOT BASICS"
         sentence: "Title", title$
@@ -293,6 +301,7 @@ procedure doOutputUI
         @addShared_UI_3
     myChoice = endPause: "Exit", "Continue", 2, 1
     if myChoice = 1
+        @selectTableID
         exit
     endif
 
@@ -835,7 +844,7 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "ladPlot.var"
     @getGenAxisVars
-    @overrideObjIDs
+    @overwriteVars
 endproc
 
 procedure createLadVars: .address$
@@ -859,7 +868,8 @@ procedure createLadVars: .address$
     appendFileLine: .address$, "plotHeight", tab$, 5
     appendFileLine: .address$, "lineRatio", tab$, 0.5
     appendFileLine: .address$, "prevInputUnit", tab$, 1
-    appendFileLine: .address$, "title$", tab$, "Example nIE vowel and dipthongs"
+    appendFileLine: .address$, "title$", tab$,
+        ... "Example nIE vowel and dipthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "maxFreq", tab$, 4000

@@ -47,6 +47,7 @@ procedure main
     plusObject: .sound
     Remove
 
+    firstPass = 0
     @writeVars: "../data/vars/", "tier2Table.var"
 endproc
 
@@ -56,12 +57,15 @@ procedure ui
     .comment$ = ""
 
     while !.done
+        textgrid_address_or_object_number$ = .gridID$
+        sound_file_address_or_object_number$ = .soundID$
         beginPause: "Convert nested textgrid tiers to data table"
 
-            comment: "TEXTGRID INFORMATION"
-
-            sentence: "Textgrid address or object number", .gridID$
-            sentence: "Sound file address or object number", .soundID$
+            if !overwriteVars.all
+                comment: "TEXTGRID INFORMATION"
+                sentence: "Textgrid address or object number", .gridID$
+                sentence: "Sound file address or object number", .soundID$
+            endif
             sentence: "New table name", .output$
 
             sentence: "Base tier", .lowestTier$
@@ -95,6 +99,7 @@ procedure ui
         .myChoice = endPause: "Exit", "Instructions", "Convert to Table", 3, 1
         # respond to .myChoice
         if .myChoice = 1
+            @selectTableID
             exit
         endif
 
@@ -460,7 +465,14 @@ procedure defineVars
         @initialiseVars: "../data/vars/tier2Table.var"
     endif
     @readVars: "../data/vars/", "tier2Table.var"
-    @overrideObjIDs
+    @overwriteVars
+
+    if (ui.soundID$ != x_ui.soundID$) or (ui.gridID$ != x_ui.gridID$)
+        ui.output$ = ""
+        ui.lowestTier$ = ""
+        ui.otherTiers$ = ""
+    endif
+
 endproc
 
 procedure initialiseVars: .address$
@@ -480,6 +492,7 @@ procedure initialiseVars: .address$
     appendFileLine: .address$, "ui.maxFormantHz", tab$, 5000
     appendFileLine: .address$, "ui.windowLen", tab$, 0.025
     appendFileLine: .address$, "ui.preEmph", tab$, 50
+    appendFileLine: .address$, "firstPass", tab$, 1
 endproc
 
 include _genFnBank.praat

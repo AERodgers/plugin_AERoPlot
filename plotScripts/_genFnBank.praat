@@ -355,6 +355,7 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
         .myChoice = endPause: "Exit", "Continue", 2, 1
         .comment$ = "You must choose AT LEAST ONE level."
         if .myChoice = 1
+            @selectTableID
             exit
         endif
         for .i to '.rt$'Levels
@@ -463,6 +464,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
         .myChoice = endPause: "Exit", "Continue", 2, 1
 
         if .myChoice = 1
+            @selectTableID
             exit
         endif
         @retrieveObjs: "hiddenTx"
@@ -518,6 +520,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                     endfor
                 .myChoice = endPause: "Exit", "Continue", 2, 1
                 if .myChoice = 1
+                    @selectTableID
                     exit
                 endif
                 @retrieveObjs: "hiddenTx"
@@ -548,6 +551,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                 ... " be pruned."
                 .myChoice = endPause: "Exit", "Continue", 2
                 if .myChoice = 1
+                    @selectTableID
                     exit
                 endif
                 @retrieveObjs: "hiddenTx"
@@ -559,6 +563,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                 comment: "Cannot handle factors with more than 50 levels."
                 .myChoice = endPause: "Exit", "Continue", 2
                 if .myChoice = 1
+                    @selectTableID
                     exit
                 endif
                 @retrieveObjs: "hiddenTx"
@@ -1060,6 +1065,7 @@ procedure changeAddColSch: .dir$, .fileVar$
             comment: .comment$
         myChoice = endPause: "Exit", "Continue", 2, 1
         if myChoice = 1
+            @selectTableID
             exit
         endif
 
@@ -1144,6 +1150,7 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
                 endfor
         .myChoice = endPause: "Exit", "Revert to Original", "Continue", 2, 1
         if .myChoice = 1
+            @selectTableID
             exit
         elsif .myChoice = 2
             .myComment$ = "Reverted to original sequence"
@@ -1235,6 +1242,7 @@ procedure matchCol2Level: .table, .altColrMatch, .paletteRt$, .factorRt$
         comment: "NOTE: Avoid using the same colour for different levels."
         .myChoice = endPause: "Exit", "Continue", 2, 1
         if .myChoice = 1
+            @selectTableID
             exit
         endif
     else
@@ -1915,4 +1923,13 @@ procedure drawLegendLayer: .xLeft, .xRight, .yBottom, .yTop,
     endif
     # purge legend.items
     legend.items = 0
+endproc
+
+# select table befor exiting
+procedure selectTableID
+    if variableExists("tableID$")
+        if string$(number(tableID$)) = tableID$
+            selectObject: 'tableID$'
+        endif
+    endif
 endproc

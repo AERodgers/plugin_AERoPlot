@@ -101,6 +101,12 @@ procedure validateTable:  .tableID$, .headers$
             .warning$ =  .warning$ + newline$ + tab$ +
             ... "- """ + .array$[.i] + """ "  + .flag$[(.flag[.i] > 0) + 1]
         endfor
+        if variableExists("tableID$")
+            if string$(number(tableID$)) = tableID$
+                selectObject: 'tableID$'
+            endif
+        endif
+        @selectTableID
         exitScript: "Please check the grouping factors in the first menu " +
         ... "or the column headers in your table. Also, make sure you have " +
         ... " selected the correct ""Table format"" (CSV or tab-delimited)." +
@@ -134,6 +140,7 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
     ... "Save & cont.",
     ... 4, 1
     if myChoice = 1
+        @selectTableID
         exit
     endif
 
@@ -171,6 +178,10 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
         endif
     endif
     if myChoice = 2
+        if variableExists(tableID$)
+            selectObject: 'tableID$'
+        endif
+        @selectTableID
         exit
     endif
 endproc
@@ -261,16 +272,20 @@ endproc
 
 # UI and variable Functions
 procedure addShared_UI_0
-
-    comment: "TABLE / FILE INFORMATION"
-    sentence: "Object number or file path", tableID$
-    optionMenu: "Table format", tableFormat
-        option: "tab-delimited file"
-        option: "CSV file"
-    choice:  "Each plot will use:", 1
-        option: "A different table."
-        option: "The same table."
-        #option: "The same table and sequencing factor"
+    each_plot_will_use = 2
+    object_number_or_file_path$ = tableID$
+    table_format = 1
+    if !overwriteVars.all
+        comment: "TABLE / FILE INFORMATION"
+        sentence: "Object number or file path", tableID$
+        optionMenu: "Table format", tableFormat
+            option: "tab-delimited file"
+            option: "CSV file"
+        choice:  "Each plot will use:", 1
+            option: "A different table."
+            option: "The same table."
+            #option: "The same table and sequencing factor"
+    endif
 endproc
 
 procedure processShared_UI_0
@@ -396,6 +411,7 @@ procedure appendSharedVars: .address$
     appendFileLine: .address$, "lightLine$", tab$, "{0.8, 0.8, 0.8}"
     appendFileLine: .address$, "darkLine$", tab$, "{0.2, 0.2, 0.2}"
     appendFileLine: .address$, "pbInfo", tab$, 0
+    appendFileLine: .address$, "firstPass", tab$, 1
 endproc
 
 # Functions to Check for Dynamic Menu Object Numbers
@@ -414,27 +430,49 @@ procedure objsSelected: .types$, .vars$
     ... "objsSelected.varSize",
     ... "objsSelected.varArray$"
 
+
     .curSelected# = selected#()
-    if size(.curSelected#) = .typeSize
+    .check = size(.curSelected#) == .typeSize
+
+    # populate override array with dummy values
+    for .i to .typeSize
+        .override$[.i] = ""
+    endfor
+
+    if .check
+        .check = 0
         for .i to .typeSize
-            .override$ = ""
             for .j to .typeSize
                 if .typeArray$[.i] = extractWord$(selected$(.j), "")
                     .override$[.i] = string$(selected(.j))
+                    .check = 1
                 endif
             endfor
         endfor
     endif
 endproc
 
-procedure overrideObjIDs
+procedure overwriteVars
+    .sameSelection = 1
     #check that @objsSelected has been run already.
-    if variableExists("objsSelected.types$")
-        for .i to objsSelected.typeSize
+    if variableExists("objsSelected.check")
+        .all = objsSelected.check
+        for .i to objsSelected.typeSize * objsSelected.check
             if objsSelected.override$[.i] != ""
                 .curVar$ = objsSelected.varArray$ [.i]
+                .sameSelection = .sameSelection * ('.curVar$' == x_'.curVar$')
                 '.curVar$' = objsSelected.override$[.i]
+            else
+                .all = 0
             endif
         endfor
+    else
+        .all = 0
+    endif
+
+    if (.all and firstPass) or !.sameSelection
+        title$ = ""
+        oFactor$ = ""
+        iFactor$ = ""
     endif
 endproc

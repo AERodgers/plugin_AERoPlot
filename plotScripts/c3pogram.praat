@@ -44,34 +44,52 @@
     # 1.2.-    - 28.10.20 - added ability to display intensity curve
     #                     - added window width function.
 
-form c3pogram
-    sentence image_title
-    comment Enter ID number of sound (and textgrid) file in the objects window.
-    natural sound 1
-    integer grid 0 (=  no textgrid)
-    comment Enter number of textgrid tier for display (sets min and max time of output display)
-    integer tier 0 (=  no textgrid)
-    boolean Paint_spectrogram 1
-    natural Window_width 8
-    comment Enter parameter settings
-    natural minF0 60
-    natural maxF0 400
-    real mindB 30
-    real maxdB 90
-    choice scale 2
-        button Hertz
-        button Semitones re 1 Hz
-        button Intensity
-    choice Parameter_two 1
-        button Cepstral Peak Prominence
-        button Residual of intensity (linear regression)
-        button H1-H2 of differentiated glottal pulse (LPC-IF)
-        button Harmonicity (Praat function)
-    comment CPP appears to reflect more intuitive expectations of contour.
-    comment Residual of linear regression of intensity used to compensate for global declination.
-    comment H1-H2 estimation is very basic. It also emphasises very tense / creaky stretches
-    comment Harmonicity seems to reflects spectral balance (higher values for approximants, nasals)
-endform
+
+#Get sound and textgrid data
+sound = selected("Sound")
+grid = 0
+tier = 0
+if size(selected#()) = 2
+    grid = selected("TextGrid")
+endif
+
+beginPause: "c3pogram"
+    sentence: "Image title", ""
+
+    comment: "Enter number of textgrid tier for display " +
+    ... "(also sets min and max time of output display)"
+    if grid
+        natural: "tier", "1"
+    endif
+    boolean: "Paint_spectrogram", 1
+    natural: "Window_width", 8
+    comment: "Enter parameter settings"
+    natural: "minF0", 60
+    natural: "maxF0", 400
+    real: "mindB", 30
+    real: "maxdB", 90
+    choice: "Scale", 2
+        option: "Hertz"
+        option: "Semitones re 1 Hz"
+        option: "Intensity"
+    choice: "Parameter_two", 1
+        option: "Cepstral Peak Prominence"
+        option: "Residual of intensity (linear regression)"
+        option: "H1-H2 of differentiated glottal pulse (LPC-IF)"
+        option: "Harmonicity (Praat function)"
+    comment: "CPP appears to reflect more intuitive expectations of contour."
+    comment: "Residual of linear regression of intensity used to " +
+         ... "compensate for global declination."
+    comment: "H1-H2 estimation is very basic. It also emphasises very " +
+          ..."tense / creaky stretches"
+    comment: "Harmonicity seems to reflects spectral balance " +
+         ... "(higher values for approximants, nasals)"
+ myChoice = endPause: "Exit", "Apply", 2, 1
+ # respond to myChoice
+ if myChoice = 1
+     exit
+ endif
+
 title$ = image_title$
 
 @c3pogram: parameter_two, scale, paint_spectrogram, title$, grid, sound, tier,

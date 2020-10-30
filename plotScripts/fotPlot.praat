@@ -63,9 +63,15 @@ while keepGoing
     timeRelativeTo -= (tableID$ == "../example/AER_NI_I.txt")
 
     keepGoing = plotUses
+    firstPass = 0
     @writeVars: "../data/vars/", "fotPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, "FOT."
+    if variableExists("tableID$")
+        if string$(number(tableID$)) = tableID$
+            selectObject: 'tableID$'
+        endif
+    endif
 endwhile
 
 
@@ -102,12 +108,12 @@ procedure doInputUI
             option: "Hertz"
             option: "Bark"
 
-
             @addShared_UI_1
 
         myChoice = endPause: "Exit", "Apply", "OK", 2, 1
         # respond to myChoice
         if myChoice = 1
+            @selectTableID
             exit
         endif
 
@@ -250,7 +256,7 @@ procedure makeTimeRelativeMenu
         myChoice = endPause: "Exit", "Continue", 2, 1
 
         if myChoice = 1
-            exit
+            @selectTableID
         endif
         @retrieveObjs: "hiddenTx"
 
@@ -353,7 +359,7 @@ procedure doOutputUI
         @addShared_UI_3
     myChoice = endPause: "Exit", "Continue", 2, 1
     if myChoice = 1
-        exit
+        @selectTableID
     endif
     @retrieveObjs: "hiddenTx"
     # Process generic outoutUI
@@ -830,7 +836,15 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "fotPlot.var"
     @getGenAxisVars
-    @overrideObjIDs
+    @overwriteVars
+
+    if tableID$ != x_tableID$
+        repFactor$ = ""
+        timeCol$ = ""
+        f3Col$ = ""
+        oFactor$ = ""
+        iFactor$ = ""
+    endif
 endproc
 
 procedure createFoTVars: .address$
@@ -861,10 +875,10 @@ procedure createFoTVars: .address$
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "dataPointsOnTop", tab$, 1
     appendFileLine: .address$, "maxFreq", tab$, 3800
-    appendFileLine: .address$, "tokenMarking", tab$, 1
+    appendFileLine: .address$, "tokenMarking", tab$, 11
     appendFileLine: .address$, "addJitter", tab$, 1
     appendFileLine: .address$, "showLines", tab$, 1
-    appendFileLine: .address$, "ellipsisSDs", tab$, 3
+    appendFileLine: .address$, "ellipsisSDs", tab$, 2
     appendFileLine: .address$, "coreLevel", tab$, 2
     appendFileLine: .address$, "saveName$", tab$, "Formants_over_Time.png"
     @appendSharedVars: .address$

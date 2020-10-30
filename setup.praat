@@ -57,9 +57,9 @@ Add action command:
 ... "Table", 1,
 ... "", 0,
 ... "", 0,
-... "F1F2 Plot...",
+... "Formants-over-time Plot...",
 ... "AERoPlot", 0,
-... "plotScripts/f1f2Plot.praat"
+... "plotScripts/fotPlot.praat"
 
 Add action command:
 ... "Table", 1,
@@ -69,13 +69,16 @@ Add action command:
 ... "AERoPlot",0,
 ... "plotScripts/ladPlot.praat"
 
+
 Add action command:
 ... "Table", 1,
 ... "", 0,
 ... "", 0,
-... "Formants-over-time Plot...",
+... "F1F2 Plot...",
 ... "AERoPlot", 0,
-... "plotScripts/fotPlot.praat"
+... "plotScripts/f1f2Plot.praat"
+
+
 
 ## AERoPlot Sound + TextGrid
 Add action command:

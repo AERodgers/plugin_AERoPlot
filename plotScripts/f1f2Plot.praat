@@ -47,15 +47,23 @@ while keepGoing
     coreLevel += 1
     ellipsisSDs += 1
     showMeans += 2
+    if !useInnerFactor
+        iFactor$ = ""
+    endif
     # correct global menu flags
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
     keepGoing = plotUses
-
+    firstPass = 0
     @writeVars: "../data/vars/", "f1f1Plot.var"
     viewPort$ =  "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
+    if variableExists("tableID$")
+        if string$(number(tableID$)) = tableID$
+            selectObject: 'tableID$'
+        endif
+    endif
 endwhile
 
 
@@ -90,7 +98,11 @@ procedure doInputUI
         myChoice = endPause: "Exit", "Apply", 2, 1
         # respond to myChoice
         if myChoice = 1
+            @selectTableID
             exit
+        endif
+        if !use_secondary_factor
+            secondary_factor$ = ""
         endif
 
         # error handling
@@ -184,6 +196,11 @@ procedure doOutputUI
     else
         varRoot$ = "o"
     endif
+    if tableID$ != x_tableID$
+        tokenMarking = 1
+        showMeans = 2
+        coreLevel = 1
+    endif
 
     @hideObjs: "table", "../data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings"
@@ -206,7 +223,6 @@ procedure doOutputUI
                 option: factorName$[i]
             endfor
             option: "Nothing"
-
         optionMenu: "Show means", showMeans
             option: "Don't show means."
             option: "... without text"
@@ -232,6 +248,7 @@ procedure doOutputUI
         @addShared_UI_3
     myChoice = endPause: "Exit", "Continue", 2, 1
     if myChoice = 1
+        @selectTableID
         exit
     endif
     @retrieveObjs: "hiddenTx"
@@ -510,14 +527,14 @@ procedure doEllipses
                     else
                         Colour:  'curColour$[2]'
                     endif
-                    Draw ellipses where:
+                    nowarn Draw ellipses where:
                     ... "F2DrawValue", majorT_Max, majorT_Min,
                     ... "F1DrawValue", majorR_Max, majorR_Min,
                     ... subInnerFactor$,  ellipsisSDs, 0, "no",
                     ... criteria$
                     Line width: 2
                     Colour: curColour$[4]
-                    Draw ellipses where:
+                    nowarn Draw ellipses where:
                     ... "F2DrawValue", majorT_Max, majorT_Min,
                     ... "F1DrawValue", majorR_Max, majorR_Min,
                     ... subInnerFactor$,  ellipsisSDs, 0, "no",
@@ -710,7 +727,9 @@ procedure defineVars
     endif
     @readVars: "../data/vars/", "f1f1Plot.var"
     @getGenAxisVars
-    @overrideObjIDs
+
+    @overwriteVars
+
 endproc
 
 procedure createF1F2Vars:
@@ -732,14 +751,14 @@ procedure createF1F2Vars:
     appendFileLine: .address$, "arrowRatio", tab$, 0.75
     appendFileLine: .address$, "prevInputUnit", tab$, 1
     appendFileLine: .address$, "title$", tab$,
-    ... "Example nIE vowel and dipthongs"
+        ... "Example nIE vowel and dipthongs"
     appendFileLine: .address$, "outputUnits", tab$, 2
     appendFileLine: .address$, "minF1", tab$, 150
     appendFileLine: .address$, "maxF1", tab$, 1400
     appendFileLine: .address$, "minF2", tab$, 500
     appendFileLine: .address$, "maxF2", tab$, 3600
     appendFileLine: .address$, "tokenMarking", tab$, 11
-    appendFileLine: .address$, "showMeans", tab$, 12
+    appendFileLine: .address$, "showMeans", tab$, 2
     appendFileLine: .address$, "showArrows", tab$, 1
     appendFileLine: .address$, "ellipsisSDs", tab$, 3
     appendFileLine: .address$, "coreLevel", tab$, 2
