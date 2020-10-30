@@ -1,4 +1,4 @@
-# Generate Data Table from Textgtrid with Nested Tiers
+# Generate Data Table from TextGrid with Nested Tiers
 # ===================================================================
 # A data extraction tool for general use and for the AERoplot plugin.
 #
