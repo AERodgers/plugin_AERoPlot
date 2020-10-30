@@ -19,7 +19,7 @@
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
-curLadVersion$ = "1.3.2.0"
+curLadVersion$ = "1.4.0.0"
 plotPrefix$ = "LAD."
 # Main script loop
 keepGoing = 1

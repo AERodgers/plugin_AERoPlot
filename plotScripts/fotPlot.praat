@@ -15,7 +15,7 @@
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
-curFoTVersion$ = "1.3.0.1"
+curFoTVersion$ = "1.4.0.0"
 plotPrefix$ = "FOT."
 # Main script loop
 keepGoing = 1

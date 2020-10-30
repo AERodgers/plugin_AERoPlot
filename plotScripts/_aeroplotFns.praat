@@ -16,7 +16,7 @@
 # They are specifically written to work only as part of the the aeroplot plugin
 # and will likely cause problems you try to use them in other contexts.
 #
-# v.1.3.0.1
+# v.1.4.0.0
 
 # Table functions
 procedure validateTable:  .tableID$, .headers$

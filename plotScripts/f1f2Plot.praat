@@ -16,7 +16,7 @@
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: "../data/temp"
 
-curF1f2Version$ = "1.3.1.0"
+curF1f2Version$ = "1.4.0.0"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1

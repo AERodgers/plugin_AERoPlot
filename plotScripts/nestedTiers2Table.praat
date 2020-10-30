@@ -18,7 +18,7 @@
 @main
 
 procedure main
-    .curVersion$ = "1.0.0.0"
+    .curVersion$ = "1.4.0.0"
     @defineVars
 
     @ui

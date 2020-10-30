@@ -1,6 +1,6 @@
 # General Functions
 # =================
-  genFnBankVersion$ = "1.3.2.1"
+  genFnBankVersion$ = "1.4.0.0"
 # A component of the AERoplot plugin.
 #
 # Written for Praat 6.0.40 or later
