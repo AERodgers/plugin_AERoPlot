@@ -89,7 +89,16 @@ procedure doInputUI
         beginPause: "Formants over time plot: input settings"
             comment:  comment$
 
-            @addShared_UI_0
+            @addShared_UI_0: "Context", "Element"
+            if isExample
+                repFactor$ = "Rep"
+                timeCol$ = "Element_t"
+                f1Col$ = "F1"
+                f2Col$ = "F2"
+                f3Col$ = "F3"
+                f4Col$ = ""
+                inputUnits = 1
+            endif
 
             comment: "GROUPING FACTORS (COLUMN HEADERS)"
             sentence: "Repetition column", repFactor$
@@ -507,17 +516,17 @@ procedure calcFOTPlotLayers
         @modifyColVectr: curColVector$, "oColour$['o',1]", " - shading * 2"
 
         selectObject: table
-        plotTable[o] = Extract rows where: "self$[oFactor$] = curOLevel$"
+        plotTable[o] = nowarn Extract rows where: "self$[oFactor$] = curOLevel$"
 
         for i to iLevels
             curILevel$ = iLevel$[i]
             if possRows.matrix##[o,i]
 
                 selectObject: table
-                tempTable[o,i] = Extract rows where:
+                tempTable[o,i] = nowarn Extract rows where:
                     ... "self$[oFactor$] = curOLevel$ and " +
                     ... "self$[iFactor$] = curILevel$"
-                tempNumRows = Get number of rows
+                tempNumRows = nowarn Get number of rows
 
                 Rename: curOLevel$ + "_" + curILevel$
                 meanTinPlot[o,i] = Get mean: timeCol$ + "DrawValue"
@@ -714,7 +723,7 @@ procedure drawEllipses
                     else
                         Colour:  oColour$[o,2]
                     endif
-                    Draw ellipses where: curTCol$, minT, maxT,
+                    nowarn Draw ellipses where: curTCol$, minT, maxT,
                     ... curFCol$, minF, maxF,
                     ... oFactor$,
                     ... ellipsisSDs, 0, "no",
@@ -722,7 +731,7 @@ procedure drawEllipses
                     curFCol$ = f'f'Col$ + "DrawValue"
                     Line width: 2
                     Colour: oColour$[o,4]
-                    Draw ellipses where: curTCol$, minT, maxT,
+                    nowarn Draw ellipses where: curTCol$, minT, maxT,
                     ... curFCol$, minF, maxF,
                     ... oFactor$,
                     ... ellipsisSDs, 0, "no",

@@ -96,7 +96,7 @@ procedure doInputUI
         beginPause: "Ladefoged-style Formant Plot: input settings"
             comment:  comment$
 
-            @addShared_UI_0
+            @addShared_UI_0: "Element", "Context"
 
             comment: "GROUPING FACTORS (COLUMN HEADERS)"
             comment: "Leave ""Comparison factor"" blank if you don't need to " +
