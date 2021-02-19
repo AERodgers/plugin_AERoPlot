@@ -417,7 +417,8 @@ procedure harmonicity: .sound, .minF0
     .table = array2table.table
     .minimum = Get minimum: "value"
     @delRowsIf: .table, "self[""value""] = harmonicity.minimum"
-    @delRowsIf: .table, "self[""value""] < harmonicity.mean - harmonicity.stDev * 1"
+    @delRowsIf: .table,
+    ... "self[""value""] < harmonicity.mean - harmonicity.stDev * 1"
     selectObject: .harmonicity
     Remove
 endproc
@@ -453,14 +454,17 @@ procedure intensity: .sound, .minF0, .minT, .maxT
     @tableStats: .tempTable, "time", "value"
 
     selectObject: .tempTable
-    @delRowsIf: .table, "self [""value""] < tableStats.yMean - tableStats.stDevY"
+    @delRowsIf: .table,
+    ... "self [""value""] < tableStats.yMean - tableStats.stDevY"
     .mean = Get mean: "value"
     .stDev = Get standard deviation: "value"
     selectObject: .tempTable
     Remove
 
     selectObject: .table
-    Formula: "value", "self[""value""] - (self[""time""] * tableStats.slope + tableStats.intercept)"
+    Formula: "value",
+    "self[""value""] - (self[""time""] * " +
+    "tableStats.slope + tableStats.intercept)"
 endproc
 
 procedure cpp: .sound, .minF0, .maxF0, .pitchTable
@@ -481,7 +485,8 @@ procedure cpp: .sound, .minF0, .maxF0, .pitchTable
     for .i to .numRows
         selectObject: .powerCepstrogram
         .powerCepstralSlice = To PowerCepstrum (slice): .time[.i]
-        .cpp[.i] = Get peak prominence: .minF0, .maxF0, "Parabolic", 0.001, 0, "Straight", "Robust"
+        .cpp[.i] = Get peak prominence:
+        ... .minF0, .maxF0, "Parabolic", 0.001, 0, "Straight", "Robust"
         Remove
     endfor
 
@@ -689,7 +694,8 @@ procedure tableStats: .table, .colX$, .colY$
         .stDevX = Get standard deviation: .colX$
         .linear_regression = To linear regression
         .linear_regression$ = Info
-        .slope = extractNumber (.linear_regression$, "Coefficient of factor '.colX$': ")
+        .slope = extractNumber
+        ...  (.linear_regression$, "Coefficient of factor '.colX$': ")
         .slope = number(fixed$(.slope, 3))
         .intercept = extractNumber (.linear_regression$, "Intercept: ")
         .intercept = number(fixed$(.intercept, 3))
