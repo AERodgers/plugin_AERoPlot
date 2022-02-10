@@ -2,7 +2,7 @@
 
 AERoPlot allows you to generate elegant plots from data in Praat.
 
-To use it, you need to [download Praat](https://www.praat.org) onto your computer. Then:
+To use it, you need to [download Praat](https://www.praat.org) onto your computer or make sure you have the latest version (at least 6.2.0). Then:
 1. Click on the **clone or download** button above followed by **download ZIP**.
 2. Download and unzip the file.
 3. Copy the **plugin_AERoplot-master** folder and *all* its contents into the **Praat preferences directory**.
