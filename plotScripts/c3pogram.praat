@@ -1,5 +1,5 @@
 
-# C3POGRAM   V.1.2.0
+# C3POGRAM   V.1.2.1
 # ==================
 # Written for Praat 6.0.40 or later
 #
@@ -13,6 +13,8 @@
 #
 # Phonetics and speech Laboratory, Trinity College Dublin
 # October 19, 2019
+#
+# 2022.06.07 - Option to draw line based pitch contour
 
 ### C3POGRAM
     # This script draws a pitch contour with a spectrogram and single textgrid reference tier (if
@@ -43,14 +45,31 @@
     #                       incpororate them into other scripts.
     # 1.2.-    - 28.10.20 - added ability to display intensity curve
     #                     - added window width function.
+    # 1.2.1    - 21.06.22 - C3PoGram can now draw normal f0 contour.
+    #                     - smoothing parameter added for normal f0 contour.
+    #                       [NB 999 = no smoothing, 19 = mild smoothing]
+    #                     - If a sound, textgrid, and pitch object is selected,
+    #                       C3PoGram will assume that the pitch object is a
+    #                       smoothed or modified version of the original pitch
+    #                       contour and will draw the original contour in light
+    #                       grey beneath the contour in the pitch object.
+    #                     - if no title is provided, title will default to
+    #                       name of sound object
+
 
 
 #Get sound and textgrid data
+original_state# = selected#()
 sound = selected("Sound")
 grid = 0
 tier = 0
-if size(selected#()) = 2
+pitch_obj = 0
+smoothing = 0
+if size(selected#()) = 2 or size(selected#()) = 3
     grid = selected("TextGrid")
+endif
+if size(selected#()) = 3
+    pitch_obj = selected("Pitch")
 endif
 
 beginPause: "c3pogram"
@@ -61,6 +80,7 @@ beginPause: "c3pogram"
     if grid
         natural: "tier", "1"
     endif
+    natural: "Smoothing", 999
     boolean: "Paint_spectrogram", 1
     natural: "Window_width", 8
     comment: "Enter parameter settings"
@@ -72,11 +92,12 @@ beginPause: "c3pogram"
         option: "Hertz"
         option: "Semitones re 1 Hz"
         option: "Intensity"
-    choice: "Parameter_two", 1
+    choice: "Parameter two", 5
         option: "Cepstral Peak Prominence"
         option: "Residual of intensity (linear regression)"
         option: "H1-H2 of differentiated glottal pulse (LPC-IF)"
         option: "Harmonicity (Praat function)"
+        option: "F0 only"
     comment: "CPP appears to reflect more intuitive expectations of contour."
     comment: "Residual of linear regression of intensity used to " +
          ... "compensate for global declination."
@@ -91,13 +112,22 @@ beginPause: "c3pogram"
  endif
 
 title$ = image_title$
+if title$ = ""
+    selectObject: sound
+    title$ = selected$("Sound")
+    title$ = replace_regex$ (title$, "[%#\^_]", "\\& ", 0)
+endif
+@c3pogram: parameter_two, scale, paint_spectrogram, title$,
+    ... grid, sound, pitch_obj, tier,
+    ... minF0, maxF0, mindB, maxdB, window_width, smoothing
 
-@c3pogram: parameter_two, scale, paint_spectrogram, title$, grid, sound, tier,
-    ... minF0, maxF0, mindB, maxdB, window_width
+
+selectObject: original_state#
 
 # C3POGRAM FUNCTIONS
-procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
-    ...  .tier, .minF0, .maxF0, .mindB, .maxdB, .vpWidth
+procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
+    ... .grid, .sound, .pitch_two, .tier,
+    ...  .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
 
     # adjust sound intensity
     selectObject: .sound
@@ -144,7 +174,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
         # draw text grid text and lines
         Select outer viewport: 0, .vpWidth, 0, 4
         selectObject: .refTier
-        Draw: .minT, .maxT, "no", "yes", "no"
+        Draw: .minT, .maxT, "yes", "yes", "no"
         Line width: 1
         Draw inner box
     endif
@@ -169,6 +199,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
     .secondParam$[2] = "intensity"
     .secondParam$[3] = "h1h2"
     .secondParam$[4] = "harmonicity"
+    .secondParam$[5] = "f0"
     .name$ = .secondParam$[.param2]
     if .param2 = 1
         @cpp: .sound, .minF0, .maxF0, pitch2Table.table
@@ -178,15 +209,28 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
         @h1h2: .sound, pitch2Table.table
         selectObject: h1h2.table
         Formula: "value", "-self"
-    else
+    elsif .param2 = 4
         @harmonicity: .sound, .minF0
+    else
+        '.name$'.table = 0
     endif
     .vqTable = '.name$'.table
 
-
     # draw cp3ogram
     #intensity hack
-    if .hz_ST != 3
+    if .param2 = 5
+        if .pitch_two
+            @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
+            ... .vpWidth, pitch.obj, .smoothing, "Silver"
+            @uninterpolate: .sound, .pitch_two, .minF0, .maxF0
+            @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
+            ... .vpWidth, uninterpolate.obj, .smoothing, "Blue"
+            removeObject: uninterpolate.obj
+        else
+            @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
+            ... .vpWidth, pitch.obj, .smoothing, "Blue"
+        endif
+    elsif .hz_ST != 3
         @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
         ... .maxF0, .param2, .hz_ST, .vpWidth
     else
@@ -198,6 +242,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
     if .hz_ST = 2
         .leftMajor = 5
         .leftText$ = "F0 (ST re 1 Hz)"
+        Axes: .minT, .maxT, log2(.minF0) * 12, log2(.maxF0) * 12
     else
         .leftMajor = 50
         .leftText$ = "F0 (Hz)"
@@ -227,9 +272,11 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$, .grid, .sound,
     nowarn Text top: "yes", "##" + .title$
     Font size: 10
 
-    selectObject: .vqTable
-    plusObject: pitch2Table.table
+    selectObject: pitch2Table.table
     plusObject: pitch.obj
+    if .vqTable
+        plusObject: .vqTable
+    endif
     if .grid * .tier > 0
         plusObject: .refTier
     endif
@@ -256,7 +303,7 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     # set picture window
     Select outer viewport: 0, .vpWidth, 0, 3.35
     Axes: .minT, .maxT, .minF0, .maxF0
-    .di = Horizontal mm to world coordinates: 0.9
+    .di = Horizontal mm to world coordinates: 3
     Font size: 10
     Courier
     Solid line
@@ -275,7 +322,7 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
         if not(abs(.shT - .curT)*1000 > 5.5555)
             Paint circle: "{'.sh','.sh',1-0.8*'.sh'}", .curT, .curF0,
             ... .di * 0.1 + .di * (1 - .sh)
-            Colour: "blue"
+            Colour: "cyan"
             Line width: 0.5
             Draw circle: .curT, .curF0, .di * 0.1 + .di * (1 - .sh)
         else
@@ -585,8 +632,8 @@ procedure pitch2Table: .pitchObject, .interpolate
     endif
 
     # Get key pitch data
-    .frameTimeFirst = Get time from frame number: 1
     .timeStep = Get time step
+    .frameTimeFirst = Get time from frame number: 1
 
     #create pitch Table (remove temp objects)
     .pitchTier = Down to PitchTier
@@ -720,4 +767,75 @@ procedure tableStats: .table, .colX$, .colY$
     .yMean = Get mean: .colY$
     .yMed = Get quantile: .colY$, 0.5
     Remove
+endproc
+
+procedure draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
+    ... .vpWidth, .pitch_two, .smoothing, .colour$
+    Solid line
+    if .hz_ST = 2
+        .line_minF0 = log2(.minF0/100) * 12
+        .line_maxF0 = log2(.maxF0/100) * 12
+    else
+        .line_minF0 = .minF0
+        .line_maxF0 = .maxF0
+    endif
+
+    Select outer viewport: 0, .vpWidth, 0, 3.35
+    Axes: .minT, .maxT, .line_minF0, .line_maxF0
+    if .pitch_two
+        .foreground_pitch = .pitch_two
+    else
+         .foreground_pitch = pitch.obj
+    endif
+    White
+    Line width: 9
+    selectObject: .foreground_pitch
+    .smooth_pitch = Smooth: .smoothing
+    if .hz_ST = 1
+        Draw: .minT, .maxT, .line_minF0, .line_maxF0, "no"
+        '.colour$'
+        Line width: 7
+        Draw: .minT, .maxT, .line_minF0, .line_maxF0, "no"
+    else
+        Draw semitones (re 100 Hz):
+        ... .minT, .maxT, .line_minF0, .line_maxF0, "no"
+        '.colour$'
+        Line width: 7
+        Draw: .minT, .maxT, .line_minF0, .line_maxF0, "no"
+        Draw semitones (re 100 Hz):
+        ... .minT, .maxT, .line_minF0, .line_maxF0, "no"
+    endif
+    Solid line
+    Black
+    Line width: 1
+    # Remove smoothed pitch object
+    Remove
+endproc
+
+procedure uninterpolate: .sound, .pitch_obj, .minF0, .maxF0
+    selectObject: .sound
+    .point_process = To PointProcess (periodic, cc): .minF0, .maxF0
+    .vuv_grid = To TextGrid (vuv): 0.02, 0.01
+    .vuv_table = Down to Table: "no", 6, "no", "no"
+    .num_rows = Get number of rows
+
+   selectObject: .pitch_obj
+   .obj = Copy: "uninterpolated"
+   Edit
+
+   for .i to .num_rows
+       selectObject: .vuv_table
+       .cur_vuv$ = Get value: .i, "text"
+       if (.cur_vuv$ == "U")
+           .tmin = Get value: .i, "tmin"
+           .tmax = Get value: .i, "tmax"
+           selectObject: .obj
+           editor: .obj
+               Move cursor to: .tmin
+               Move end of selection by: .tmax - .tmin
+               Unvoice
+           endeditor
+       endif
+   endfor
+   removeObject: {.point_process, .vuv_grid, .vuv_table}
 endproc
