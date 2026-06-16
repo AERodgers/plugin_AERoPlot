@@ -2,14 +2,11 @@
 # ==============================
 # A feature of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 16th, 2020 (my parents' 60th wedding anniversary! Congratulations them!)
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 #
 # Named after style of figure in Ladefoged and Johnson (2011:193)
@@ -18,7 +15,7 @@
 
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
-@purgeDirFiles: "../data/temp"
+@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 curLadVersion$ = "1.4.0.0"
 plotPrefix$ = "LAD."
 # Main script loop
@@ -32,9 +29,14 @@ while keepGoing
     @processInputUI
 
     @doOutputUI
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table",
+           ... preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
     @setupColours:
-    ... "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/palettes/",
+    ... "colrPalFile$",
+    ... "curPalette",
+    ... table,
+    ... altColrMatch
     @retrieveObjs: "hiddenTx"
 
     @doLadPlot
@@ -74,7 +76,8 @@ while keepGoing
     endif
 
     firstPass = 0
-    @writeVars: "../data/vars/", "ladPlot.var"
+    @writeVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
+            ... "ladPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
     if variableExists("tableID$")
@@ -226,7 +229,7 @@ procedure processInputUI
     # run tertiary filter UI first to remove unwanted items
     if tertiaryFilters
         @filterTertFactors: table, "factorName$", numFactors,
-        ... "../data/vars/", "ladTertFactor.var",
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "ladTertFactor.var",
         ... headerList$
         table = filterTertFactors.table
         # recalculate outer levels based on purged table
@@ -255,7 +258,9 @@ procedure processInputUI
 endproc
 
 procedure doOutputUI
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table",
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/temp/",
+    ... "hiddenTx"
 
     beginPause: "Graphical Output Settings: Ladefoged-style plot"
         comment: "PLOT BASICS"
@@ -783,35 +788,60 @@ procedure drawDataPoints
             if variableExists("tailEnd['o','i',1]")
                 for f to numFormants
                     curFCol$ = f'f'Col$ + "DrawValue"
+
                     curColr$[1] = "Black"
                     c = (f/2 == round(f/2) - 0.5) * 0.15
+
                     @modifyColVectr: oColour$[o, 3], "curColr$[2]", "+'c'"
                     for bgFg to 2
                         Colour: curColr$[bgFg]
+
                         if tokenMarking
-                            # draw outliers
+
                             Line width: 6 - bgFg
-                            nowarn Scatter plot where (mark):
-                            ... curTCol$, minX, maxX,
-                            ... curFCol$, minF, maxF,
-                            ... fontM / 10, "no", "o",
+
+                            # Create temp table for extracted outliers.
+                            temp_table_extract = Extract rows where: 
                             ... "self$[oFactor$] = oLevel$[o] and " +
                             ... "!(self[curFCol$] < tailEnd[o,i,f] and " +
                             ... "self[curFCol$] > tailStart[o,i,f]) and " +
                             ... "self$[iFactor$] = iLevel$[i]"
+
+                            # draw outliers
+                            nowarn Scatter plot (mark):
+                            ... curTCol$, minX, maxX,
+                            ... curFCol$, minF, maxF,
+                            ... fontM / 10, "no", "o"
+
+                            # return objects window to previous state
+                            removeObject: temp_table_extract
+                            selectObject: plotTable[o]
+                            
                             if tokenMarking = 1
-                                # draw non-outliers
-                                nowarn Scatter plot where (mark):
-                                ... curTCol$, minX, maxX,
-                                ... curFCol$, minF, maxF,
-                                ... fontM / 10, "no", "x",
+
+                                
+                                # Create temp table for extracted non-outliers.
+                                temp_table_extract = Extract rows where: 
                                 ... "self$[oFactor$] = oLevel$[o] and " +
                                 ... "self[curFCol$] < tailEnd[o,i,f] and " +
                                 ... "self[curFCol$] > tailStart[o,i,f] and " +
-                                ... "self$[iFactor$] = iLevel$[i]"
+                                ... "self$[iFactor$] = iLevel$[i]"   
+                                
+                                # draw non-outliers 
+                                nowarn Scatter plot (mark):
+                                ... curTCol$, minX, maxX,
+                                ... curFCol$, minF, maxF,
+                                ... fontM / 10, "no", "x"
+
+
+                                # return objects window to previous state
+                                removeObject: temp_table_extract
+                                selectObject: plotTable[o]
+
                             endif
-                        endfor
-                    endif
+
+                        endif
+                     endfor
                 endfor
             endif
         endfor
@@ -835,14 +865,19 @@ procedure defineVars
         prevLoops = 1
     endif
     @checkDirectoryStructure
-    if !fileReadable("../data/vars/ladPlot.var")
-        @createLadVars: "../data/vars/ladPlot.var"
+    if !fileReadable(
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ladPlot.var")
+        @createLadVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ladPlot.var"
     endif
-    @readVars: "../data/vars/", "ladPlot.var"
+    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
+           ... "ladPlot.var"
     if ladVersion$ != curLadVersion$
-        @createLadVars: "../data/vars/ladPlot.var"
+        @createLadVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ladPlot.var"
     endif
-    @readVars: "../data/vars/", "ladPlot.var"
+    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
+           ... "ladPlot.var"
     @getGenAxisVars
     @overwriteVars
 endproc
@@ -851,7 +886,8 @@ procedure createLadVars: .address$
 
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "ladVersion$", tab$, curLadVersion$
-    appendFileLine: .address$, "tableID$", tab$, "../example/AER_NI_I.txt"
+    appendFileLine: .address$, "tableID$", tab$,
+            ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
     appendFileLine: .address$, "xAxisFactor", tab$, 1
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"

@@ -2,19 +2,16 @@
 # ============
 # A feature of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 16th, 2020 (my parents' 60th wedding anniversary! Congratulations them!)
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
-@purgeDirFiles: "../data/temp"
+@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 
 curF1f2Version$ = "1.4.0.0"
 plotPrefix$ = "F12."
@@ -31,9 +28,11 @@ while keepGoing
     @processInputUI
 
     @doOutputUI
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table", preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
     @setupColours:
-    ... "../data/palettes/", "colrPalFile$",
+    ... preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/palettes/", "colrPalFile$",
     ... "curPalette", table, altColrMatch
     @retrieveObjs: "hiddenTx"
 
@@ -56,7 +55,8 @@ while keepGoing
     dataPointsOnTop += 1
     keepGoing = plotUses
     firstPass = 0
-    @writeVars: "../data/vars/", "f1f1Plot.var"
+    @writeVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "f1f1Plot.var"
     viewPort$ =  "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, plotPrefix$
     if variableExists("tableID$")
@@ -176,7 +176,7 @@ procedure processInputUI
     # run tertiary filter UI first to remove unwanted items
     if tertiaryFilters
         @filterTertFactors: table, "factorName$", numFactors,
-            ... "../data/vars/",
+            ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
             ... "fpTertFactor.var",
             ... "'oFactor$', 'iFactor$', 'f1Col$', 'f2Col$'"
         table = filterTertFactors.table
@@ -202,7 +202,8 @@ procedure doOutputUI
         coreLevel = 1
     endif
 
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table", preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings"
         comment: "PLOT BASICS"
         sentence: "Title", title$
@@ -717,15 +718,19 @@ procedure defineVars
     @checkDirectoryStructure
 
 
-    if !fileReadable("../data/vars/f1f1Plot.var")
+    if !fileReadable(preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/vars/f1f1Plot.var")
         @createF1F2Vars
     endif
-    @readVars: "../data/vars/", "f1f1Plot.var"
+    @readVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "f1f1Plot.var"
 
     if f1f2Version$ != curF1f2Version$
-        @createF1F2Vars: "../data/vars/f1f1Plot.var"
+        @createF1F2Vars: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/vars/f1f1Plot.var"
     endif
-    @readVars: "../data/vars/", "f1f1Plot.var"
+    @readVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "f1f1Plot.var"
     @getGenAxisVars
 
     @overwriteVars
@@ -733,12 +738,13 @@ procedure defineVars
 endproc
 
 procedure createF1F2Vars:
-     .address$ =  "../data/vars/f1f1Plot.var"
+     .address$ =  preferencesDirectory$ +
+     ... "/plugin_AERoPlot/data/vars/f1f1Plot.var"
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "f1f2Version$", tab$, curF1f2Version$
     appendFileLine: .address$, "plotSize", tab$, 5
     appendFileLine: .address$, "tableID$", tab$,
-    ... "../example/AER_NI_I.txt"
+    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
     appendFileLine: .address$, "oFactor$", tab$, "Context"
     appendFileLine: .address$, "iFactor$", tab$, "Element"
     appendFileLine: .address$, "useInnerFactor", tab$, 1

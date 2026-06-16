@@ -2,19 +2,16 @@
 # =========================
 # A feature of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 16th, 2020 (my parents' 60th wedding anniversary! Congratulations them!)
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
-@purgeDirFiles: "../data/temp"
+@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 curFoTVersion$ = "1.4.0.0"
 plotPrefix$ = "FOT."
 # Main script loop
@@ -28,9 +25,11 @@ while keepGoing
         ... headerList$ + ",'repFactor$'"
     @processInputUI
     @doOutputUI
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table", preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
     @setupColours:
-    ... "../data/palettes/", "colrPalFile$", "curPalette", table, altColrMatch
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/palettes/",
+    ... "colrPalFile$", "curPalette", table, altColrMatch
     @retrieveObjs: "hiddenTx"
 
     @doFOTPlot
@@ -60,11 +59,13 @@ while keepGoing
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
-    timeRelativeTo -= (tableID$ == "../example/AER_NI_I.txt")
+    timeRelativeTo -= (tableID$ ==
+    ... preferencesDirectory$ + "/plugin_AERoPlot//example/AER_NI_I.txt")
 
     keepGoing = plotUses
     firstPass = 0
-    @writeVars: "../data/vars/", "fotPlot.var"
+    @writeVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "fotPlot.var"
     viewPort$ =  "'left', 'right', 'top', 'bottom' + 'vertAdjust'"
     @saveImage: saveDir$, saveName$, quality, viewPort$, fontM, "FOT."
     if variableExists("tableID$")
@@ -87,6 +88,7 @@ procedure doInputUI
     while ! done
         repFactor$ = replace$(repFactor$, "?", "", 0)
         beginPause: "Formants over time plot: input settings"
+            comment: "NB: THIS FUNCTION IS NOT WORRK CORRECTLY RIGHT NOW."
             comment:  comment$
 
             @addShared_UI_0: "Context", "Element"
@@ -232,8 +234,11 @@ procedure processInputUI
 
     # run tertiary filter UI first to remove unwanted items
     if tertiaryFilters
-        @filterTertFactors: table, "factorName$", numFactors,
-        ... "../data/vars/", "fotTertFactor.var",
+        @filterTertFactors: table,
+        ... "factorName$",
+        ... numFactors,
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
+        ... "fotTertFactor.var",
         ... headerList$
         table = filterTertFactors.table
         # recalculate outer levels based on purged table
@@ -245,8 +250,10 @@ endproc
 procedure makeTimeRelativeMenu
     if keepGoing = 1
         timeRelativeTo = timeRelativeTo +
-        ... (tableID$ == "../example/AER_NI_I.txt")
-        @hideObjs: "table", "../data/temp/", "hiddenTx"
+        ... (tableID$ == preferencesDirectory$ +
+        ... "/plugin_AERoPlot/example/AER_NI_I.txt")
+        @hideObjs: "table", preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
         optText$ = "Make time relative to"
         beginPause: "Choose Reference Element"
             optionMenu: optText$, timeRelativeTo + 1
@@ -315,10 +322,12 @@ procedure makeTimeRelativeMenu
                     endif
                 endfor
             endfor
-            Save as binary file: "../data/temp/table.bin"
+            Save as binary file: preferencesDirectory$ +
+            ... "/plugin_AERoPlot/data/temp/table.bin"
         endif
     elsif plotUses = 2
-        oldTable = Read from file: "../data/temp/table.bin"
+        oldTable = Read from file: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/temp/table.bin"
         removeObject: table
         table = oldTable
     endif
@@ -326,7 +335,8 @@ endproc
 
 procedure doOutputUI
     varRoot$ = "i"
-    @hideObjs: "table", "../data/temp/", "hiddenTx"
+    @hideObjs: "table",
+           ... preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
     beginPause: "Graphical Output Settings: formants over time"
         comment: "PLOT BASICS"
         sentence: "Title", title$
@@ -836,14 +846,19 @@ endproc
 procedure defineVars
     # check / fix directory ending
     @checkDirectoryStructure
-    if !fileReadable("../data/vars/fotPlot.var")
-        @createFoTVars: "../data/vars/fotPlot.var"
+    if !fileReadable(
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/fotPlot.var")
+        @createFoTVars: 
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/fotPlot.var"
     endif
-    @readVars: "../data/vars/", "fotPlot.var"
+    @readVars:
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "fotPlot.var"
     if fotVersion$ != curFoTVersion$
-        @createFoTVars: "../data/vars/fotPlot.var"
+        @createFoTVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/fotPlot.var"
     endif
-    @readVars: "../data/vars/", "fotPlot.var"
+    @readVars:
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "fotPlot.var"
     @getGenAxisVars
     @overwriteVars
 
@@ -860,7 +875,7 @@ procedure createFoTVars: .address$
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "fotVersion$", tab$, curFoTVersion$
     appendFileLine: .address$, "tableID$", tab$,
-        ... "../example/AER_NI_I.txt"
+        ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
     appendFileLine: .address$, "timeCol$", tab$, "Element_t"
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"

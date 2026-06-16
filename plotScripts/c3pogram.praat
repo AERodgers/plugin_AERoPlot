@@ -1,20 +1,14 @@
 
 # C3POGRAM   V.1.3.0
 # ==================
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # This version is included as a feature of the AERoplot plugin.
 #
 # script by Antoin Eoin Rodgers
 #
-# | email   | rodgeran@tcd.ie
-# | twitter | @phonetic_antoin
+# | email   | antoin.rodgers@tcd.ie
 # | github  | github.com/AERodgers
-#
-# Phonetics and speech Laboratory, Trinity College Dublin
-# October 19, 2019
-#
-# 2022.06.07 - Option to draw line based pitch contour
 
 ### C3POGRAM
     # This script draws a pitch contour with a spectrogram and single textgrid reference tier (if

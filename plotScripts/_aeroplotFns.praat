@@ -2,21 +2,18 @@
 # =========================
 # A component of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 16th, 2020 (my parents' 60th wedding anniversary! Congratulations them!)
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 #
 # These procedures are used by all AERoPlot features.
 # They are specifically written to work only as part of the the aeroplot plugin
 # and will likely cause problems you try to use them in other contexts.
 #
-# v.1.4.0.0
+# v.1.5.0.0
 
 # Table functions
 procedure validateTable:  .tableID$, .headers$
@@ -167,8 +164,13 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
         Font size: .fontSize
         Black
 
-        if ! fileReadable(.dir$)
-            createDirectory(.dir$)
+
+        if ! folderExists(.dir$)
+            for i to length(.dir$)
+                appendInfoLine: i, ": ", unicode(mid$(.dir$, i, 1))
+            endfor
+            pause
+            createFolder: .dir$
         endif
 
         if .quality
@@ -201,15 +203,16 @@ endproc
 # file and folder functions
 procedure checkDirectoryStructure
 
-    createDirectory: "../data/"
-    createDirectory: "../data/archive"
-    createDirectory: "../data/last"
-    createDirectory: "../data/vars"
-    createDirectory: "../data/temp"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/archive"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/last"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/vars"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 
 
-    if !fileReadable("../data/palettes/current.palette")
-        createDirectory: "../data/palettes"
+    if !fileReadable(preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/palettes/current.palette")
+        createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/palettes"
         .palName$[1] = "Adjusted_CB_Qualitative_Set1"
         .js$[1] =
         ... "['rgb(55,126,184)','rgb(255,127,0)','rgb(228,26,28)'," +
@@ -263,7 +266,8 @@ procedure checkDirectoryStructure
         .colrName$[6] = .colrName$[1]
 
         for .i to 6
-            .address$ = "../data/palettes/" + .palName$[.i] + ".palette"
+            .address$ = preferencesDirectory$ +
+            ... "/plugin_AERoPlot/data/palettes/" + .palName$[.i] + ".palette"
             writeFileLine: .address$, .js$[.i] + newline$ + .colrName$[.i]
         endfor
     endif
@@ -340,7 +344,9 @@ endproc
 procedure addShared_UI_3
     comment: "IMAGE SAVING"
     #boolean: "Very high quality", quality
-    sentence: "Save directory", saveDir$
+    comment: "NB: 'save folder' is for information purposes only."
+    comment: "You can copy the path to 'save folder' and paste it into your file manager."
+    sentence: "Save folder", saveDir$
     sentence: "Save name", saveName$
 
     comment: "COLOUR MANAGEMENT"
@@ -388,14 +394,16 @@ procedure processShared_UIs
     makeNewColSeq = sorting = 4
     altColrMatch = sorting = 5
     sorting = (sorting <= 2) * sorting + (sorting > 2)
-    saveDir$ = save_directory$
+    # The following line is now redundant, as the save folder is now fixed due
+    # to potential write permissions.
+    #saveDir$ = save_folder$
     saveName$ = save_name$
     #quality = very_high_quality
     changeAddColSch = add_or_change_colour_scheme
 endproc
 
 procedure appendSharedVars: .address$
-    saveDir$ = homeDirectory$ + "/Desktop/AERoPlot_Images"
+    saveDir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/AERoPlot_Images"
     fontM = 14
     appendFileLine: .address$, "font$", tab$, "Helvetica"
     appendFileLine: .address$, "font_choice", tab$, 1

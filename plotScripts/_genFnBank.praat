@@ -3,14 +3,11 @@
   genFnBankVersion$ = "1.4.0.0"
 # A component of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 16th, 2020 (my parents' 60th wedding anniversary! Congratulations them!)
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 #
 # This bank of procedures are used in but are not specific to AERoPlot.
@@ -57,7 +54,7 @@ procedure checkPraatVersion
     .version$ = praatVersion$
     if number(left$(.version$, 1)) < 6
         echo You are running Praat 'praatVersion$'.
-        ... 'newline$'This script runs on Praat version 6.0.40 or later.
+        ... 'newline$'This script runs on Praat version 6.0.60 or later.
         ... 'newline$'To run this script, update to the latest
         ... version at praat.org
         exit
@@ -341,7 +338,8 @@ procedure filterLevels: .table, .factor$, .rt$, .stateVar$
     .varRoot$ = replace_regex$('.rt$'Factor$, "^.", "\l&", 1)
     .comment$ = ""
     .done = 0
-    @hideObjs: "filterLevels.table", "../data/temp/", "hiddenTx"
+    @hideObjs: "filterLevels.table", preferencesDirectory$ +
+                ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
     while ! .done
         beginPause: "Levels to display in graphic."
             comment:
@@ -454,7 +452,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
         endif
 
         # UI to select tertiary factors
-        @hideObjs: "filterTertFactors.table", "../data/temp/", "hiddenTx"
+        @hideObjs: "filterTertFactors.table", preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
         beginPause: "Tertiary Filters"
             comment: "Choose tertiary factors for filtering your data."
             for .i to .posTertFactrs
@@ -503,7 +501,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
 
                 # level filter UI
                 @hideObjs:
-                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
+                ... "filterTertFactors.table", preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
                 beginPause: "Filter " + .tertFactor$[.i]
                     comment: "Filter """ + .tertFactor$[.i] + """."
                     for .j to .curFactrLevels
@@ -545,7 +543,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                 endfor
             elsif .curFactrLevels == 1
                 @hideObjs:
-                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
+                ... "filterTertFactors.table", preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
                 beginPause: "Filter " + .tertFactor$[.i]
                 comment: .tertFactor$[.i] + " only has one level and cannot " +
                 ... " be pruned."
@@ -557,7 +555,7 @@ procedure filterTertFactors: .table, .factorArray$, .numFactors,
                 @retrieveObjs: "hiddenTx"
             else
                 @hideObjs:
-                ... "filterTertFactors.table", "../data/temp/", "hiddenTx"
+                ... "filterTertFactors.table", preferencesDirectory$ + "/plugin_AERoPlot/data/temp/", "hiddenTx"
                 beginPause: "Filter " + .tertFactor$[.i]
                 comment: .tertFactor$[.i] + " has '.curFactrLevels' levels. "
                 comment: "Cannot handle factors with more than 50 levels."
@@ -949,7 +947,8 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
         @readInColPal: .dir$, "current.palette", .colourPalVar$
     endif
     if maxColDiff
-        @seqColrByDist: "../data/palettes/",
+        @seqColrByDist: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/palettes/",
         ... .colrPalFileVar$,
         ... {0,0,0},
         ... "curPalette"

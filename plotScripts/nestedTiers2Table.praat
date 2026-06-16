@@ -2,19 +2,16 @@
 # ===================================================================
 # A data extraction tool for general use and for the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# July 26th, 2020
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 
 @checkPraatVersion
 @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
-@purgeDirFiles: "../data/temp"
+@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 @main
 
 procedure main
@@ -39,7 +36,12 @@ procedure main
             .tColTiers$ = "'ui.lowestTier$'_t"
         endif
         @formantsSought: .sound, 'ui.output$', .tColTiers$,
-        ... ui.timeStep, ui.maxNumFormants, ui.maxFormantHz, ui.numFormants, ui.windowLen, ui.preEmph,
+        ... ui.timeStep,
+        ... ui.maxNumFormants,
+        ... ui.maxFormantHz,
+        ... ui.numFormants,
+        ... ui.windowLen,
+        ... ui.preEmph,
         ... .scale$[ui.scale]
     endif
 
@@ -49,7 +51,8 @@ procedure main
     Remove
 
     firstPass = 0
-    @writeVars: "../data/vars/", "tier2Table.var"
+    @writeVars:
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
 endproc
 
 ## UI-RELATED PROCEDURES
@@ -459,19 +462,19 @@ endproc
 
 ## VARIABLE / PROCEDURE INTITIALISATION
 procedure defineVars
-    createDirectory: "../data/"
-    createDirectory: "../data/vars"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/"
+    createFolder: preferencesDirectory$ + "/plugin_AERoPlot/data/vars"
 
     main.scale$[1] = "Hertz"
     main.scale$[2] = "Bark"
-    if !fileReadable("../data/vars/tier2Table.var")
-        @initialiseVars: "../data/vars/tier2Table.var"
+    if !fileReadable(preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var")
+        @initialiseVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var"
     endif
-    @readVars: "../data/vars/", "tier2Table.var"
+    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
     if main.version$ != main.curVersion$
-        @initialiseVars: "../data/vars/tier2Table.var"
+        @initialiseVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var"
     endif
-    @readVars: "../data/vars/", "tier2Table.var"
+    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
     @overwriteVars
 
     if (ui.soundID$ != x_ui.soundID$) or (ui.gridID$ != x_ui.gridID$)
@@ -486,12 +489,12 @@ procedure initialiseVars: .address$
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "main.version$", tab$, main.curVersion$
     appendFileLine: .address$, "ui.gridID$", tab$,
-    ... "../example/AER_NI_I.textgrid"
+    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.textgrid"
     appendFileLine: .address$, "ui.lowestTier$", tab$, "Element"
     appendFileLine: .address$, "ui.otherTiers$", tab$,
     ... "Speaker,Sex,Type,Context,Rep,IPA,Segment"
     appendFileLine: .address$, "ui.output$", tab$, "aer_ni_i"
-    appendFileLine: .address$, "ui.soundID$", tab$, "../example/AER_NI_I.wav"
+    appendFileLine: .address$, "ui.soundID$", tab$, preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.wav"
     appendFileLine: .address$, "ui.formants2tabulate", tab$, 4
     appendFileLine: .address$, "ui.numFormants", tab$, 5
     appendFileLine: .address$, "ui.scale", tab$, 1

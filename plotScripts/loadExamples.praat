@@ -2,24 +2,23 @@
 # ============================================
 # A feature of the AERoplot plugin.
 #
-# Written for Praat 6.0.40 or later
+# Written for Praat 6.0.60 or later
 #
 # script by Antoin Eoin Rodgers
-# Phonetics and speech Laboratory, Trinity College Dublin
-# October 30th 2020
 #
-# email:     rodgeran@tcd.ie
-# twitter:   @phonetic_antoin
+# email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 #
 # This is just a script to load example files for demonstration purposes.
 
-@checkPraatVersion
-@purgeDirFiles: "../data/temp"
-@checkDirectoryStructure
 
-Read from file: "../example/AER_NI_I.wav"
-Read from file: "../example/AER_NI_I.TextGrid"
+@checkPraatVersion
+
+@checkDirectoryStructure
+@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
+
+Read from file: preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.wav"
+Read from file: preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.TextGrid"
 
 
 include _aeroplotFns.praat

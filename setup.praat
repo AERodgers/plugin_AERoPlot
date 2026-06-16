@@ -1,3 +1,13 @@
+# AERoplot plugin.
+#
+# Written for Praat 6.0.60 or later
+# script by Antoin Eoin Rodgers
+#
+# email:     antoin.rodgers@tcd.ie
+# github:    github.com/AERodgers
+#
+# v.1.5.0.0
+
 # Menu Commands
 Add menu command: "Objects", "New",
 ... "--",
