@@ -113,20 +113,77 @@ endproc
 
 
 # Image Functions
+procedure drawSharedTitleLayer: .left, .right, .top, .bottom, .fontL, .fontM, .title$
+    Select inner viewport: .left, .right, .top, .bottom
+    Font size: .fontL
+    nowarn Text top: "yes", "##" + .title$
+    Font size: .fontM
+endproc
+
+procedure useDefaultSaveFolder
+    if saveDir$ = ""
+        saveDir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/AERoPlot_Images"
+    endif
+endproc
+
+procedure prepareImageSave: .dir$, .name$
+    .dir$ = replace$(.dir$, "\", "/", 0)
+    if .dir$ = "" or (left$(.dir$, 1) != "/" and mid$(.dir$, 2, 2) != ":/")
+        exitScript: "Enter an absolute save folder path."
+    endif
+    if .name$ = "" or .name$ = "." or .name$ = ".." or
+    ... index(.name$, "/") or index(.name$, "\")
+        exitScript: "Enter a file name without a folder path."
+    endif
+    if lowerCase$(right$(.name$, 4)) = ".png"
+        .stem$ = left$(.name$, length(.name$) - 4)
+    else
+        .stem$ = .name$
+    endif
+    if .stem$ = ""
+        exitScript: "Enter a file name before the .png extension."
+    endif
+
+    while right$(.dir$, 1) = "/" and length(.dir$) > 1 and
+    ... right$(.dir$, 2) != ":/"
+        .dir$ = left$(.dir$, length(.dir$) - 1)
+    endwhile
+    .parent$ = .dir$
+    .missing = 0
+    while not folderExists(.parent$)
+        .missing += 1
+        .folders$[.missing] = .parent$
+        .slash = rindex(.parent$, "/")
+        if .slash = 0
+            exitScript: "Cannot find an existing parent for the save folder: " + .dir$
+        elsif .slash = 1
+            .parent$ = "/"
+        elsif .slash = 3 and mid$(.parent$, 2, 1) = ":"
+            .parent$ = left$(.parent$, 3)
+        else
+            .parent$ = left$(.parent$, .slash - 1)
+        endif
+        if .parent$ = .folders$[.missing]
+            exitScript: "Cannot find an existing parent for the save folder: " + .dir$
+        endif
+    endwhile
+    for .i to .missing
+        .folderIndex = .missing + 1 - .i
+        createFolder: .folders$[.folderIndex]
+    endfor
+
+    if right$(.dir$, 1) != "/"
+        .dir$ += "/"
+    endif
+    .path$ = .dir$ + .stem$ + ".png"
+    .suffix = 1
+    while fileReadable(.path$)
+        .path$ = .dir$ + .stem$ + "_" + string$(.suffix) + ".png"
+        .suffix += 1
+    endwhile
+endproc
+
 procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
-
-    if !(right$(.dir$) = "/" or right$(.dir$) = "\")
-            ... and .dir$ != ""
-        .dir$ = .dir$ +  "/"
-    endif
-
-
-    if ! rindex(.savName$, ".")
-        .savName$ += ".png"
-    elsif right$(.savName$, rindex(.savName$ , ".")) != "png"
-       .savName$ = left$(.savName$, index(.savName$, ".")) + "png"
-    endif
-
     beginPause: "Save?"
         comment: "What do you want to do?"
     myChoice =
@@ -142,16 +199,7 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
     endif
 
     if myChoice / 2 = round(myChoice / 2)
-        # ensure save name is unique
-        .newName$ = .savName$
-        .nameExists = fileReadable(.dir$ + .savName$)
-        .sfx = 1
-        while .nameExists
-            .newName$ =
-                ... replace$(.savName$, ".png", "_", 1) + string$(.sfx) + ".png"
-            .nameExists = fileReadable(.dir$ + .newName$)
-            .sfx += 1
-        endwhile
+        @prepareImageSave: .dir$, .savName$
 
         Select inner viewport: '.view$'
         Font size: 2
@@ -165,18 +213,10 @@ procedure saveImage: .dir$, .savName$, .quality, .view$, .fontSize, .ref$
         Black
 
 
-        if ! folderExists(.dir$)
-            for i to length(.dir$)
-                appendInfoLine: i, ": ", unicode(mid$(.dir$, i, 1))
-            endfor
-            pause
-            createFolder: .dir$
-        endif
-
         if .quality
-            Save as 300-dpi PNG file: .dir$ + .newName$
+            Save as 300-dpi PNG file: prepareImageSave.path$
         else
-            Save as 600-dpi PNG file: .dir$ + .newName$
+            Save as 600-dpi PNG file: prepareImageSave.path$
         endif
     endif
     if myChoice = 2
@@ -289,7 +329,7 @@ procedure addShared_UI_0:  .oFactorDefault$, .iFactorDefault$
         optionMenu: "Table format", tableFormat
             option: "tab-delimited file"
             option: "CSV file"
-        choice:  "Each plot will use:", 1
+        optionMenu: "Each plot will use:", 1
             option: "A different table."
             option: "The same table."
             #option: "The same table and sequencing factor"
@@ -344,8 +384,7 @@ endproc
 procedure addShared_UI_3
     comment: "IMAGE SAVING"
     #boolean: "Very high quality", quality
-    comment: "NB: 'save folder' is for information purposes only."
-    comment: "You can copy the path to 'save folder' and paste it into your file manager."
+    comment: "Absolute folder path; leave blank to use the default."
     sentence: "Save folder", saveDir$
     sentence: "Save name", saveName$
 
@@ -394,9 +433,8 @@ procedure processShared_UIs
     makeNewColSeq = sorting = 4
     altColrMatch = sorting = 5
     sorting = (sorting <= 2) * sorting + (sorting > 2)
-    # The following line is now redundant, as the save folder is now fixed due
-    # to potential write permissions.
-    #saveDir$ = save_folder$
+    saveDir$ = save_folder$
+    @useDefaultSaveFolder
     saveName$ = save_name$
     #quality = very_high_quality
     changeAddColSch = add_or_change_colour_scheme

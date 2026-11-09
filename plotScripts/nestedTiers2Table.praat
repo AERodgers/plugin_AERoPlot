@@ -10,24 +10,33 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
+firstPass = 1
 @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
 @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 @main
 
 procedure main
-    .curVersion$ = "1.4.0.0"
+    .curVersion$ = "1.5.0.2"
     @defineVars
 
     @ui
 
+    @writeVars:
+    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+
     @getObject: ui.gridID$, "textGrid", "main"
     @getObject: ui.soundID$, "sound", "main"
-
+    if ui.formants2tabulate > 1
+        @warnLongRecording: .sound
+        if not warnLongRecording.proceed
+            removeObject: {.textGrid, .sound}
+            exit
+        endif
+    endif
     @tiers2Table:
     ... .textGrid,
     ... "'ui.lowestTier$','ui.otherTiers$'",
     ...  ui.output$
-
     # decide time columns for
     if ui.formants2tabulate
         if tiers2Table.isIntTier[1]
@@ -51,8 +60,8 @@ procedure main
     Remove
 
     firstPass = 0
-    @writeVars:
-    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    # @writeVars:
+    # ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
 endproc
 
 ## UI-RELATED PROCEDURES
@@ -81,6 +90,7 @@ procedure ui
             sentence: "Base tier", .lowestTier$
             sentence: "Other tiers to process (separated by commas)",
             ... .otherTiers$
+            boolean: "Base tier times only", .baseTierTimeOnly
 
             comment: "OPTIONAL FORMANT PROCESSING"
             optionMenu: "Formants to tabulate", .formants2tabulate
@@ -90,6 +100,11 @@ procedure ui
                 option: "F1 - F3"
                 option: "F1 - F4"
                 #option: "F1 - F5"
+
+            comment: "This is only relevant if vowel formant measurements are to"
+            comment: "be taken at specific points identified in a point tier."
+            sentence: "Point tier for Formant measurement times", .formantTier$
+            sentence: "Interval tier for vowel duration measurements", .vowelDur$
 
             comment: "Output scale"
             optionMenu: "frequency scale", .scale
@@ -142,6 +157,10 @@ procedure ui
     .output$ = replace_regex$(.output$, "[^a-zA-Z0-9]", "_", 0)
     .soundID$ = sound_file_address_or_object_number$
     .formants2tabulate = formants_to_tabulate
+
+    .formantTier$ = point_tier_for_Formant_measurement_times$
+    .vowelDur$ = interval_tier_for_vowel_duration_measurements$
+
     .maxNumFormants = .formants2tabulate - 1
     .scale = frequency_scale
 
@@ -321,7 +340,8 @@ procedure tiers2Table:
         .curNumRows = Get number of rows
         selectObject: '.output$'
        .curNumCols = Get number of columns
-        Insert column: .curNumCols + .newColSt - 1, .curFactor$
+       Insert column: .curNumCols + .newColSt - 1, .curFactor$
+
         Insert column: .curNumCols + .newColSt, "'.curFactor$'_tmin"
         Insert column: .curNumCols + .newColSt + 1, "'.curFactor$'_tmax"
         for .j to .curNumRows
@@ -329,7 +349,6 @@ procedure tiers2Table:
             .curTmin = Get value: .j, "tmin"
             .curText$ = Get value: .j, "text"
             .curTmax = Get value: .j, "tmax"
-
             selectObject: '.output$'
             Formula:
             ... .curFactor$,
@@ -368,7 +387,7 @@ procedure tiers2Table:
         endfor
 
         selectObject: '.output$'
-        if .curNumRows = 1
+        if (.curNumRows = 1) or (ui.baseTierTimeOnly)
             Remove column: "'.curFactor$'_tmin"
             Remove column: "'.curFactor$'_tmax"
         elsif .isIntTier[.i]
@@ -383,20 +402,54 @@ procedure tiers2Table:
         removeObject: .tempTable
     endfor
 
+
+
+    if (ui.vowelDur$ != "") and (ui.formantTier$ != "") and (ui.formants2tabulate)
+        selectObject: .gridTable
+
+        .vowelTable = Extract rows where column (text):
+        ... "tier",
+        ... "is equal to",
+        ... ui.vowelDur$
+
+        .num_rows = Get number of rows
+        for .i to .num_rows
+            .v_t_min[.i] = Get value: .i, "tmin"
+            .v_t_max[.i] = Get value: .i, "tmax"
+            .v_t_dur[.i] = number(fixed$((.v_t_max[.i] - .v_t_min[.i]), 3))*1000
+        endfor
+
+        .t_name$ = "'.hierArray$[1]'_t"
+        selectObject: '.output$'
+        Append column: "Vowel.dur"
+        for .i to .num_rows
+        Formula: "Vowel.dur",
+            ... "if (self[.t_name$] >= .v_t_min[.i]) and " +
+            ...    "(self[.t_name$] <= .v_t_max[.i])" +
+            ... "then .v_t_dur[.i] " +
+            ... "else self " +
+            ... "endif"
+        endfor
+    removeObject: .vowelTable
+    endif
+
     removeObject: .gridTable
 endproc
 
 ## FORMANT ESTIMATION
 procedure formantsSought:
-    ... .sound, .table, .timeCols$,
-    ... .timeStep, .maxFormantsSought, .maxFormantHz, .numFormants, .windowLen, .preEmph,
-    ... .scale$
+        ... .sound, .table, .timeCols$, .timeStep,
+        ....maxFormantsSought, .maxFormantHz, .numFormants,
+        ... .windowLen, .preEmph,
+        ... .scale$
 
     if .timeStep = 0
         .timeStep = .windowLen * 0.25
     endif
 
-    @csvLine2Array: .timeCols$, "formantsSought.numCols", "formantsSought.colArray$"
+    @csvLine2Array: .timeCols$,
+                ... "formantsSought.numCols",
+                ..."formantsSought.colArray$"
     .firstT$ = .colArray$[1]
     if .numCols = 1
         .lastT$ = .firstT$
@@ -467,14 +520,19 @@ procedure defineVars
 
     main.scale$[1] = "Hertz"
     main.scale$[2] = "Bark"
-    if !fileReadable(preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var")
-        @initialiseVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var"
+    if !fileReadable(preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/vars/tier2Table.var")
+        @initialiseVars: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/vars/tier2Table.var"
     endif
-    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    @readVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "tier2Table.var"
     if main.version$ != main.curVersion$
-        @initialiseVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var"
+        @initialiseVars: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/vars/tier2Table.var"
     endif
-    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    @readVars: preferencesDirectory$ +
+    ... "/plugin_AERoPlot/data/vars/", "tier2Table.var"
     @overwriteVars
 
     if (ui.soundID$ != x_ui.soundID$) or (ui.gridID$ != x_ui.gridID$)
@@ -490,13 +548,17 @@ procedure initialiseVars: .address$
     appendFileLine: .address$, "main.version$", tab$, main.curVersion$
     appendFileLine: .address$, "ui.gridID$", tab$,
     ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.textgrid"
-    appendFileLine: .address$, "ui.lowestTier$", tab$, "Element"
+    appendFileLine: .address$, "ui.lowestTier$", tab$, "Comparible.target.int"
     appendFileLine: .address$, "ui.otherTiers$", tab$,
-    ... "Speaker,Sex,Type,Context,Rep,IPA,Segment"
-    appendFileLine: .address$, "ui.output$", tab$, "aer_ni_i"
-    appendFileLine: .address$, "ui.soundID$", tab$, preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.wav"
+    ... "Speaker,Section,Phenomenon,Broad,Narrow,Comment"
+    appendFileLine: .address$, "ui.baseTierTimeOnly", tab$, 1
+       appendFileLine: .address$, "ui.output$", tab$, "aer_ni_i"
+    appendFileLine: .address$, "ui.soundID$", tab$, preferencesDirectory$ +
+    ... "/plugin_AERoPlot/example/AER_NI_I.wav"
     appendFileLine: .address$, "ui.formants2tabulate", tab$, 4
     appendFileLine: .address$, "ui.numFormants", tab$, 5
+    appendFileLine: .address$, "ui.formantTier$", tab$, "Vowel.duration"
+    appendFileLine: .address$, "ui.vowelDur$", tab$, "5"
     appendFileLine: .address$, "ui.scale", tab$, 1
     appendFileLine: .address$, "ui.timeStep", tab$, 0
     appendFileLine: .address$, "ui.maxFormantHz", tab$, 5000
@@ -512,7 +574,6 @@ procedure check4ExampleObjs: .gridID$, .soundID$
     plusObject: '.soundID$'
     if extractLine$ (selected$(1), " ") = "AER_NI_I" and
         ... extractLine$ (selected$(2), " ") = "AER_NI_I"
-
         ui.output$ = "aer_ni_i"
         ui.lowestTier$ = "Element"
         ui.otherTiers$ = "Speaker,Sex,Type,Context,Rep,IPA,Segment"

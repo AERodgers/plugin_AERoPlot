@@ -1,5 +1,5 @@
 
-# C3POGRAM   V.1.3.0
+# C3POGRAM   V.1.4.0
 # ==================
 # Written for Praat 6.0.60 or later
 #
@@ -52,38 +52,62 @@
     # 1.3.0               - Changed C3PoGram input from pause menu to form to
     #                     - allow access to it while other plugin pause menus
     #                       are running.
+    # 1.4.0               - Improved UI appearance and added more comments to code.
+    #                     - Added font selection to UI.
+    #                     - Added option to include sound waveform in output.
 
 form c3pogram
     sentence Image_title
 
-    comment Enter number of textgrid tier for display (also sets min and max time of output display)
-
+    comment TextGrid tier to display (only used when a TextGrid is selected)
     natural Use_tier 1
-    comment This will only be used if a textgrid has been selected.
 
+    comment Display settings: F0-only smoothing; width in inches
     natural Smoothing 999
     boolean Paint_spectrogram 1
-    natural Window_width 8
-    comment Enter parameter settings
+    boolean Draw_sound_waveform 0
+    positive Window_width 8
+    comment F0 limits (Hz) and intensity limits (dB)
     natural minF0 60
     natural maxF0 400
     real mindB 30
     real maxdB 90
-    comment Select the contour to draw.
-    choice Plot_type 1
+    comment Select the contour and, for F0 + secondary parameter, its measure.
+    optionmenu Plot_type 1
         option F0 + secondary parameter
         option F0 only
         option Intensity only
-        option Nothing
-    choice F0_scale 2
+        option Background only
+    optionmenu F0_scale 2
         option Hertz
         option Semitones re 1 Hz
-    choice Secondary_parameter 1
+    optionmenu Secondary_parameter 1
         option Cepstral Peak Prominence
         option Residual of intensity (linear regression)
         option H1-H2 of differentiated glottal pulse (LPC-IF)
         option Harmonicity (Praat function)
+    optionmenu Font 4
+        option times
+        option helvetica
+        option palatino
+        option courier
 endform
+
+# MAIN SCRIPT
+
+@checkPraatVersion
+
+# The drawing procedures use the global layout_ variables defined here.
+# If reusing these procedures elsewhere, define the required layout_
+# variables in the calling script as well.
+#
+# Layout dimensions in inches. Vertical coordinates increase downward.
+# Outer viewports include margins; waveform inner boundaries use the nominal margin.
+layout_plot_height = 3.4
+layout_tier_height = 0.65
+layout_waveform_height = layout_tier_height
+layout_waveform_margin = 0.4
+layout_title_height = 0.4
 
 #Get sound and textgrid data
 original_state# = selected#()
@@ -93,11 +117,59 @@ if size(selected#()) = 2 or size(selected#()) = 3
 else
     grid = 0
 endif
-
 if size(selected#()) = 3
     pitch_obj = selected("Pitch")
-    else
+else
     pitch_obj = 0
+endif
+
+# Validate before modifying the selected Sound or creating analysis objects.
+if (plot_type = 1 or plot_type = 2 or plot_type = 3) and minF0 <= 0
+    exitScript: "Minimum F0 must be greater than zero."
+endif
+if (plot_type = 1 or plot_type = 2) and maxF0 <= minF0
+    exitScript: "Maximum F0 must be greater than minimum F0."
+endif
+if plot_type = 3 and maxdB <= mindB
+    exitScript: "Maximum intensity must be greater than minimum intensity."
+endif
+if window_width <= 0
+    exitScript: "Window width must be greater than zero."
+endif
+if grid
+    selectObject: grid
+    number_of_tiers = Get number of tiers
+    if use_tier < 1 or use_tier > number_of_tiers
+        exitScript: "TextGrid tier must be between 1 and " + string$(number_of_tiers) + "."
+    endif
+endif
+@warnLongRecording: sound
+if not warnLongRecording.proceed
+    selectObject: original_state#
+    exit
+endif
+
+# Calculate viewport boundaries for the selected tier and waveform.
+layout_left = 0
+layout_right = window_width
+layout_plot_top = 0
+if draw_sound_waveform
+    layout_waveform_inner_top = layout_title_height
+    layout_waveform_inner_bottom = layout_waveform_inner_top + layout_waveform_height
+    layout_waveform_outer_top = layout_waveform_inner_top - layout_waveform_margin
+    layout_waveform_outer_bottom = layout_waveform_inner_bottom + layout_waveform_margin
+    # Align the plot with the waveform's nominal inner bottom, allowing for the outer margin.
+    layout_plot_top = layout_waveform_inner_bottom - layout_waveform_margin
+endif
+
+layout_plot_bottom = layout_plot_top + layout_plot_height
+layout_image_bottom = layout_plot_bottom
+if grid * use_tier > 0
+    layout_image_bottom = layout_image_bottom + layout_tier_height
+endif
+layout_title_bottom = layout_image_bottom
+if draw_sound_waveform
+    layout_title_bottom = layout_title_height
 endif
 
 title$ = image_title$
@@ -106,31 +178,36 @@ if title$ = ""
     title$ = selected$("Sound")
     title$ = replace_regex$ (title$, "[%#\^_]", "\\& ", 0)
 endif
-@c3pogram: plot_type, secondary_parameter, f0_scale, paint_spectrogram, title$,
+
+@c3pogram: plot_type, secondary_parameter, f0_scale, paint_spectrogram,
+    ... draw_sound_waveform, font, title$,
     ... grid, sound, pitch_obj, use_tier,
     ... minF0, maxF0, mindB, maxdB, window_width, smoothing
-
 
 selectObject: original_state#
 
 
 # C3POGRAM FUNCTIONS
-procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
+procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
+    ... .font, .title$,
     ... .grid, .sound, .pitch_two, .tier,
     ...  .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
 
-    # adjust sound intensity
+    if not .paintSpect and .plotType = 4 and not .drawWaveform and
+    ... .grid * .tier <= 0
+        exitScript: "Nothing is selected to draw. Enable the spectrogram or waveform, " +
+        ... "select a contour, or choose a TextGrid tier."
+    endif
+
+    # Normalize the selected Sound itself, not just its display.
     selectObject: .sound
     Scale intensity: 70
 
     if .grid * .tier > 0
         selectObject: .grid
+        .minT = Get start time
+        .maxT = Get end time
         .refTier = Extract one tier: .tier
-        .gridTable = Down to Table: "no", 3, "no", "no"
-        .num_rows = Get number of rows
-        .minT = Get value: 1, "tmin"
-        .maxT = Get value: .num_rows, "tmax"
-        Remove
     else
         selectObject: .sound
         .minT = Get start time
@@ -143,14 +220,40 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
     10
     Line width: 1
     Solid line
-    Courier
-    Select outer viewport: 0, .vpWidth, 0, 3.35
+    .font$[1] = "Times"
+    .font$[2] = "Helvetica"
+    .font$[3] = "Palatino"
+    .font$[4] = "Courier"
+    .fontCommand$ = .font$[.font]
+    '.fontCommand$'
+
+    if .drawWaveform
+        Select outer viewport: layout_left, layout_right, layout_waveform_outer_top,
+        ... layout_waveform_outer_bottom
+        Black
+        selectObject: .sound
+        .waveMin = Get minimum: .minT, .maxT, "None"
+        .waveMax = Get maximum: .minT, .maxT, "None"
+        .waveRange = .waveMax - .waveMin
+        if .waveRange > 0
+            .waveMin = .waveMin - .waveRange * 0.05
+            .waveMax = .waveMax + .waveRange * 0.05
+        else
+            .waveMin = -1
+            .waveMax = 1
+        endif
+        Draw: .minT, .maxT, .waveMin, .waveMax, "no", "Curve"
+        Line width: 1
+        Draw inner box
+    endif
+
+    Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
 
     # draw spectrogram
     if .paintSpect
         selectObject: .sound
         specky = To Spectrogram: 0.005, 5000, 0.002, 20, "Gaussian"
-        Paint: .minT, .maxT, 0, 0, 100, "yes", 50, .vpWidth, 0, "no"
+        Paint: .minT, .maxT, 0, 0, 100, "yes", 50, 8, 0, "no"
         Marks right every: 1, 200, "no", "yes", "no"
         Line width: 2
         Marks right every: 1000, 1, "yes", "yes", "no"
@@ -162,25 +265,28 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
 
     if .grid * .tier > 0
         # draw text grid text and lines
-        Select outer viewport: 0, .vpWidth, 0, 4
+        Select outer viewport: layout_left, layout_right, layout_plot_top, layout_image_bottom
         selectObject: .refTier
         Draw: .minT, .maxT, "yes", "yes", "no"
         Line width: 1
         Draw inner box
     endif
 
-    # Adjust time to start from 0
+    # Label elapsed time from zero; the plotted data retains its original time coordinates.
     Axes: 0, .maxT-.minT, 1, 0
 
     # Draw time axis
-    Marks bottom every: 1, 0.2, "yes", "yes", "no"
+    @niceTimeInterval: .maxT - .minT
+    Marks bottom every: 1, niceTimeInterval.major, "yes", "yes", "no"
     Line width: 1
-    Marks bottom every: 1, 0.1, "no", "yes", "no"
+    Marks bottom every: 1, niceTimeInterval.minor, "no", "yes", "no"
     Text bottom: "yes", "Time (secs)"
 
     if .plotType = 1 or .plotType = 2
-        # get pitch table
         @pitch: .sound, .minF0, .maxF0
+    endif
+    if .plotType = 1
+        # The secondary-parameter plot needs a table; the F0 line uses the Pitch object.
         @pitch2Table: pitch.obj, 0
         selectObject: pitch2Table.table
         Rename: "pitch"
@@ -200,6 +306,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
         elsif .param2 = 3
             @h1h2: .sound, pitch2Table.table
             selectObject: h1h2.table
+            # Reverse H1-H2 so lower values produce larger, more intensely coloured points.
             Formula: "value", "-self"
         elsif .param2 = 4
             @harmonicity: .sound, .minF0
@@ -212,26 +319,26 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
     # draw selected contour
     if .plotType = 1
         @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
-        ... .maxF0, .param2, .hz_ST, .vpWidth
+        ... .maxF0, .param2, .hz_ST
     elsif .plotType = 2
         if .pitch_two
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
-            ... .vpWidth, pitch.obj, .smoothing, "Silver"
+            ... pitch.obj, .smoothing, "Silver"
             @uninterpolate: .sound, .pitch_two, .minF0, .maxF0
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
-            ... .vpWidth, uninterpolate.obj, .smoothing, "Blue"
+            ... uninterpolate.obj, .smoothing, "Blue"
             removeObject: uninterpolate.obj
         else
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
-            ... .vpWidth, pitch.obj, .smoothing, "Blue"
+            ... pitch.obj, .smoothing, "Blue"
         endif
     elsif .plotType = 3
-        @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+        @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB
     endif
 
     # add contour axis information
     if .plotType = 1 or .plotType = 2
-        Select outer viewport: 0, .vpWidth, 0, 3.35
+        Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
         if .hz_ST = 2
             .leftMajor = 5
             .leftText$ = "F0 (ST re 1 Hz)"
@@ -246,7 +353,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
         Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
         Text left: "yes", .leftText$
     elsif .plotType = 3
-        Select outer viewport: 0, .vpWidth, 0, 3.35
+        Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
         Line width: 2
         Marks left every: 1, 10, "yes", "yes", "no"
         Line width: 1
@@ -255,19 +362,18 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
     endif
 
     # add title
-    if .grid * .tier > 0
-        Select outer viewport: 0, .vpWidth, 0, 4
-    else
-        Select outer viewport: 0, .vpWidth, 0, 3.35
-    endif
+    Select outer viewport: layout_left, layout_right, 0, layout_title_bottom
 
     Font size: 14
     nowarn Text top: "yes", "##" + .title$
     Font size: 10
+    Select outer viewport: layout_left, layout_right, 0, layout_image_bottom
 
     if .plotType = 1 or .plotType = 2
-        selectObject: pitch2Table.table
-        plusObject: pitch.obj
+        selectObject: pitch.obj
+        if .plotType = 1
+            plusObject: pitch2Table.table
+        endif
         if .vqTable
             plusObject: .vqTable
         endif
@@ -282,7 +388,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
 endproc
 
 procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
-    ... .maxF0, .type, .hz_ST, .vpWidth
+    ... .maxF0, .type, .hz_ST
     selectObject: .pitchTable
     # adjust F0 if pitch scale set to semitones
     if .hz_ST = 2
@@ -291,19 +397,54 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
         .maxF0 = log2(.maxF0) * 12
     endif
 
-    # Convert second parameter to shading values
+    # Higher parameter values yield lower shade values and larger, more saturated circles.
     selectObject: .secondParam
-    .minPar2  = Get minimum: "value"
-    .maxPar2 = Get maximum: "value"
+    .numSecondPts = Get number of rows
+    if .numSecondPts = 0
+        exitScript: "The selected secondary parameter has no usable values."
+    endif
+    .definedValues = 0
+    for .i to .numSecondPts
+        .value = Get value: .i, "value"
+        if .value <> undefined
+            if .definedValues = 0
+                .minPar2 = .value
+                .maxPar2 = .value
+            else
+                .minPar2 = min(.minPar2, .value)
+                .maxPar2 = max(.maxPar2, .value)
+            endif
+            .definedValues += 1
+        endif
+    endfor
+    if .definedValues = 0
+        exitScript: "The selected secondary parameter has no defined values."
+    endif
     Append column: "shade"
-    Formula: "shade", "1 - (self[""value""] - .minPar2) / (.maxPar2 - .minPar2)"
+    if .maxPar2 = .minPar2
+        Formula: "shade", "if self[""value""] = undefined then undefined else 0.5 fi"
+    else
+        Formula: "shade", "1 - (self[""value""] - .minPar2) / (.maxPar2 - .minPar2)"
+    endif
+
+    # Binary search is safe for strictly increasing times; retain the general search otherwise.
+    .orderedTimes = 1
+    for .i to .numSecondPts
+        .secondTime[.i] = Get value: .i, "time"
+        if .secondTime[.i] = undefined
+            .orderedTimes = 0
+        elsif .i > 1
+            if .secondTime[.i] <= .secondTime[.i - 1]
+                .orderedTimes = 0
+            endif
+        endif
+    endfor
 
     # set picture window
-    Select outer viewport: 0, .vpWidth, 0, 3.35
+    Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
     Axes: .minT, .maxT, .minF0, .maxF0
     .di = Horizontal mm to world coordinates: 3
     Font size: 10
-    Courier
     Solid line
 
     # Draw C3POGRAM points
@@ -314,10 +455,33 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
         selectObject: .pitchTable
         .curT = Get value: .i, "Time"
         .curF0 = Get value: .i, "F0"
-        @nearestVal: .curT, .secondParam, "time"
-        .sh = Get value: nearestVal.index, "shade"
-        .shT = Get value: nearestVal.index, "time"
-        if not(abs(.shT - .curT)*1000 > 5.5555)
+        if .orderedTimes and .numSecondPts > 0 and .curT <> undefined
+            .low = 1
+            .high = .numSecondPts + 1
+            while .low < .high
+                .mid = floor((.low + .high) / 2)
+                if .secondTime[.mid] < .curT
+                    .low = .mid + 1
+                else
+                    .high = .mid
+                endif
+            endwhile
+            .nearest = min(.low, .numSecondPts)
+            if .nearest > 1
+                if abs(.curT - .secondTime[.nearest - 1]) <= abs(.curT - .secondTime[.nearest])
+                    .nearest = .nearest - 1
+                endif
+            endif
+            selectObject: .secondParam
+        else
+            @nearestVal: .curT, .secondParam, "time"
+            .nearest = nearestVal.index
+        endif
+        .sh = Get value: .nearest, "shade"
+        .shT = Get value: .nearest, "time"
+        # A match more than 5.5555 ms away is shown as a small red point.
+        if .sh <> undefined and .shT <> undefined and
+        ... abs(.shT - .curT)*1000 <= 5.5555
             Paint circle: "{'.sh','.sh',1-0.8*'.sh'}", .curT, .curF0,
             ... .di * 0.1 + .di * (1 - .sh)
             Colour: "cyan"
@@ -332,17 +496,15 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     endfor
 endproc
 
-
-procedure drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+procedure drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB
     selectObject: .sound
     .intensity = To Intensity: .minF0, 0, "yes"
 
     # set picture window
-    Select outer viewport: 0, .vpWidth, 0, 3.35
+    Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
     Axes: .minT, .maxT, .mindB, .maxdB
 
     Font size: 10
-    Courier
     Solid line
     Line width: 7
     Black
@@ -363,15 +525,11 @@ procedure pitch: .sound, .minF0, .maxF0
 endproc
 
 procedure h1h2: .sound, .pitchTable
-    # Procedure dependencies @getHn
-
     # PROCESS SOUND WAVEFORM
     # Get sampling data from sound object
     selectObject: .sound
     .sampHz = Get sampling frequency
     .coeffs = round (.sampHz/1000) + 2
-    # create spectrogram of original sound (delete later)
-    .soundSpectro = To Spectrogram: 0.03, 5000, 0.002, 20, "Gaussian"
     # get LPC, IF sound waveform, and IF waveform narrowband spectrogram
     selectObject: .sound
     .lpc = To LPC (autocorrelation): .coeffs, 0.025, 0.005, 50
@@ -408,10 +566,12 @@ procedure h1h2: .sound, .pitchTable
     # PROCESS H1-H2
     # get h1-h2 array
     for .i to .numRows
-        @getHn: .ifSpectro, 1, .time[.i], .f0[.i]
-        .h1 = getHn.db
-        @getHn: .ifSpectro, 2, .time[.i], .f0[.i]
-        .h1h2$ = fixed$(.h1 - getHn.db, 3)
+        selectObject: .ifSpectro
+        .slice = To Spectrum (slice): .time[.i]
+        .h1 = Get sound pressure level of nearest maximum: .f0[.i]
+        .h2 = Get sound pressure level of nearest maximum: .f0[.i] * 2
+        Remove
+        .h1h2$ = fixed$(.h1 - .h2, 3)
         selectObject: .table
         Set string value: .i, "value", .h1h2$
     endfor
@@ -424,8 +584,7 @@ procedure h1h2: .sound, .pitchTable
     @delRowsIf: .table, "self[""value""] > h1h2.mean + h1h2.stDev * 3"
 
     ### Remove surplus objects:
-    selectObject: .soundSpectro
-    plusObject: .lpc
+    selectObject: .lpc
     plusObject: .if
     plusObject: .ifSpectro
     if .isPitchObj
@@ -444,7 +603,7 @@ endproc
 procedure harmonicity: .sound, .minF0
     # Procedure dependencies: @array2table (@list2array), @delRowsIf
 
-    # create harmonicity object
+    # Create the harmonicity object.
     selectObject: .sound
     .harmonicity = To Harmonicity (ac): 0.01, .minF0, 0.1, 4.5
     #get main stats for harmonicity table
@@ -471,7 +630,7 @@ endproc
 procedure intensity: .sound, .minF0, .minT, .maxT
     # Procedure dependencies: @delRowsIf, @tableStats (@keepCols, @table2array)
 
-    # create harmonicity object
+    # Convert intensity frames into a time/value table.
     selectObject: .sound
     .tempI1 = To Intensity: 75, 0, "yes"
     .tempI2 = Down to IntensityTier
@@ -492,7 +651,7 @@ procedure intensity: .sound, .minF0, .minT, .maxT
     @delRowsIf: .table, "self[""value""] < intensity.mean - intensity.stDev"
 
 
-    # get linear regression of intensity for utterance portion of waveform
+    # Fit the intensity trend within the selected time range after filtering low values.
     .tempTable = Copy: "intensityTemp"
     @delRowsIf: .tempTable, "self[""time""] <= intensity.minT"
     @delRowsIf: .tempTable, "self[""time""] >= intensity.maxT"
@@ -501,11 +660,10 @@ procedure intensity: .sound, .minF0, .minT, .maxT
     selectObject: .tempTable
     @delRowsIf: .table,
     ... "self [""value""] < tableStats.yMean - tableStats.stDevY"
-    .mean = Get mean: "value"
-    .stDev = Get standard deviation: "value"
     selectObject: .tempTable
     Remove
 
+    # Subtract the fitted trend to obtain intensity residuals.
     selectObject: .table
     Formula: "value",
     ... "self[""value""] - (self[""time""] * " +
@@ -563,6 +721,7 @@ procedure array2table: .table$, .arrays$, .rows
             .string[.j] = 1
         else
             .string[.j] = 0
+        endif
     endfor
 
     # create empty table
@@ -644,9 +803,7 @@ procedure pitch2Table: .pitchObject, .interpolate
     # Get key pitchTable data
     selectObject: .pitchTable
     .rows = Get number of rows
-    .rowTimeFirst = Get value: 1, "Time"
-
-    # estimate frame of first row
+    # Map each voiced pitch point back to its original frame.
     Set column label (index): 1, "Frame"
     for .n to .rows
         .rowTimeN = Get value: .n, "Time"
@@ -768,7 +925,7 @@ procedure tableStats: .table, .colX$, .colY$
 endproc
 
 procedure draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
-    ... .vpWidth, .pitch_two, .smoothing, .colour$
+    ... .pitch_two, .smoothing, .colour$
     Solid line
     if .hz_ST = 2
         .line_minF0 = log2(.minF0/100) * 12
@@ -778,7 +935,7 @@ procedure draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
         .line_maxF0 = .maxF0
     endif
 
-    Select outer viewport: 0, .vpWidth, 0, 3.35
+    Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
     Axes: .minT, .maxT, .line_minF0, .line_maxF0
     if .pitch_two
         .foreground_pitch = .pitch_two
@@ -811,6 +968,7 @@ procedure draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
 endproc
 
 procedure uninterpolate: .sound, .pitch_obj, .minF0, .maxF0
+    # Identify voiceless intervals from the sound and remove them from the supplied pitch.
     selectObject: .sound
     .point_process = To PointProcess (periodic, cc): .minF0, .maxF0
     .vuv_grid = To TextGrid (vuv): 0.02, 0.01
@@ -837,3 +995,5 @@ procedure uninterpolate: .sound, .pitch_obj, .minF0, .maxF0
    endfor
    removeObject: {.point_process, .vuv_grid, .vuv_table}
 endproc
+
+include _genFnBank.praat

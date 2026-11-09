@@ -13,7 +13,7 @@
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 
-curF1f2Version$ = "1.4.0.0"
+curF1f2Version$ = "1.5.0.0"
 plotPrefix$ = "F12."
 # Main script loop
 keepGoing = 1
@@ -286,7 +286,7 @@ procedure drawf1f2Plot
              ... table, "F2DrawValue", "F1DrawValue",
              ... legBlockTolerance, bufferZone, 1, 0, -1
     endif
-    @drawTitleLayer
+    @drawSharedTitleLayer: left, right, top - titleAdjust, bottom, fontL, fontM, title$
 endproc
 
 
@@ -705,14 +705,6 @@ procedure doMeansText
     endfor
 endproc
 
-procedure drawTitleLayer
-    Select inner viewport: left, right, top - titleAdjust, bottom
-    Font size: fontL
-    nowarn Text top: "yes", "##" + title$
-    Font size: fontM
-endproc
-
-
 # Initialisation procedures and script inclusions
 procedure defineVars
     @checkDirectoryStructure
@@ -731,6 +723,7 @@ procedure defineVars
     endif
     @readVars: preferencesDirectory$ +
     ... "/plugin_AERoPlot/data/vars/", "f1f1Plot.var"
+    @useDefaultSaveFolder
     @getGenAxisVars
 
     @overwriteVars

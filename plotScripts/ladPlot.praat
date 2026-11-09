@@ -391,7 +391,7 @@ procedure doLadPlot
         ... table, "x", yList$,
         ... legBlockTolerance, bufferZone, 1, 0, - 1
     endif
-    @drawTitleLayer
+    @drawSharedTitleLayer: left, right, top, bottom, fontL, fontM, title$
 endproc
 
 
@@ -849,14 +849,6 @@ procedure drawDataPoints
     Line width: 1
 endproc
 
-procedure drawTitleLayer
-    Select inner viewport: left, right, top, bottom
-    Font size: fontL
-    nowarn Text top: "yes", "##" + title$
-    Font size: fontM
-endproc
-
-
 # Initialisation procedures and script inclusions
 procedure defineVars
     if !variableExists("prevLoops")
@@ -878,6 +870,7 @@ procedure defineVars
     endif
     @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
            ... "ladPlot.var"
+    @useDefaultSaveFolder
     @getGenAxisVars
     @overwriteVars
 endproc

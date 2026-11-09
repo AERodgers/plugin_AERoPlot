@@ -12,7 +12,7 @@
 @checkPraatVersion
 @objsSelected: "Table", "tableID$"
 @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
-curFoTVersion$ = "1.4.0.0"
+curFoTVersion$ = "1.5.0.0"
 plotPrefix$ = "FOT."
 # Main script loop
 keepGoing = 1
@@ -60,7 +60,7 @@ while keepGoing
     tokenMarking += 1
     dataPointsOnTop += 1
     timeRelativeTo -= (tableID$ ==
-    ... preferencesDirectory$ + "/plugin_AERoPlot//example/AER_NI_I.txt")
+    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt")
 
     keepGoing = plotUses
     firstPass = 0
@@ -88,7 +88,7 @@ procedure doInputUI
     while ! done
         repFactor$ = replace$(repFactor$, "?", "", 0)
         beginPause: "Formants over time plot: input settings"
-            comment: "NB: THIS FUNCTION IS NOT WORRK CORRECTLY RIGHT NOW."
+            comment: "NB: The interactive workflow is still being validated."
             comment:  comment$
 
             @addShared_UI_0: "Context", "Element"
@@ -269,10 +269,12 @@ procedure makeTimeRelativeMenu
             comment:
             ... "In such cases, make sure you adjust the time columns " +
             ... "in advance of running this script."
+            comment: "Each group and repetition needs exactly one reference time."
         myChoice = endPause: "Exit", "Continue", 2, 1
 
         if myChoice = 1
             @selectTableID
+            exit
         endif
         @retrieveObjs: "hiddenTx"
 
@@ -280,51 +282,12 @@ procedure makeTimeRelativeMenu
         timeRelativeTo = make_time_relative_to - 1
         if timeRelativeTo
             timeRelativeTo$ = iLevel$[timeRelativeTo]
-
-            if repFactor$ != ""
-                @summariseFactor: table, repFactor$, "rep"
-            endif
-            for o to oLevels
-                curOLevel$ = oLevel$[o]
-                selectObject: table
-
-                nowarn Extract rows where:
-                ... "self$[oFactor$] = curOLevel$ and " +
-                ... "self$[iFactor$] = timeRelativeTo$"
-                Rename: curOLevel$
-                tempTable = selected()
-                numReps[o] = Get number of rows
-                for i to numReps[o]
-                    if repFactor$ = ""
-                        refTime[o,i] = Get value: i, timeCol$
-                    else
-                        repName$[o,i] = Get value: i, repFactor$
-                        refTime[o,i] = Get value: i, timeCol$
-                    endif
-                endfor
-                removeObject: tempTable
-            endfor
-
-            selectObject: table
-            for o to oLevels
-                for i to numReps[o]
-                    if repFactor$ = ""
-                        nowarn Formula: timeCol$,
-                        ... "if self$[oFactor$] = oLevel$[o] then " +
-                        ... "fixed$(self - refTime[o,i], 3) else " +
-                        ... "self endif"
-                    else
-                        nowarn Formula: timeCol$,
-                        ... "if self$[oFactor$] = oLevel$[o] and " +
-                        ... "self$[repFactor$] = repName$[o,i] then " +
-                        ... "fixed$(self - refTime[o,i], 3) else " +
-                        ... "self endif"
-                    endif
-                endfor
-            endfor
-            Save as binary file: preferencesDirectory$ +
-            ... "/plugin_AERoPlot/data/temp/table.bin"
+            @makeTimeRelative: table, oFactor$, iFactor$, timeCol$,
+            ... repFactor$, timeRelativeTo$
         endif
+        selectObject: table
+        Save as binary file: preferencesDirectory$ +
+        ... "/plugin_AERoPlot/data/temp/table.bin"
     elsif plotUses = 2
         oldTable = Read from file: preferencesDirectory$ +
         ... "/plugin_AERoPlot/data/temp/table.bin"
@@ -379,6 +342,7 @@ procedure doOutputUI
     myChoice = endPause: "Exit", "Continue", 2, 1
     if myChoice = 1
         @selectTableID
+        exit
     endif
     @retrieveObjs: "hiddenTx"
     # Process generic outoutUI
@@ -441,15 +405,13 @@ procedure doFOTPlot
              ... table, "'timeCol$'DrawValue", yList$,
              ... legBlockTolerance, bufferZone, 1, 0, - 1
     endif
-    @drawTitleLayer
+    @drawSharedTitleLayer: left, right, top, bottom, fontL, fontM, title$
 endproc
 
 
 # Plot calculation procedures
 procedure calcFOTAxisIncrements
-    minorTimeDist = 0.01
     jitter = 0.0015
-    majorTimeDist = 0.05
 
     vertAdjust = 0.15
     legendLeftAdjust = 4.02
@@ -490,6 +452,9 @@ procedure calcFOTAxisVals
     # get min and max T to the nearest 10th of a ms +/- space for grid edge
     minT = floor(minT * 10) / 10 - 0.049
     maxT = ceiling(maxT * 50) / 50 + 0.049
+    @niceTimeInterval: maxT - minT
+    minorTimeDist = niceTimeInterval.minor
+    majorTimeDist = niceTimeInterval.major
     @getOutputScales:
     ... table, "'timeCol$'",
     ... minT, maxT, minorTimeDist,
@@ -503,7 +468,7 @@ endproc
 procedure calcFOTPlotLayers
     # create iLevels[o,i] array of tables
 
-    if tokenMarking and tokenMarking < numFactors
+    if tokenMarking and tokenMarking <= numFactors
         selectObject: table
         Append column: "token"
         Formula: "token", """##"" + self$[factorName$[tokenMarking]]"
@@ -663,17 +628,17 @@ procedure drawDataPoints
         curOuter$ = oLevel$[o]
         curColour$ = oColour$[o, 1]
         curTCol$ = timeCol$ + "DrawValue"
+        Append column: "TAdj"
         for f to numFormants
             curFCol$ = f'f'Col$ + "DrawValue"
             # Draw scatter plot
-            if mean('curColour$' * colrAdj#) / 1000 < 0.19576
+            if mean('curColour$' * colrAdj#) < 0.19576
                 Colour: 'curColour$' + 0.8
             else
                 Colour: 'curColour$' - 0.5
             endif
 
             # draw background outline
-            Append column: "TAdj"
             Append column: "F'f'Adj"
             across = 1
             down = -1
@@ -681,7 +646,7 @@ procedure drawDataPoints
             ... "self[curTCol$] + across * xDist * 1.3"
             Formula: "F'f'Adj",
             ... "self[curFCol$] + down * yDist * 1.3"
-            if tokenMarking < numFactors
+            if tokenMarking <= numFactors
                 nowarn Scatter plot where:
                 ... "TAdj", minT, maxT,
                 ... "F'f'Adj", minF, maxF,
@@ -697,7 +662,7 @@ procedure drawDataPoints
             endif
 
             Colour: curColour$
-            if tokenMarking < numFactors
+            if tokenMarking <= numFactors
                 nowarn Scatter plot where:
                 ... curTCol$, minT, maxT,
                 ... curFCol$, minF, maxF,
@@ -798,7 +763,7 @@ procedure drawLines
     for o to oLevels
         for i from 2 to iLevels
             # Only draw plots where plot table exists!
-            if possRows.matrix##[o,i]
+            if possRows.matrix##[o,i] and possRows.matrix##[o,i - 1]
                 curMeanT = meanTinPlot[o,i]
                 timeNameIOF$ = "meanTinPlot[" +
                 ... string$(o) + "," + string$(i - 1) +
@@ -834,14 +799,6 @@ procedure drawLines
     endfor
 endproc
 
-procedure drawTitleLayer
-    Select inner viewport: left, right, top, bottom
-    Font size: fontL
-    nowarn Text top: "yes", "##" + title$
-    Font size: fontM
-endproc
-
-
 # Initialisation procedures and script inclusions
 procedure defineVars
     # check / fix directory ending
@@ -859,6 +816,7 @@ procedure defineVars
     endif
     @readVars:
     ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "fotPlot.var"
+    @useDefaultSaveFolder
     @getGenAxisVars
     @overwriteVars
 

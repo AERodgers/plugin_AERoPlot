@@ -52,13 +52,111 @@
 
 procedure checkPraatVersion
     .version$ = praatVersion$
-    if number(left$(.version$, 1)) < 6
-        echo You are running Praat 'praatVersion$'.
-        ... 'newline$'This script runs on Praat version 6.0.60 or later.
-        ... 'newline$'To run this script, update to the latest
-        ... version at praat.org
-        exit
+    .firstDot = index(.version$, ".")
+    .rest$ = mid$(.version$, .firstDot + 1, length(.version$))
+    .secondDot = index(.rest$, ".")
+    if .firstDot = 0 or .secondDot = 0
+        exitScript: "Cannot determine Praat version: " + .version$
     endif
+    .major = number(left$(.version$, .firstDot - 1))
+    .minor = number(left$(.rest$, .secondDot - 1))
+    .patch$ = mid$(.rest$, .secondDot + 1, length(.rest$))
+    .patch = number(replace_regex$(.patch$, "[^0-9].*$", "", 0))
+    if .major = undefined or .minor = undefined or .patch = undefined
+        exitScript: "Cannot determine Praat version: " + .version$
+    endif
+    if .major < 6 or (.major = 6 and .minor = 0 and .patch < 60)
+        exitScript: "You are running Praat " + .version$ + "." + newline$ +
+        ... "This plugin requires Praat 6.0.60 or later. Update at praat.org."
+    endif
+endproc
+
+procedure niceTimeInterval: .duration
+    if .duration <= 0 or .duration = undefined
+        exitScript: "Time range must be greater than zero."
+    endif
+    .raw = .duration / 6
+    .magnitude = 10 ^ floor(log10(.raw))
+    .ratio = .raw / .magnitude
+    if .ratio <= 1
+        .major = .magnitude
+    elsif .ratio <= 2
+        .major = 2 * .magnitude
+    elsif .ratio <= 5
+        .major = 5 * .magnitude
+    else
+        .major = 10 * .magnitude
+    endif
+    .minor = .major / 2
+endproc
+
+procedure warnLongRecording: .sound
+    # Change this threshold (seconds) to adjust the long-recording warning.
+    .warningSeconds = 60
+    .originalSelection# = selected#()
+    selectObject: .sound
+    .duration = Get total duration
+    .proceed = 1
+    if .duration > .warningSeconds
+        beginPause: "Long recording"
+            comment: "This recording is " + fixed$(.duration, 1) +
+            ... " seconds long and may take a long time to process."
+        .choice = endPause: "Cancel", "Continue", 2
+        .proceed = .choice = 2
+    endif
+    selectObject: .originalSelection#
+endproc
+
+procedure makeTimeRelative: .table, .outer$, .inner$, .time$, .repetition$, .reference$
+    selectObject: .table
+    .rows = Get number of rows
+    .references = 0
+    for .row to .rows
+        .level$ = Get value: .row, .inner$
+        if .level$ = .reference$
+            .group$ = Get value: .row, .outer$
+            .rep$ = ""
+            if .repetition$ != ""
+                .rep$ = Get value: .row, .repetition$
+            endif
+            for .i to .references
+                if .groups$[.i] = .group$ and .reps$[.i] = .rep$
+                    exitScript: "More than one reference time for group """ +
+                    ... .group$ + """ and repetition """ + .rep$ +
+                    ... """. Use a repetition column that identifies each token."
+                endif
+            endfor
+            .references += 1
+            .groups$[.references] = .group$
+            .reps$[.references] = .rep$
+            .times[.references] = Get value: .row, .time$
+        endif
+    endfor
+    for .row to .rows
+        .group$ = Get value: .row, .outer$
+        .rep$ = ""
+        if .repetition$ != ""
+            .rep$ = Get value: .row, .repetition$
+        endif
+        .match = 0
+        for .i to .references
+            if .groups$[.i] = .group$ and .reps$[.i] = .rep$
+                .match = .i
+            endif
+        endfor
+        if .match = 0
+            exitScript: "No reference time for group """ + .group$ +
+            ... """ and repetition """ + .rep$ + """."
+        endif
+        .time = Get value: .row, .time$
+        if .time = undefined or .times[.match] = undefined
+            exitScript: "Time values must be numeric and defined."
+        endif
+        .adjusted[.row] = number(fixed$(.time - .times[.match], 3))
+    endfor
+    for .row to .rows
+        Set numeric value: .row, .time$, .adjusted[.row]
+    endfor
 endproc
 
 
