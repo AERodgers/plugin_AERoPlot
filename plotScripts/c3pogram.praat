@@ -78,6 +78,7 @@ form c3pogram
         option Residual of intensity (linear regression)
         option H1-H2 of differentiated glottal pulse (LPC-IF)
         option Harmonicity (Praat function)
+        option F0 only
         option Nothing
     comment CPP appears to reflect more intuitive expectations of contour.
     comment Residual of linear regression of intensity used to compensate for global declination.
@@ -190,6 +191,7 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
     .secondParam$[3] = "h1h2"
     .secondParam$[4] = "harmonicity"
     .secondParam$[5] = "f0"
+    .secondParam$[6] = "nothing"
     .name$ = .secondParam$[.param2]
     if .param2 = 1
         @cpp: .sound, .minF0, .maxF0, pitch2Table.table
@@ -220,35 +222,39 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
             ... .vpWidth, pitch.obj, .smoothing, "Blue"
         endif
-    elsif .hz_ST != 3
-        @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
-        ... .maxF0, .param2, .hz_ST, .vpWidth
-    else
-        @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+    elsif .param2 != 6
+        if .hz_ST != 3
+            @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
+            ... .maxF0, .param2, .hz_ST, .vpWidth
+        else
+            @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
+        endif
     endif
 
     # add pitch axis information
-    Select outer viewport: 0, .vpWidth, 0, 3.35
-    if .hz_ST = 2
-        .leftMajor = 5
-        .leftText$ = "F0 (ST re 1 Hz)"
-        Axes: .minT, .maxT, log2(.minF0) * 12, log2(.maxF0) * 12
-    else
-        .leftMajor = 50
-        .leftText$ = "F0 (Hz)"
-    endif
-    if .hz_ST < 3
-        Line width: 2
-        Marks left every: 1, .leftMajor, "yes", "yes", "no"
-        Line width: 1
-        Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
-        Text left: "yes", .leftText$
-    else
-        Line width: 2
-        Marks left every: 1, 10, "yes", "yes", "no"
-        Line width: 1
-        Marks left every: 1, 2, "no", "yes", "no"
-        Text left: "yes", "Intensity (dB)"
+    if .param2 != 6
+        Select outer viewport: 0, .vpWidth, 0, 3.35
+        if .hz_ST = 2
+            .leftMajor = 5
+            .leftText$ = "F0 (ST re 1 Hz)"
+            Axes: .minT, .maxT, log2(.minF0) * 12, log2(.maxF0) * 12
+        else
+            .leftMajor = 50
+            .leftText$ = "F0 (Hz)"
+        endif
+        if .hz_ST < 3
+            Line width: 2
+            Marks left every: 1, .leftMajor, "yes", "yes", "no"
+            Line width: 1
+            Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
+            Text left: "yes", .leftText$
+        else
+            Line width: 2
+            Marks left every: 1, 10, "yes", "yes", "no"
+            Line width: 1
+            Marks left every: 1, 2, "no", "yes", "no"
+            Text left: "yes", "Intensity (dB)"
+        endif
     endif
 
     # add title
