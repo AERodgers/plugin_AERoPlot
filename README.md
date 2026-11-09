@@ -16,7 +16,7 @@ There are currently four plot types:
 2. Formant plots for showing 2+ formants (called "Ladefoged plots" here);
 3. Formants-over-time plots, similar to the Ladefoged plots, but with time on the x axis;
    NB: This function is not working correctly at the moment!
-4. C3P-o-grams, which plot F0 contours along with a second parameter indicated by line size and colour intensity (CPP, H2-H1 of the differentiate glottal source...)
+4. C3P-o-grams, with separate plot-type, F0-scale, and secondary-parameter controls. Choose F0 + secondary parameter, F0 only, Intensity only, or Nothing (no contour).
 
 By default, images are saved to a folder on your desktop called "AERoPlot_Images"
 

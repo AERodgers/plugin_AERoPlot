@@ -11,11 +11,11 @@
 # | github  | github.com/AERodgers
 
 ### C3POGRAM
-    # This script draws a pitch contour with a spectrogram and single textgrid reference tier (if
-    # grid and tier are specified). A secondary parameter determines the size and and intensity of
-    # the pitch contour points. Cut-off  points are built into the functions, below or above which
-    # the F0 contour is shown with a red dot. (NB: For H1-H2, lower values are indicated by larger
-    # circles and more intense colour.)
+    # This script draws a selected contour with a spectrogram and single textgrid reference tier
+    # (if grid and tier are specified). C3POgram plots use a secondary parameter to determine the
+    # size and intensity of pitch points. Cut-off points are built into the functions, below or
+    # above which the F0 contour is shown with a red dot. (NB: For H1-H2, lower values are indicated
+    # by larger circles and more intense colour.)
     #
     # It is written as a set of procedures so can be implemented in other scripts, while other
     # functions (e.g. @pitch and @h1h2) can be replaced with alternative estimation algorithms.
@@ -69,21 +69,20 @@ form c3pogram
     natural maxF0 400
     real mindB 30
     real maxdB 90
-    choice Scale 2
+    comment Select the contour to draw.
+    choice Plot_type 1
+        option F0 + secondary parameter
+        option F0 only
+        option Intensity only
+        option Nothing
+    choice F0_scale 2
         option Hertz
         option Semitones re 1 Hz
-        option Intensity
-    choice Parameter_two 1
+    choice Secondary_parameter 1
         option Cepstral Peak Prominence
         option Residual of intensity (linear regression)
         option H1-H2 of differentiated glottal pulse (LPC-IF)
         option Harmonicity (Praat function)
-        option F0 only
-        option Nothing
-    comment CPP appears to reflect more intuitive expectations of contour.
-    comment Residual of linear regression of intensity used to compensate for global declination.
-    comment H1-H2 estimation is very basic. It also emphasises very tense / creaky stretches
-    comment Harmonicity seems to reflects spectral balance (higher values for approximants, nasals)
 endform
 
 #Get sound and textgrid data
@@ -107,7 +106,7 @@ if title$ = ""
     title$ = selected$("Sound")
     title$ = replace_regex$ (title$, "[%#\^_]", "\\& ", 0)
 endif
-@c3pogram: parameter_two, scale, paint_spectrogram, title$,
+@c3pogram: plot_type, secondary_parameter, f0_scale, paint_spectrogram, title$,
     ... grid, sound, pitch_obj, use_tier,
     ... minF0, maxF0, mindB, maxdB, window_width, smoothing
 
@@ -116,7 +115,7 @@ selectObject: original_state#
 
 
 # C3POGRAM FUNCTIONS
-procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
+procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .title$,
     ... .grid, .sound, .pitch_two, .tier,
     ...  .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
 
@@ -179,38 +178,42 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
     Marks bottom every: 1, 0.1, "no", "yes", "no"
     Text bottom: "yes", "Time (secs)"
 
-    # get pitch table
-    @pitch: .sound, .minF0, .maxF0
-    @pitch2Table: pitch.obj, 0
-    selectObject: pitch2Table.table
-    Rename: "pitch"
-
-    # get second VQ table
-    .secondParam$[1] = "cpp"
-    .secondParam$[2] = "intensity"
-    .secondParam$[3] = "h1h2"
-    .secondParam$[4] = "harmonicity"
-    .secondParam$[5] = "f0"
-    .secondParam$[6] = "nothing"
-    .name$ = .secondParam$[.param2]
-    if .param2 = 1
-        @cpp: .sound, .minF0, .maxF0, pitch2Table.table
-    elsif .param2 = 2
-        @intensity: .sound, .minF0, .minT, .maxT
-    elsif .param2 = 3
-        @h1h2: .sound, pitch2Table.table
-        selectObject: h1h2.table
-        Formula: "value", "-self"
-    elsif .param2 = 4
-        @harmonicity: .sound, .minF0
-    else
-        '.name$'.table = 0
+    if .plotType = 1 or .plotType = 2
+        # get pitch table
+        @pitch: .sound, .minF0, .maxF0
+        @pitch2Table: pitch.obj, 0
+        selectObject: pitch2Table.table
+        Rename: "pitch"
     endif
-    .vqTable = '.name$'.table
 
-    # draw cp3ogram
-    #intensity hack
-    if .param2 = 5
+    if .plotType = 1
+        # get second VQ table
+        .secondParam$[1] = "cpp"
+        .secondParam$[2] = "intensity"
+        .secondParam$[3] = "h1h2"
+        .secondParam$[4] = "harmonicity"
+        .name$ = .secondParam$[.param2]
+        if .param2 = 1
+            @cpp: .sound, .minF0, .maxF0, pitch2Table.table
+        elsif .param2 = 2
+            @intensity: .sound, .minF0, .minT, .maxT
+        elsif .param2 = 3
+            @h1h2: .sound, pitch2Table.table
+            selectObject: h1h2.table
+            Formula: "value", "-self"
+        elsif .param2 = 4
+            @harmonicity: .sound, .minF0
+        endif
+        .vqTable = '.name$'.table
+    else
+        .vqTable = 0
+    endif
+
+    # draw selected contour
+    if .plotType = 1
+        @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
+        ... .maxF0, .param2, .hz_ST, .vpWidth
+    elsif .plotType = 2
         if .pitch_two
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
             ... .vpWidth, pitch.obj, .smoothing, "Silver"
@@ -222,17 +225,12 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
             @draw_f0_line: .hz_ST, .minT, .maxT, .minF0, .maxF0,
             ... .vpWidth, pitch.obj, .smoothing, "Blue"
         endif
-    elsif .param2 != 6
-        if .hz_ST != 3
-            @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
-            ... .maxF0, .param2, .hz_ST, .vpWidth
-        else
-            @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
-        endif
+    elsif .plotType = 3
+        @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB, .vpWidth
     endif
 
-    # add pitch axis information
-    if .param2 != 6
+    # add contour axis information
+    if .plotType = 1 or .plotType = 2
         Select outer viewport: 0, .vpWidth, 0, 3.35
         if .hz_ST = 2
             .leftMajor = 5
@@ -242,19 +240,18 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
             .leftMajor = 50
             .leftText$ = "F0 (Hz)"
         endif
-        if .hz_ST < 3
-            Line width: 2
-            Marks left every: 1, .leftMajor, "yes", "yes", "no"
-            Line width: 1
-            Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
-            Text left: "yes", .leftText$
-        else
-            Line width: 2
-            Marks left every: 1, 10, "yes", "yes", "no"
-            Line width: 1
-            Marks left every: 1, 2, "no", "yes", "no"
-            Text left: "yes", "Intensity (dB)"
-        endif
+        Line width: 2
+        Marks left every: 1, .leftMajor, "yes", "yes", "no"
+        Line width: 1
+        Marks left every: 1, .leftMajor / 5, "no", "yes", "no"
+        Text left: "yes", .leftText$
+    elsif .plotType = 3
+        Select outer viewport: 0, .vpWidth, 0, 3.35
+        Line width: 2
+        Marks left every: 1, 10, "yes", "yes", "no"
+        Line width: 1
+        Marks left every: 1, 2, "no", "yes", "no"
+        Text left: "yes", "Intensity (dB)"
     endif
 
     # add title
@@ -268,15 +265,20 @@ procedure c3pogram: .param2, .hz_ST, .paintSpect, .title$,
     nowarn Text top: "yes", "##" + .title$
     Font size: 10
 
-    selectObject: pitch2Table.table
-    plusObject: pitch.obj
-    if .vqTable
-        plusObject: .vqTable
+    if .plotType = 1 or .plotType = 2
+        selectObject: pitch2Table.table
+        plusObject: pitch.obj
+        if .vqTable
+            plusObject: .vqTable
+        endif
+        if .grid * .tier > 0
+            plusObject: .refTier
+        endif
+        Remove
+    elsif .grid * .tier > 0
+        selectObject: .refTier
+        Remove
     endif
-    if .grid * .tier > 0
-        plusObject: .refTier
-    endif
-    Remove
 endproc
 
 procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
@@ -506,8 +508,8 @@ procedure intensity: .sound, .minF0, .minT, .maxT
 
     selectObject: .table
     Formula: "value",
-    "self[""value""] - (self[""time""] * " +
-    "tableStats.slope + tableStats.intercept)"
+    ... "self[""value""] - (self[""time""] * " +
+    ... "tableStats.slope + tableStats.intercept)"
 endproc
 
 procedure cpp: .sound, .minF0, .maxF0, .pitchTable
