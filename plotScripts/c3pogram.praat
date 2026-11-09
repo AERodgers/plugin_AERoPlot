@@ -78,7 +78,7 @@ form c3pogram
         option Residual of intensity (linear regression)
         option H1-H2 of differentiated glottal pulse (LPC-IF)
         option Harmonicity (Praat function)
-        option F0 only
+        option Nothing
     comment CPP appears to reflect more intuitive expectations of contour.
     comment Residual of linear regression of intensity used to compensate for global declination.
     comment H1-H2 estimation is very basic. It also emphasises very tense / creaky stretches
