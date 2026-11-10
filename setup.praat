@@ -119,6 +119,14 @@ Add action command:
 ... "AERoPlot", 0,
 ... "plotScripts/nestedTiers2Table.praat"
 
+Add action command:
+... "Sound", 1,
+... "TextGrid", 1,
+... "", 0,
+... "Create Table (Windows UI prototype)...",
+... "AERoPlot", 0,
+... "plotScripts/windowsTablePrototype.praat"
+
 
 Add action command:
 ... "Sound", 1,

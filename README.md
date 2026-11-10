@@ -78,6 +78,89 @@ For formants-over-time plots with relative time, each combination of main factor
 
 The Praat scripts in [tests](tests) provide batch tests for C3PoGram, shared helpers, and image saving. They can be run with Praat's `--run` option; `--no-plugins --no-pref-files` avoids loading installed plug-ins or changing preferences during testing. The image-save test takes an absolute path to a test folder that does not yet exist and leaves its test files there for inspection and removal.
 
+## Experimental Windows Table interface
+
+This branch contains a **proof of concept**, not a finished installer. It adds
+**Create Table (Windows UI prototype)...** alongside the existing action when a
+Sound and TextGrid are selected. The dialog lists the actual tier names and
+creates a Table in the same Praat session. The original action remains
+available for formant extraction and its other options.
+
+To try this source version on Windows:
+
+1. Use Praat 6.4.60 or newer. The prototype was tested with Praat 6.4.60.
+2. Before copying the plugin to the Praat preferences folder, double-click
+   `windows-ui\build.cmd` in the extracted plugin folder. It compiles the dialog
+   using the .NET Framework 4 compiler included with many Windows installations;
+   the compiler must be present. The generated executable is not included in
+   source downloads. If building fails, the original Praat-only action remains
+   available.
+3. Copy the complete folder, including `windows-ui\bin`, into the Praat
+   preferences folder as described above and restart Praat. Select one Sound
+   and one TextGrid, then select the prototype action under **AERoPlot**.
+
+Choose a base tier and, optionally, additional tiers. Additional tiers are
+processed in their TextGrid order. Only table extraction is supported in this
+prototype; there is no formant extraction or saved settings yet. Tier names
+must be unique and cannot be empty, contain leading/trailing or repeated
+spaces, commas, quotes, wildcard characters, tabs or line breaks. Table names
+must start with an English letter and use only English letters, digits and
+underscores. The prototype cannot handle very long lists of tier names. Use the
+original action if these restrictions are unsuitable.
+
+Praat waits while the Windows dialog is open, so its windows will not respond
+until the dialog is closed. Cancel leaves the original selection intact. If
+Praat is forcibly closed while the dialog is open, close the dialog separately.
+This synchronous design avoids sending a command to a different Praat session,
+but needs further usability and error-handling work before release.
+
+The interactive tests in [tests](tests) exercise the dialog, cancellation and
+nested tiers; they require Windows, a built executable under an isolated
+`--pref-dir` in `plugin_AERoPlot/windows-ui/bin`, and user or UI automation
+interaction. They are separate from the existing batch tests.
+
+The example comparison test runs both interfaces on the example Sound and
+TextGrid and compares the complete tab-separated Tables. It requires a Praat
+GUI and an `AEROPLOT_TEST_RESULT` environment variable containing an absolute
+path in a test directory; it writes the result and two `.tsv` files there. Run
+it once with its `Base tier times only` argument set to `yes` and once with
+`no`, using a different unused result path each time. In both dialogs choose
+`Element` as the base tier and `Speaker`,
+`Context`, and `Segment` as additional tiers, in that order. In the original
+dialog, name the Table `native_comparison`, choose no formants, and clear the
+point-tier and vowel-duration fields. Match the timing checkbox to the script
+argument in both dialogs. The test expects 35 rows and either 5 or 9 columns.
+
+### Asynchronous integration experiment
+
+The separate [isolated test](tests/windows_async_isolated.ps1) investigates
+whether Praat can remain responsive while a companion dialog is open. It is
+not a user-facing action. On Windows, with Praat and the .NET Framework 4
+compiler installed, run it from the repository root in an interactive desktop:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows_async_isolated.ps1 -Praat "C:\Program Files\Praat\Praat.exe" -TestDirectory "C:\path\to\new-test-directory"
+```
+
+Choose a test directory that does not exist. The test creates it, copies Praat
+into separate instance directories, builds a test helper there, and leaves
+these files for inspection. It opens and controls several Praat and dialog
+windows; avoid interacting with them during the test.
+
+The test checks responsiveness, changed selection, two overlapping dialogs,
+cancellation, errors after either original object is removed, and the test
+driver refusing to send to a closed Praat process. The driver, not the helper,
+delivers callbacks and checks whether Praat has closed; the helper does not
+automatically close when Praat exits. The callback creates a simple test Table,
+not the complete AERoPlot output.
+
+Each test instance has its own preferences directory. Praat's Windows messaging
+uses a shared `Message.txt`, so targeting a specific window is not sufficient
+to avoid interference between normal instances or other senders. Safe callback
+delivery, automatic helper lifecycle, simultaneous callbacks using shared
+preferences, and edits to input objects while the dialog is open remain
+unresolved. The synchronous prototype above remains the only available action.
+
 ## Legacy Manual
 
 [v1.4 PDF manual](AERoPlot_v.1.4_Manual.pdf) remains available as a guide to plotting options, but its installation instructions, menus, and some features may be outdated. Use this README for current installation and access instructions. The [editable Word version](AERoPlot_v.1.4_Manual.docx) is also included for a future update.

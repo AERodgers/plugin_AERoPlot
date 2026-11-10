@@ -9,11 +9,13 @@
 # email:     antoin.rodgers@tcd.ie
 # github:    github.com/AERodgers
 
-@checkPraatVersion
-firstPass = 1
-@objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
-@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
-@main
+if not variableExists("aeroPrototypeInclude")
+    @checkPraatVersion
+    firstPass = 1
+    @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
+    @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
+    @main
+endif
 
 procedure main
     .curVersion$ = "1.5.0.2"
@@ -152,6 +154,7 @@ procedure ui
     .gridID$ = textgrid_address_or_object_number$
     .lowestTier$ = base_tier$
     .otherTiers$ = other_tiers_to_process$
+    .baseTierTimeOnly = base_tier_times_only
     .output$ = replace_regex$(new_table_name$, "^.*", "\l&", 1)
     .output$ = replace_regex$(.output$, "^[0-9].*", "num_&", 1)
     .output$ = replace_regex$(.output$, "[^a-zA-Z0-9]", "_", 0)
