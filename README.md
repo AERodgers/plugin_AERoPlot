@@ -49,6 +49,8 @@ In Praat's Objects window:
 
 When both a Sound and TextGrid are selected, C3PoGram offers separate dropdowns for the interval tier used to crop the plot to its first and last non-empty intervals, and the tier shown with the spectrogram. Point tiers are available for display but not cropping. Choose **Do not crop** to use the full Sound duration, or **No TextGrid** in the display menu to hide the tier. The boundary checkbox controls dotted extensions of tier boundaries or points over the plot; separators in the tier itself remain visible. The TextGrid font can be selected independently; **Times** uses Praat's Times serif face. Axis and TextGrid text use 12 pt, and the title uses 16 pt. Without a selected TextGrid, the TextGrid controls are hidden and the full Sound duration is used. C3PoGram remembers the boundary checkbox and other general settings between sessions; TextGrid tier selections and font are not remembered.
 
+Choose **Draw** to draw and reopen the settings with all choices intact, including TextGrid choices for the current run. Each redraw replaces the previous picture. Choose **Draw & Exit** to draw and finish, or **Cancel** to finish without drawing again.
+
 You can also practise using the formant Datasets from the Literature, which are baked into Praat (`New --> Table --> Datasets from the literature`). For example, if you use the Peterson and Barney (1952) dataset, use the columns "IPA", "Type", and "Sex" as grouping factors.
 
 
@@ -78,7 +80,7 @@ C3PoGram and optional formant extraction from a TextGrid warn before processing 
 
 For formants-over-time plots with relative time, each combination of main factor and repetition must have exactly one row for the chosen reference element. If repetitions are present, provide a repetition column; missing or duplicate reference times are reported instead of producing incorrectly aligned data.
 
-The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus an interactive C3PoGram smoke test. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the C3PoGram smoke test from Praat's GUI; its settings window requires choosing **Draw** or **Cancel**.
+The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus an interactive C3PoGram smoke test. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the C3PoGram smoke test from Praat's GUI; its settings window requires choosing **Draw**, **Draw & Exit**, or **Cancel**.
 
 ## Legacy Manual
 

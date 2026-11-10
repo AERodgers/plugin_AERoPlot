@@ -163,6 +163,10 @@
     endif
     selectObject: original_state#
 
+    longRecordingConfirmed = 0
+    repeat
+    minimum_F0 = minimum_f0
+    maximum_F0 = maximum_f0
     beginPause: "C3PoGram settings"
     sentence: "Image title", image_title$
     comment: "Display settings: F0-only smoothing; width in inches"
@@ -171,8 +175,8 @@
     boolean: "Draw sound waveform", draw_sound_waveform
     positive: "Window width", window_width
     comment: "F0 limits (Hz) and intensity limits (dB)"
-    natural: "Minimum F0", minimum_f0
-    natural: "Maximum F0", maximum_f0
+    natural: "Minimum F0", minimum_F0
+    natural: "Maximum F0", maximum_F0
     real: "Minimum dB", minimum_dB
     real: "Maximum dB", maximum_dB
     comment: "Select the contour and, for F0 + secondary parameter, its measure."
@@ -215,11 +219,13 @@
             option: "Courier"
         boolean: "Show TextGrid boundaries", show_TextGrid_boundaries
     endif
-    clicked = endPause: "Cancel", "Draw", 2, 1
+    clicked = endPause: "Cancel", "Draw", "Draw & Exit", 3, 1
     if clicked = 1
         selectObject: original_state#
         exit
     endif
+    minimum_f0 = minimum_F0
+    maximum_f0 = maximum_F0
     @writeVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "c3pogram.var"
     selectObject: original_state#
 
@@ -269,10 +275,13 @@ if sound and grid
         display_tier_id = display_tier - 1
     endif
 endif
-@warnLongRecording: sound
-if not warnLongRecording.proceed
-    selectObject: original_state#
-    exit
+if not longRecordingConfirmed
+    @warnLongRecording: sound
+    if not warnLongRecording.proceed
+        selectObject: original_state#
+        exit
+    endif
+    longRecordingConfirmed = 1
 endif
 
 # Calculate viewport boundaries for the selected tier and waveform.
@@ -312,6 +321,7 @@ endif
     ... minimum_dB, maximum_dB, window_width, smoothing
 
 selectObject: original_state#
+until clicked = 3
 
 
 # C3POGRAM FUNCTIONS
