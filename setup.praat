@@ -115,7 +115,7 @@ Add action command:
 ... "Sound", 1,
 ... "TextGrid", 1,
 ... "", 0,
-... "Create data table from nested textgrid tiers...",
+... "Create Table from nested TextGrid tiers",
 ... "AERoPlot", 0,
 ... "plotScripts/nestedTiers2Table.praat"
 
@@ -124,7 +124,7 @@ Add action command:
 ... "Sound", 1,
 ... "TextGrid", 1,
 ... "", 0,
-... "C3P-o-Gram...",
+... "C3P-o-Gram",
 ... "", 0,
 ... "plotScripts/c3pogram.praat"
 

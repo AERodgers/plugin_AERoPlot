@@ -1,44 +1,74 @@
 # AERoPlot - a Praat plug-in for plotting data
 
-AERoPlot allows you to generate elegant plots from data in Praat.
+AERoPlot allows you to generate elegant plots from data in Praat. It can create four types of figure.
 
+## **Download and installation**
 To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is recommended. The plugin's version check accepts Praat 6.0.60 or later, but compatibility with all older versions has not been verified.
 
 1. Download this repository as a ZIP and unzip it.
-2. Copy the extracted **plugin_AERoPlot-master** folder and *all* its contents into the **Praat preferences folder**. (The folder name may differ if the ZIP was downloaded from a different branch.)
+
+2. Copy the extracted **plugin_AERoPlot** folder and *all* its contents into the **Praat preferences folder**.  
+    - The folder name may differ if the ZIP was downloaded from a different branch.
+    - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
 
-    ([Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.)
+## **Functionality**
 
+### **C3P-o-grams**
+The contextual **C3P-o-gram** menu appears when you select a Sound object or Sound + TextGrid object together.
+
+This can generate an **F0 contour** and a possible **secondary parameter** represented by point size and colour intensity.
+
+Possible secondary parameters include:
+
+* **Cepstral peak prominence (CPP)**
+* **Intensity residual**
+* **H1-H2 of the differentiated glottal pulse**
+* **Harmonicity**
+
+It can also draw the **intensity contour** alone or just the **spectrogram (and waveform)** without any contour.
+ 
+### **Plots from data tables**
+
+Create three plot types from tables generated with **Create Table from nested TextGrid tiers**, or from any well-formed, compatible table or table file:
+
+* **F1–F2 plots**
+* **Formant plots** (2+ formants; called “Ladefoed plots” here)
+* **Formants-over-time plots** (similar to Ladefoed plots, with time on the x-axis)
+
+Tables created from **Create Table from nested TextGrid tiers** are very useful for extracting standard acoustic and TextGrid parameters.
+
+## A Quick tutorial using the sample data  
 In Praat's Objects window:
-* Select a **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
-* Select a **Sound** to access **C3P-o-Gram**, or select a Sound and TextGrid to include a TextGrid tier. With both selected, **AERoPlot** also offers conversion of nested TextGrid tiers to a data table.
-* Use **New > AERoPlot > Load example sound and text grid...** to load the example Sound and TextGrid.
+* Use **New > AERoPlot > Load example sound and text grid** to load the example Sound and TextGrid.
+* Select both the Sound and TextGrid objects
+* Use **Create Table from nested TextGrid tiers** to convert the nested TextGrid tiers to a data table
+* Select the **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
+* Select a **Sound** to access **C3P-o-Gram**, or select a Sound and TextGrid to include a TextGrid tier.
+(Note this is more suited to short sound files rather than the full sample data files.)
 
-There are currently four plot types:
-1. F1-F2 plots;
-2. Formant plots for showing 2+ formants (called "Ladefoged plots" here);
-3. Formants-over-time plots, similar to the Ladefoged plots, but with time on the x axis;
-   NB: This function is undergoing repairs and its full interactive workflow still needs validation.
-4. C3P-o-grams, which can plot F0 contours with a secondary parameter indicated by point size and colour intensity: cepstral peak prominence (CPP), intensity residual, H1-H2 of the differentiated glottal pulse, or harmonicity.
+You can also practise using the formant Datasets from the Literature, which are baked into Praat (`New --> Table --> Datasets from the literature`). For example, if you use the Peterson and Barney (1952) dataset, use the columns "IPA", "Type", and "Sex" as grouping factors.
 
+
+## Saving Images
 The F1-F2, Ladefoged, and Formants-over-time plots save PNG images, when requested, to `plugin_AERoPlot/data/AERoPlot_Images` inside your [Praat preferences folder](https://praat.org/manual/preferences_folder.html). The **Save folder** field accepts an absolute path and is remembered separately for each plot type; leave it blank to restore the default. Existing saved folder settings are retained until changed or cleared. Missing folders are created when saving, and existing image files are preserved by adding a numbered suffix. The **Save name** field is a filename, not a path; `.png` is added if needed.
 
 C3PoGram draws in Praat's Picture window; use the Picture window's save or export commands to save it.
 
-The plugin has functionality, including:
+## Quality of Life
+The plugin has several quality of life features, including:
  * the ability to display Hertz logarithmically or along the bark scale;
  * memory - menus remember your choices from across different sessions;
- * an automatic legend function, which choses the optimal location for the plot on the chart;
+ * an automatic legend function, which chooses the optimal location for the plot on the chart;
  * several colour palette choices and colour sorting methods (default, by in order of maximal difference in the colour space, etc.);
  * cross-hatching to help distinguish elements;
  * shading and outlining of text and plot elements to make them more readable;
  * the ability to categorise data by main and sub categories and to use tertiary filters to exclude unnecessary data;
  * a high degree of customisability for displaying / hiding many plot elements.
 
-There are quite a few not-so-obvious quality-of-life features and many ways to customise your plot in terms of content and appearance. Controls are kept compact to avoid menu bloat.
+There are quite a few other not-so-obvious quality-of-life features and many ways to customise your plot in terms of content and appearance. Controls are kept compact to avoid menu bloat.
 
-**Legacy manual:** The [v1.4 PDF manual](AERoPlot_v.1.4_Manual.pdf) remains available as a guide to plotting options, but its installation instructions, menus, and some features may be outdated. Use this README for current installation and access instructions. The [editable Word version](AERoPlot_v.1.4_Manual.docx) is also included for a future update.
+## Useful Things to know 
 
 C3PoGram can draw an F0 contour with or without a secondary parameter, intensity alone, or a background without a contour. The spectrogram and waveform can be enabled separately. Lower H1-H2 values produce larger, more saturated points. The time-axis tick spacing adjusts to the displayed duration. Window width controls the plot width in inches; spectrogram pre-emphasis is fixed at 8 dB/octave. C3PoGram scales the selected Sound object to 70 dB in Praat; this does not change the original sound file.
 
@@ -48,15 +78,15 @@ For formants-over-time plots with relative time, each combination of main factor
 
 The Praat scripts in [tests](tests) provide batch tests for C3PoGram, shared helpers, and image saving. They can be run with Praat's `--run` option; `--no-plugins --no-pref-files` avoids loading installed plug-ins or changing preferences during testing. The image-save test takes an absolute path to a test folder that does not yet exist and leaves its test files there for inspection and removal.
 
-Try the [sample datasets](example), including the Peterson and Barney (1952) table. Load a table into Praat and select it before choosing a table plot. For the Peterson and Barney data, use the columns "IPA", "Type", and "Sex" as grouping factors. When running a table-plot script without a selected Table, entering `0` in its object-number or file-path field also loads the Peterson and Barney data.
+## Legacy Manual
+
+[v1.4 PDF manual](AERoPlot_v.1.4_Manual.pdf) remains available as a guide to plotting options, but its installation instructions, menus, and some features may be outdated. Use this README for current installation and access instructions. The [editable Word version](AERoPlot_v.1.4_Manual.docx) is also included for a future update.
 
 
-Known issues / future plans:
-* ~~The option to display only outliers in the box plot component of the Ladefoged does not function yet.~~
-* ~~The add / change colour options is not storing changes as intended.~~
+## Known issues / future plans:
 * The full interactive Formants over Time workflow still needs validation.
 * There will be an easily accessible archive function to make facilitate the reproduction and alteration of previous plots.
-* Intelligibilty / intuitiveness of menus will be improved (feedback much appreciated and needed here).
+* Intelligibility / intuitiveness of menus will be improved (feedback much appreciated and needed here).
 ___
 
 The plugin is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
