@@ -1,4 +1,4 @@
-# This smoke test is interactive because C3PoGram now uses a pause window.
+# This smoke test is interactive because PitchPlus uses a pause window.
 # Run with the words tier displayed and crop set to Do not crop. Check that the
 # tier touches the plot and its boundaries align with the corresponding times.
 # Repeat with Show TextGrid boundaries off and on: only the dotted extensions
@@ -16,8 +16,8 @@ Set interval text: 1, 2, "word"
 Insert point: 2, 0.2, "point"
 
 selectObject: sound, grid
-runScript: "../plotScripts/c3pogram.praat"
+runScript: "../plotScripts/pitch_plus.praat"
 assert selected("Sound") = sound
 assert selected("TextGrid") = grid
 removeObject: {sound, grid}
-writeInfoLine: "C3PoGram interactive smoke test passed."
+writeInfoLine: "PitchPlus interactive smoke test passed."

@@ -1,6 +1,6 @@
 
-# C3POGRAM   V.1.4.0
-# ==================
+# PitchPlus
+# =============
 # Written for Praat 6.0.60 or later
 #
 # This version is included as a feature of the AERoplot plugin.
@@ -10,9 +10,9 @@
 # | email   | antoin.rodgers@tcd.ie
 # | github  | github.com/AERodgers
 
-### C3POGRAM
+### PitchPlus
     # This script draws a selected contour with a spectrogram and single textgrid reference tier
-    # (if grid and tier are specified). C3POgram plots use a secondary parameter to determine the
+    # (if grid and tier are specified). PitchPlus uses a secondary parameter to determine the
     # size and intensity of pitch points. Cut-off points are built into the functions, below or
     # above which the F0 contour is shown with a red dot. (NB: For H1-H2, lower values are indicated
     # by larger circles and more intense colour.)
@@ -71,7 +71,7 @@
     if numberOfSelected("Sound") > 0
         sound = selected("Sound")
     else
-        exitScript: "Select a Sound object before running C3PoGram."
+        exitScript: "Select a Sound object before running " + plot_interface$ + "."
     endif
     if numberOfSelected("TextGrid") > 0
         grid = selected("TextGrid")
@@ -119,47 +119,55 @@
     textGrid_font = 1
     show_TextGrid_boundaries = 0
 
-    c3pogramPluginDir$ = preferencesDirectory$ + "/plugin_AERoPlot"
-    if !folderExists(c3pogramPluginDir$)
-        createFolder: c3pogramPluginDir$
+    pitch_plus_plugin_dir$ = preferencesDirectory$ + "/plugin_AERoPlot"
+    if !folderExists(pitch_plus_plugin_dir$)
+        createFolder: pitch_plus_plugin_dir$
     endif
-    c3pogramDataDir$ = c3pogramPluginDir$ + "/data"
-    if !folderExists(c3pogramDataDir$)
-        createFolder: c3pogramDataDir$
+    pitch_plus_data_dir$ = pitch_plus_plugin_dir$ + "/data"
+    if !folderExists(pitch_plus_data_dir$)
+        createFolder: pitch_plus_data_dir$
     endif
-    c3pogramVarsDir$ = c3pogramDataDir$ + "/vars"
-    if !folderExists(c3pogramVarsDir$)
-        createFolder: c3pogramVarsDir$
+    pitch_plus_vars_dir$ = pitch_plus_data_dir$ + "/vars"
+    if !folderExists(pitch_plus_vars_dir$)
+        createFolder: pitch_plus_vars_dir$
     endif
-    c3pogramVars$ = preferencesDirectory$ +
-    ... "/plugin_AERoPlot/data/vars/c3pogram.var"
-    if !fileReadable(c3pogramVars$)
-        writeFileLine: c3pogramVars$, "variable", tab$, "value"
-        appendFileLine: c3pogramVars$, "image_title$", tab$, image_title$
-        appendFileLine: c3pogramVars$, "smoothing", tab$, smoothing
-        appendFileLine: c3pogramVars$, "paint_spectrogram", tab$, paint_spectrogram
-        appendFileLine: c3pogramVars$, "draw_sound_waveform", tab$, draw_sound_waveform
-        appendFileLine: c3pogramVars$, "window_width", tab$, window_width
-        appendFileLine: c3pogramVars$, "minimum_f0", tab$, minimum_f0
-        appendFileLine: c3pogramVars$, "maximum_f0", tab$, maximum_f0
-        appendFileLine: c3pogramVars$, "minimum_dB", tab$, minimum_dB
-        appendFileLine: c3pogramVars$, "maximum_dB", tab$, maximum_dB
-        appendFileLine: c3pogramVars$, "plot_type", tab$, plot_type
-        appendFileLine: c3pogramVars$, "f0_scale", tab$, f0_scale
-        appendFileLine: c3pogramVars$, "secondary_parameter", tab$, secondary_parameter
-        appendFileLine: c3pogramVars$, "font", tab$, font
-        appendFileLine: c3pogramVars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
+    pitch_plus_vars$ = pitch_plus_vars_dir$ + "/pitch_plus.var"
+    if !fileReadable(pitch_plus_vars$)
+        legacy_vars$ = pitch_plus_vars_dir$ + "/pitch_plot_plus.var"
+        if !fileReadable(legacy_vars$)
+            legacy_vars$ = pitch_plus_vars_dir$ + "/c3pogram.var"
+        endif
+        if fileReadable(legacy_vars$)
+            writeFile: pitch_plus_vars$, readFile$(legacy_vars$)
+        endif
     endif
-    @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "c3pogram.var"
+    if !fileReadable(pitch_plus_vars$)
+        writeFileLine: pitch_plus_vars$, "variable", tab$, "value"
+        appendFileLine: pitch_plus_vars$, "image_title$", tab$, image_title$
+        appendFileLine: pitch_plus_vars$, "smoothing", tab$, smoothing
+        appendFileLine: pitch_plus_vars$, "paint_spectrogram", tab$, paint_spectrogram
+        appendFileLine: pitch_plus_vars$, "draw_sound_waveform", tab$, draw_sound_waveform
+        appendFileLine: pitch_plus_vars$, "window_width", tab$, window_width
+        appendFileLine: pitch_plus_vars$, "minimum_f0", tab$, minimum_f0
+        appendFileLine: pitch_plus_vars$, "maximum_f0", tab$, maximum_f0
+        appendFileLine: pitch_plus_vars$, "minimum_dB", tab$, minimum_dB
+        appendFileLine: pitch_plus_vars$, "maximum_dB", tab$, maximum_dB
+        appendFileLine: pitch_plus_vars$, "plot_type", tab$, plot_type
+        appendFileLine: pitch_plus_vars$, "f0_scale", tab$, f0_scale
+        appendFileLine: pitch_plus_vars$, "secondary_parameter", tab$, secondary_parameter
+        appendFileLine: pitch_plus_vars$, "font", tab$, font
+        appendFileLine: pitch_plus_vars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
+    endif
+    @readVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
     hasBoundarySetting = 0
-    for settingIndex to c3pogramNumVars
-        if c3pogramVar$[settingIndex] = "show_TextGrid_boundaries"
+    for settingIndex to pitch_plusNumVars
+        if pitch_plusVar$[settingIndex] = "show_TextGrid_boundaries"
             hasBoundarySetting = 1
         endif
     endfor
     if not hasBoundarySetting
-        appendFileLine: c3pogramVars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
-        @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "c3pogram.var"
+        appendFileLine: pitch_plus_vars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
+        @readVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
     endif
     selectObject: original_state#
 
@@ -167,32 +175,38 @@
     repeat
     minimum_F0 = minimum_f0
     maximum_F0 = maximum_f0
-    beginPause: "C3PoGram settings"
+    beginPause: plot_interface$ + " settings"
     sentence: "Image title", image_title$
-    comment: "Display settings: F0-only smoothing; width in inches"
-    natural: "Smoothing", smoothing
-    boolean: "Paint spectrogram", paint_spectrogram
+    if not spectrogram_only
+        comment: "Display settings: F0-only smoothing; width in inches"
+        natural: "Smoothing", smoothing
+        boolean: "Paint spectrogram", paint_spectrogram
+    else
+        comment: "Display settings: width in inches"
+    endif
     boolean: "Draw sound waveform", draw_sound_waveform
     positive: "Window width", window_width
-    comment: "F0 limits (Hz) and intensity limits (dB)"
-    natural: "Minimum F0", minimum_F0
-    natural: "Maximum F0", maximum_F0
-    real: "Minimum dB", minimum_dB
-    real: "Maximum dB", maximum_dB
-    comment: "Select the contour and, for F0 + secondary parameter, its measure."
-    optionMenu: "Plot type", plot_type
-        option: "F0 + secondary parameter"
-        option: "F0 only"
-        option: "Intensity only"
-        option: "Background only"
-    optionMenu: "F0 scale", f0_scale
-        option: "Hertz"
-        option: "Semitones re 1 Hz"
-    optionMenu: "Secondary parameter", secondary_parameter
-        option: "Cepstral Peak Prominence"
-        option: "Residual of intensity (linear regression)"
-        option: "H1-H2 of differentiated glottal pulse (LPC-IF)"
-        option: "Harmonicity (Praat function)"
+    if not spectrogram_only
+        comment: "F0 limits (Hz) and intensity limits (dB)"
+        natural: "Minimum F0", minimum_F0
+        natural: "Maximum F0", maximum_F0
+        real: "Minimum dB", minimum_dB
+        real: "Maximum dB", maximum_dB
+        comment: "Select the contour and, for F0 + secondary parameter, its measure."
+        optionMenu: "Plot type", plot_type
+            option: "F0 + secondary parameter"
+            option: "F0 only"
+            option: "Intensity only"
+            option: "Background only"
+        optionMenu: "F0 scale", f0_scale
+            option: "Hertz"
+            option: "Semitones re 1 Hz"
+        optionMenu: "Secondary parameter", secondary_parameter
+            option: "Cepstral Peak Prominence"
+            option: "Residual of intensity (linear regression)"
+            option: "H1-H2 of differentiated glottal pulse (LPC-IF)"
+            option: "Harmonicity (Praat function)"
+    endif
     optionMenu: "Font", font
         option: "Times"
         option: "Helvetica"
@@ -226,8 +240,15 @@
     endif
     minimum_f0 = minimum_F0
     maximum_f0 = maximum_F0
-    @writeVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "c3pogram.var"
+    @writeVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
     selectObject: original_state#
+
+    draw_plot_type = plot_type
+    draw_paint_spectrogram = paint_spectrogram
+    if spectrogram_only
+        draw_plot_type = 4
+        draw_paint_spectrogram = 1
+    endif
 
     # The drawing procedures use the global layout_ variables defined here.
     # If reusing these procedures elsewhere, define the required layout_
@@ -245,13 +266,13 @@ layout_waveform_margin = layout_inner_margin
 layout_title_height = 0.55
 
 # Validate before modifying the selected Sound or creating analysis objects.
-if (plot_type = 1 or plot_type = 2 or plot_type = 3) and minimum_f0 <= 0
+if (draw_plot_type = 1 or draw_plot_type = 2 or draw_plot_type = 3) and minimum_f0 <= 0
     exitScript: "Minimum F0 must be greater than zero."
 endif
-if (plot_type = 1 or plot_type = 2) and maximum_f0 <= minimum_f0
+if (draw_plot_type = 1 or draw_plot_type = 2) and maximum_f0 <= minimum_f0
     exitScript: "Maximum F0 must be greater than minimum F0."
 endif
-if plot_type = 3 and maximum_dB <= minimum_dB
+if draw_plot_type = 3 and maximum_dB <= minimum_dB
     exitScript: "Maximum intensity must be greater than minimum intensity."
 endif
 if window_width <= 0
@@ -314,7 +335,7 @@ if title$ = ""
     title$ = replace_regex$ (title$, "[%#\^_]", "\\& ", 0)
 endif
 
-@c3pogram: plot_type, secondary_parameter, f0_scale, paint_spectrogram,
+@pitchPlus: draw_plot_type, secondary_parameter, f0_scale, draw_paint_spectrogram,
     ... draw_sound_waveform, font, title$,
     ... grid, sound, pitch_obj, crop_tier_id, display_tier_id,
     ... textGrid_font, show_TextGrid_boundaries, minimum_f0, maximum_f0,
@@ -324,8 +345,8 @@ selectObject: original_state#
 until clicked = 3
 
 
-# C3POGRAM FUNCTIONS
-procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
+# PitchPlus functions
+procedure pitchPlus: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     ... .font, .title$,
     ... .grid, .sound, .pitch_two, .cropTier, .displayTier, .textGridFont,
     ... .showBoundaries, .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
@@ -498,7 +519,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
 
     # draw selected contour
     if .plotType = 1
-        @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
+        @drawPitchPlus: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
         ... .maxF0, .param2, .hz_ST
     elsif .plotType = 2
         if .pitch_two
@@ -570,7 +591,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     endif
 endproc
 
-procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
+procedure drawPitchPlus: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     ... .maxF0, .type, .hz_ST
     selectObject: .pitchTable
     # adjust F0 if pitch scale set to semitones
@@ -630,7 +651,7 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     Font size: 12
     Solid line
 
-    # Draw C3POGRAM points
+    # Draw PitchPlus points
     selectObject: .pitchTable
     .numPitchPts = Get number of rows
     Colour: "Black"
