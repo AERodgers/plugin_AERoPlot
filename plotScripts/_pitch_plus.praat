@@ -1,6 +1,6 @@
 
-# C3POGRAM   V.1.4.0
-# ==================
+# PitchPlus
+# =============
 # Written for Praat 6.0.60 or later
 #
 # This version is included as a feature of the AERoplot plugin.
@@ -10,9 +10,9 @@
 # | email   | antoin.rodgers@tcd.ie
 # | github  | github.com/AERodgers
 
-### C3POGRAM
+### PitchPlus
     # This script draws a selected contour with a spectrogram and single textgrid reference tier
-    # (if grid and tier are specified). C3POgram plots use a secondary parameter to determine the
+    # (if grid and tier are specified). PitchPlus uses a secondary parameter to determine the
     # size and intensity of pitch points. Cut-off points are built into the functions, below or
     # above which the F0 contour is shown with a red dot. (NB: For H1-H2, lower values are indicated
     # by larger circles and more intense colour.)
@@ -55,98 +55,254 @@
     # 1.4.0               - Improved UI appearance and added more comments to code.
     #                     - Added font selection to UI.
     #                     - Added option to include sound waveform in output.
+    # 1.5.0               - Added conditional TextGrid tier menus and interval
+    #                       cropping; replaced the form with a pause window.
 
-form c3pogram
-    sentence Image_title
+    # MAIN SCRIPT
 
-    comment TextGrid tier to display (only used when a TextGrid is selected)
-    natural Use_tier 1
+    @checkPraatVersion
 
-    comment Display settings: F0-only smoothing; width in inches
-    natural Smoothing 999
-    boolean Paint_spectrogram 1
-    boolean Draw_sound_waveform 0
-    positive Window_width 8
-    comment F0 limits (Hz) and intensity limits (dB)
-    natural minF0 60
-    natural maxF0 400
-    real mindB 30
-    real maxdB 90
-    comment Select the contour and, for F0 + secondary parameter, its measure.
-    optionmenu Plot_type 1
-        option F0 + secondary parameter
-        option F0 only
-        option Intensity only
-        option Background only
-    optionmenu F0_scale 2
-        option Hertz
-        option Semitones re 1 Hz
-    optionmenu Secondary_parameter 1
-        option Cepstral Peak Prominence
-        option Residual of intensity (linear regression)
-        option H1-H2 of differentiated glottal pulse (LPC-IF)
-        option Harmonicity (Praat function)
-    optionmenu Font 4
-        option times
-        option helvetica
-        option palatino
-        option courier
-endform
+    # Identify selected objects before building the UI so the TextGrid controls
+    # can be shown only when both a Sound and TextGrid are selected.
+    original_state# = selected#()
+    sound = 0
+    grid = 0
+    pitch_obj = 0
+    if numberOfSelected("Sound") > 0
+        sound = selected("Sound")
+    else
+        exitScript: "Select a Sound object before running " + plot_interface$ + "."
+    endif
+    if numberOfSelected("TextGrid") > 0
+        grid = selected("TextGrid")
+    endif
+    if numberOfSelected("Pitch") > 0
+        pitch_obj = selected("Pitch")
+    endif
 
-# MAIN SCRIPT
+    number_of_tiers = 0
+    crop_tier = 1
+    display_tier = 1
+    if sound and grid
+        selectObject: grid
+        number_of_tiers = Get number of tiers
+        crop_option_index = 1
+        for tier to number_of_tiers
+            tier_name$[tier] = Get tier name: tier
+            tier_is_interval[tier] = Is interval tier: tier
+            if tier_is_interval[tier]
+                crop_option_index += 1
+                if crop_tier = 1
+                    crop_tier = crop_option_index
+                endif
+            endif
+        endfor
+        if number_of_tiers > 0
+            display_tier = 2
+        endif
+    endif
+    selectObject: original_state#
 
-@checkPraatVersion
+    image_title$ = ""
+    smoothing = 999
+    paint_spectrogram = 1
+    draw_sound_waveform = 0
+    window_width = 8
+    minimum_f0 = 60
+    maximum_f0 = 400
+    minimum_dB = 30
+    maximum_dB = 90
+    plot_type = 1
+    f0_scale = 2
+    secondary_parameter = 1
+    font = 2
+    textGrid_font = 1
+    show_TextGrid_boundaries = 0
 
-# The drawing procedures use the global layout_ variables defined here.
-# If reusing these procedures elsewhere, define the required layout_
-# variables in the calling script as well.
+    pitch_plus_plugin_dir$ = preferencesDirectory$ + "/plugin_AERoPlot"
+    if !folderExists(pitch_plus_plugin_dir$)
+        createFolder: pitch_plus_plugin_dir$
+    endif
+    pitch_plus_data_dir$ = pitch_plus_plugin_dir$ + "/data"
+    if !folderExists(pitch_plus_data_dir$)
+        createFolder: pitch_plus_data_dir$
+    endif
+    pitch_plus_vars_dir$ = pitch_plus_data_dir$ + "/vars"
+    if !folderExists(pitch_plus_vars_dir$)
+        createFolder: pitch_plus_vars_dir$
+    endif
+    pitch_plus_vars$ = pitch_plus_vars_dir$ + "/pitch_plus.var"
+    if !fileReadable(pitch_plus_vars$)
+        legacy_vars$ = pitch_plus_vars_dir$ + "/pitch_plot_plus.var"
+        if !fileReadable(legacy_vars$)
+            legacy_vars$ = pitch_plus_vars_dir$ + "/c3pogram.var"
+        endif
+        if fileReadable(legacy_vars$)
+            writeFile: pitch_plus_vars$, readFile$(legacy_vars$)
+        endif
+    endif
+    if !fileReadable(pitch_plus_vars$)
+        writeFileLine: pitch_plus_vars$, "variable", tab$, "value"
+        appendFileLine: pitch_plus_vars$, "image_title$", tab$, image_title$
+        appendFileLine: pitch_plus_vars$, "smoothing", tab$, smoothing
+        appendFileLine: pitch_plus_vars$, "paint_spectrogram", tab$, paint_spectrogram
+        appendFileLine: pitch_plus_vars$, "draw_sound_waveform", tab$, draw_sound_waveform
+        appendFileLine: pitch_plus_vars$, "window_width", tab$, window_width
+        appendFileLine: pitch_plus_vars$, "minimum_f0", tab$, minimum_f0
+        appendFileLine: pitch_plus_vars$, "maximum_f0", tab$, maximum_f0
+        appendFileLine: pitch_plus_vars$, "minimum_dB", tab$, minimum_dB
+        appendFileLine: pitch_plus_vars$, "maximum_dB", tab$, maximum_dB
+        appendFileLine: pitch_plus_vars$, "plot_type", tab$, plot_type
+        appendFileLine: pitch_plus_vars$, "f0_scale", tab$, f0_scale
+        appendFileLine: pitch_plus_vars$, "secondary_parameter", tab$, secondary_parameter
+        appendFileLine: pitch_plus_vars$, "font", tab$, font
+        appendFileLine: pitch_plus_vars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
+    endif
+    @readVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
+    hasBoundarySetting = 0
+    for settingIndex to pitch_plusNumVars
+        if pitch_plusVar$[settingIndex] = "show_TextGrid_boundaries"
+            hasBoundarySetting = 1
+        endif
+    endfor
+    if not hasBoundarySetting
+        appendFileLine: pitch_plus_vars$, "show_TextGrid_boundaries", tab$, show_TextGrid_boundaries
+        @readVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
+    endif
+    selectObject: original_state#
+
+    longRecordingConfirmed = 0
+    repeat
+    minimum_F0 = minimum_f0
+    maximum_F0 = maximum_f0
+    beginPause: plot_interface$ + " settings"
+    sentence: "Image title", image_title$
+    if not spectrogram_only
+        comment: "Display settings: F0-only smoothing; width in inches"
+        natural: "Smoothing", smoothing
+        boolean: "Paint spectrogram", paint_spectrogram
+    else
+        comment: "Display settings: width in inches"
+    endif
+    boolean: "Draw sound waveform", draw_sound_waveform
+    positive: "Window width", window_width
+    if not spectrogram_only
+        comment: "F0 limits (Hz) and intensity limits (dB)"
+        natural: "Minimum F0", minimum_F0
+        natural: "Maximum F0", maximum_F0
+        real: "Minimum dB", minimum_dB
+        real: "Maximum dB", maximum_dB
+        comment: "Select the contour and, for F0 + secondary parameter, its measure."
+        optionMenu: "Plot type", plot_type
+            option: "F0 + secondary parameter"
+            option: "F0 only"
+            option: "Intensity only"
+            option: "Background only"
+        optionMenu: "F0 scale", f0_scale
+            option: "Hertz"
+            option: "Semitones re 1 Hz"
+        optionMenu: "Secondary parameter", secondary_parameter
+            option: "Cepstral Peak Prominence"
+            option: "Residual of intensity (linear regression)"
+            option: "H1-H2 of differentiated glottal pulse (LPC-IF)"
+            option: "Harmonicity (Praat function)"
+    endif
+    optionMenu: "Font", font
+        option: "Times"
+        option: "Helvetica"
+        option: "Palatino"
+        option: "Courier"
+    if sound and grid
+        comment: "TextGrid options"
+        optionMenu: "Crop tier", crop_tier
+            option: "Do not crop"
+            for tier to number_of_tiers
+                if tier_is_interval[tier]
+                    option: string$(tier) + ": " + tier_name$[tier]
+                endif
+            endfor
+        optionMenu: "Display tier", display_tier
+            option: "No TextGrid"
+            for tier to number_of_tiers
+                option: string$(tier) + ": " + tier_name$[tier]
+            endfor
+        optionMenu: "TextGrid font", textGrid_font
+            option: "Times"
+            option: "Helvetica"
+            option: "Palatino"
+            option: "Courier"
+        boolean: "Show TextGrid boundaries", show_TextGrid_boundaries
+    endif
+    clicked = endPause: "Cancel", "Draw", "Draw & Exit", 3, 1
+    if clicked = 1
+        selectObject: original_state#
+        exit
+    endif
+    minimum_f0 = minimum_F0
+    maximum_f0 = maximum_F0
+    @writeVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
+    selectObject: original_state#
+
+    draw_plot_type = plot_type
+    draw_paint_spectrogram = paint_spectrogram
+    if spectrogram_only
+        draw_plot_type = 4
+        draw_paint_spectrogram = 1
+    endif
+
+    # The drawing procedures use the global layout_ variables defined here.
+    # If reusing these procedures elsewhere, define the required layout_
+    # variables in the calling script as well.
 #
 # Layout dimensions in inches. Vertical coordinates increase downward.
-# Outer viewports include margins; waveform inner boundaries use the nominal margin.
-layout_plot_height = 3.4
-layout_tier_height = 0.65
-layout_waveform_height = layout_tier_height
-layout_waveform_margin = 0.4
-layout_title_height = 0.4
-
-#Get sound and textgrid data
-original_state# = selected#()
-sound = selected("Sound")
-if size(selected#()) = 2 or size(selected#()) = 3
-    grid = selected("TextGrid")
-else
-    grid = 0
-endif
-if size(selected#()) = 3
-    pitch_obj = selected("Pitch")
-else
-    pitch_obj = 0
-endif
+# Allow for the larger title, 12-point axes and TextGrid labels, and their margins.
+layout_plot_height = 3.6
+layout_font_size = 12
+# Praat's TextGrid Draw reserves one fifth of its inner height for one tier.
+layout_inner_margin = 2.8 * layout_font_size / 72
+layout_tier_height = (layout_plot_height - 2 * layout_inner_margin) / 4
+layout_waveform_height = 0.75
+layout_waveform_margin = layout_inner_margin
+layout_title_height = 0.55
 
 # Validate before modifying the selected Sound or creating analysis objects.
-if (plot_type = 1 or plot_type = 2 or plot_type = 3) and minF0 <= 0
+if (draw_plot_type = 1 or draw_plot_type = 2 or draw_plot_type = 3) and minimum_f0 <= 0
     exitScript: "Minimum F0 must be greater than zero."
 endif
-if (plot_type = 1 or plot_type = 2) and maxF0 <= minF0
+if (draw_plot_type = 1 or draw_plot_type = 2) and maximum_f0 <= minimum_f0
     exitScript: "Maximum F0 must be greater than minimum F0."
 endif
-if plot_type = 3 and maxdB <= mindB
+if draw_plot_type = 3 and maximum_dB <= minimum_dB
     exitScript: "Maximum intensity must be greater than minimum intensity."
 endif
 if window_width <= 0
     exitScript: "Window width must be greater than zero."
 endif
-if grid
-    selectObject: grid
-    number_of_tiers = Get number of tiers
-    if use_tier < 1 or use_tier > number_of_tiers
-        exitScript: "TextGrid tier must be between 1 and " + string$(number_of_tiers) + "."
+crop_tier_id = 0
+display_tier_id = 0
+if sound and grid
+    if crop_tier > 1
+        crop_option_index = 1
+        for tier to number_of_tiers
+            if tier_is_interval[tier]
+                crop_option_index += 1
+                if crop_option_index = crop_tier
+                    crop_tier_id = tier
+                endif
+            endif
+        endfor
+    endif
+    if display_tier > 1
+        display_tier_id = display_tier - 1
     endif
 endif
-@warnLongRecording: sound
-if not warnLongRecording.proceed
-    selectObject: original_state#
-    exit
+if not longRecordingConfirmed
+    @warnLongRecording: sound
+    if not warnLongRecording.proceed
+        selectObject: original_state#
+        exit
+    endif
+    longRecordingConfirmed = 1
 endif
 
 # Calculate viewport boundaries for the selected tier and waveform.
@@ -164,7 +320,7 @@ endif
 
 layout_plot_bottom = layout_plot_top + layout_plot_height
 layout_image_bottom = layout_plot_bottom
-if grid * use_tier > 0
+if display_tier_id > 0
     layout_image_bottom = layout_image_bottom + layout_tier_height
 endif
 layout_title_bottom = layout_image_bottom
@@ -179,22 +335,24 @@ if title$ = ""
     title$ = replace_regex$ (title$, "[%#\^_]", "\\& ", 0)
 endif
 
-@c3pogram: plot_type, secondary_parameter, f0_scale, paint_spectrogram,
+@pitchPlus: draw_plot_type, secondary_parameter, f0_scale, draw_paint_spectrogram,
     ... draw_sound_waveform, font, title$,
-    ... grid, sound, pitch_obj, use_tier,
-    ... minF0, maxF0, mindB, maxdB, window_width, smoothing
+    ... grid, sound, pitch_obj, crop_tier_id, display_tier_id,
+    ... textGrid_font, show_TextGrid_boundaries, minimum_f0, maximum_f0,
+    ... minimum_dB, maximum_dB, window_width, smoothing
 
 selectObject: original_state#
+until clicked = 3
 
 
-# C3POGRAM FUNCTIONS
-procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
+# PitchPlus functions
+procedure pitchPlus: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     ... .font, .title$,
-    ... .grid, .sound, .pitch_two, .tier,
-    ...  .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
+    ... .grid, .sound, .pitch_two, .cropTier, .displayTier, .textGridFont,
+    ... .showBoundaries, .minF0, .maxF0, .mindB, .maxdB, .vpWidth, .smoothing
 
     if not .paintSpect and .plotType = 4 and not .drawWaveform and
-    ... .grid * .tier <= 0
+    ... .displayTier <= 0
         exitScript: "Nothing is selected to draw. Enable the spectrogram or waveform, " +
         ... "select a contour, or choose a TextGrid tier."
     endif
@@ -202,16 +360,40 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     # Normalize the selected Sound itself, not just its display.
     selectObject: .sound
     Scale intensity: 70
+    .minT = Get start time
+    .maxT = Get end time
 
-    if .grid * .tier > 0
+    if .cropTier > 0
         selectObject: .grid
-        .minT = Get start time
-        .maxT = Get end time
-        .refTier = Extract one tier: .tier
-    else
-        selectObject: .sound
-        .minT = Get start time
-        .maxT = Get end time
+        .numIntervals = Get number of intervals: .cropTier
+        .firstNonempty = 0
+        .lastNonempty = 0
+        for .i to .numIntervals
+            .label$ = Get label of interval: .cropTier, .i
+            if .label$ <> ""
+                if .firstNonempty = 0
+                    .firstNonempty = .i
+                endif
+                .lastNonempty = .i
+            endif
+        endfor
+        if .firstNonempty = 0
+            selectObject: original_state#
+            exitScript: "The selected TextGrid crop tier has no non-empty intervals."
+        endif
+        .cropStart = Get start time of interval: .cropTier, .firstNonempty
+        .cropEnd = Get end time of interval: .cropTier, .lastNonempty
+        .minT = max(.minT, .cropStart)
+        .maxT = min(.maxT, .cropEnd)
+        if .maxT <= .minT
+            selectObject: original_state#
+            exitScript: "The selected TextGrid intervals do not overlap the Sound."
+        endif
+    endif
+
+    if .displayTier > 0
+        selectObject: .grid
+        .refTier = Extract one tier: .displayTier
     endif
 
     # reset draw space
@@ -226,9 +408,15 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     .font$[4] = "Courier"
     .fontCommand$ = .font$[.font]
     '.fontCommand$'
+    Font size: 12
+    .textGridFont$[1] = "Times"
+    .textGridFont$[2] = "Helvetica"
+    .textGridFont$[3] = "Palatino"
+    .textGridFont$[4] = "Courier"
 
     if .drawWaveform
-        Select outer viewport: layout_left, layout_right, layout_waveform_outer_top,
+        Select outer viewport: layout_left, layout_right,
+        ... layout_waveform_outer_top,
         ... layout_waveform_outer_bottom
         Black
         selectObject: .sound
@@ -254,20 +442,33 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
         selectObject: .sound
         specky = To Spectrogram: 0.005, 5000, 0.002, 20, "Gaussian"
         Paint: .minT, .maxT, 0, 0, 100, "yes", 50, 8, 0, "no"
-        Marks right every: 1, 200, "no", "yes", "no"
-        Line width: 2
-        Marks right every: 1000, 1, "yes", "yes", "no"
-        Text right: "yes", "Spectral Frequency (kHz)"
+        if .plotType = 4
+            Marks left every: 1, 200, "no", "yes", "no"
+            Line width: 2
+            Marks left every: 1000, 1, "yes", "yes", "no"
+            Text left: "yes", "Frequency (Hz)"
+        else
+            Marks right every: 1, 200, "no", "yes", "no"
+            Line width: 2
+            Marks right every: 1000, 1, "yes", "yes", "no"
+            Text right: "yes", "Spectral Frequency (kHz)"
+        endif
         Remove
     endif
     Line width: 1
     Draw inner box
 
-    if .grid * .tier > 0
+    if .displayTier > 0
         # draw text grid text and lines
-        Select outer viewport: layout_left, layout_right, layout_plot_top, layout_image_bottom
+        Select outer viewport: layout_left, layout_right,
+        ... layout_plot_top, layout_image_bottom
         selectObject: .refTier
-        Draw: .minT, .maxT, "yes", "yes", "no"
+        .textGridFontCommand$ = .textGridFont$[.textGridFont]
+        '.textGridFontCommand$'
+        Font size: 12
+        Draw: .minT, .maxT, .showBoundaries, "yes", "no"
+        '.fontCommand$'
+        Font size: 12
         Line width: 1
         Draw inner box
     endif
@@ -318,7 +519,7 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
 
     # draw selected contour
     if .plotType = 1
-        @drawC3Pogram: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
+        @drawPitchPlus: pitch2Table.table, .vqTable, .minT, .maxT, .minF0,
         ... .maxF0, .param2, .hz_ST
     elsif .plotType = 2
         if .pitch_two
@@ -335,6 +536,9 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     elsif .plotType = 3
         @drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB
     endif
+
+    # Drawing procedures set their own font size; restore the axis size.
+    Font size: 12
 
     # add contour axis information
     if .plotType = 1 or .plotType = 2
@@ -364,9 +568,9 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
     # add title
     Select outer viewport: layout_left, layout_right, 0, layout_title_bottom
 
-    Font size: 14
+    Font size: 16
     nowarn Text top: "yes", "##" + .title$
-    Font size: 10
+    Font size: 12
     Select outer viewport: layout_left, layout_right, 0, layout_image_bottom
 
     if .plotType = 1 or .plotType = 2
@@ -377,17 +581,17 @@ procedure c3pogram: .plotType, .param2, .hz_ST, .paintSpect, .drawWaveform,
         if .vqTable
             plusObject: .vqTable
         endif
-        if .grid * .tier > 0
+        if .displayTier > 0
             plusObject: .refTier
         endif
         Remove
-    elsif .grid * .tier > 0
+    elsif .displayTier > 0
         selectObject: .refTier
         Remove
     endif
 endproc
 
-procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
+procedure drawPitchPlus: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     ... .maxF0, .type, .hz_ST
     selectObject: .pitchTable
     # adjust F0 if pitch scale set to semitones
@@ -444,10 +648,10 @@ procedure drawC3Pogram: .pitchTable, .secondParam, .minT, .maxT, .minF0,
     Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
     Axes: .minT, .maxT, .minF0, .maxF0
     .di = Horizontal mm to world coordinates: 3
-    Font size: 10
+    Font size: 12
     Solid line
 
-    # Draw C3POGRAM points
+    # Draw PitchPlus points
     selectObject: .pitchTable
     .numPitchPts = Get number of rows
     Colour: "Black"
@@ -504,7 +708,7 @@ procedure drawIntensity: .sound, .minT, .maxT, .minF0, .mindB, .maxdB
     Select outer viewport: layout_left, layout_right, layout_plot_top, layout_plot_bottom
     Axes: .minT, .maxT, .mindB, .maxdB
 
-    Font size: 10
+    Font size: 12
     Solid line
     Line width: 7
     Black

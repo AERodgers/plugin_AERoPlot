@@ -14,8 +14,8 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
 
 ## **Functionality**
 
-### **C3P-o-grams**
-The contextual **C3P-o-gram** menu appears when you select a Sound object or Sound + TextGrid object together.
+### **PitchPlus and Spectrogram**
+The contextual **AERoPlot** menu offers **PitchPlus** and **Spectrogram** when you select a Sound object, with or without a TextGrid. PitchPlus was previously called C3PoGram.
 
 This can generate an **F0 contour** and a possible **secondary parameter** represented by point size and colour intensity.
 
@@ -27,6 +27,8 @@ Possible secondary parameters include:
 * **Harmonicity**
 
 It can also draw the **intensity contour** alone or just the **spectrogram (and waveform)** without any contour.
+
+**Spectrogram** always draws a spectrogram and offers a simplified interface without contour settings. It supports the same waveform and TextGrid options as PitchPlus.
  
 ### **Plots from data tables**
 
@@ -44,8 +46,12 @@ In Praat's Objects window:
 * Select both the Sound and TextGrid objects
 * Use **Create Table from nested TextGrid tiers** to convert the nested TextGrid tiers to a data table
 * Select the **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
-* Select a **Sound** to access **C3P-o-Gram**, or select a Sound and TextGrid to include a TextGrid tier.
+* Select a **Sound** to access **PitchPlus** or **Spectrogram**, or select a Sound and TextGrid to include a TextGrid tier.
 (Note this is more suited to short sound files rather than the full sample data files.)
+
+When both a Sound and TextGrid are selected, both interfaces offer separate dropdowns for the interval tier used to crop the plot to its first and last non-empty intervals, and the tier shown with the spectrogram. Point tiers are available for display but not cropping. Choose **Do not crop** to use the full Sound duration, or **No TextGrid** in the display menu to hide the tier. The boundary checkbox controls dotted extensions of tier boundaries or points over the plot; separators in the tier itself remain visible. The TextGrid font can be selected independently; **Times** uses Praat's Times serif face. Axis and TextGrid text use 12 pt, and the title uses 16 pt. Without a selected TextGrid, the TextGrid controls are hidden and the full Sound duration is used. The interfaces share remembered general settings and the boundary checkbox; TextGrid tier selections and font are not remembered between runs. Existing PitchPlotPlus or C3PoGram settings are migrated on first use, leaving the old settings file intact. Spectrogram does not change PitchPlus's contour or spectrogram-toggle preferences.
+
+Choose **Draw** to draw and reopen the settings with all choices intact, including TextGrid choices for the current run. Each redraw replaces the previous picture. Choose **Draw & Exit** to draw and finish, or **Cancel** to finish without drawing again.
 
 You can also practise using the formant Datasets from the Literature, which are baked into Praat (`New --> Table --> Datasets from the literature`). For example, if you use the Peterson and Barney (1952) dataset, use the columns "IPA", "Type", and "Sex" as grouping factors.
 
@@ -53,7 +59,7 @@ You can also practise using the formant Datasets from the Literature, which are 
 ## Saving Images
 The F1-F2, Ladefoged, and Formants-over-time plots save PNG images, when requested, to `plugin_AERoPlot/data/AERoPlot_Images` inside your [Praat preferences folder](https://praat.org/manual/preferences_folder.html). The **Save folder** field accepts an absolute path and is remembered separately for each plot type; leave it blank to restore the default. Existing saved folder settings are retained until changed or cleared. Missing folders are created when saving, and existing image files are preserved by adding a numbered suffix. The **Save name** field is a filename, not a path; `.png` is added if needed.
 
-C3PoGram draws in Praat's Picture window; use the Picture window's save or export commands to save it.
+PitchPlus and Spectrogram draw in Praat's Picture window; use the Picture window's save or export commands to save them.
 
 ## Quality of Life
 The plugin has several quality of life features, including:
@@ -70,13 +76,13 @@ There are quite a few other not-so-obvious quality-of-life features and many way
 
 ## Useful Things to know 
 
-C3PoGram can draw an F0 contour with or without a secondary parameter, intensity alone, or a background without a contour. The spectrogram and waveform can be enabled separately. Lower H1-H2 values produce larger, more saturated points. The time-axis tick spacing adjusts to the displayed duration. Window width controls the plot width in inches; spectrogram pre-emphasis is fixed at 8 dB/octave. C3PoGram scales the selected Sound object to 70 dB in Praat; this does not change the original sound file.
+PitchPlus can draw an F0 contour with or without a secondary parameter, intensity alone, or a background without a contour. The spectrogram and waveform can be enabled separately. Lower H1-H2 values produce larger, more saturated points. The time-axis tick spacing adjusts to the displayed duration. Window width controls the plot width in inches; spectrogram pre-emphasis is fixed at 8 dB/octave. Both interfaces scale the selected Sound object to 70 dB in Praat; this does not change the original sound file.
 
-C3PoGram and optional formant extraction from a TextGrid warn before processing recordings longer than 60 seconds. To change the threshold, edit `warningSeconds` in the `warnLongRecording` procedure in [the general function bank](plotScripts/_genFnBank.praat).
+PitchPlus, Spectrogram and optional formant extraction from a TextGrid warn before processing recordings longer than 60 seconds. To change the threshold, edit `warningSeconds` in the `warnLongRecording` procedure in [the general function bank](plotScripts/_genFnBank.praat).
 
 For formants-over-time plots with relative time, each combination of main factor and repetition must have exactly one row for the chosen reference element. If repetitions are present, provide a repetition column; missing or duplicate reference times are reported instead of producing incorrectly aligned data.
 
-The Praat scripts in [tests](tests) provide batch tests for C3PoGram, shared helpers, and image saving. They can be run with Praat's `--run` option; `--no-plugins --no-pref-files` avoids loading installed plug-ins or changing preferences during testing. The image-save test takes an absolute path to a test folder that does not yet exist and leaves its test files there for inspection and removal.
+The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus interactive PitchPlus and Spectrogram smoke tests. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the plot smoke tests from Praat's GUI; their settings windows require choosing **Draw**, **Draw & Exit**, or **Cancel**.
 
 ## Experimental Windows Table interface
 
