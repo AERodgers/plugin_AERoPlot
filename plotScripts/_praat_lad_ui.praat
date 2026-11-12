@@ -10,7 +10,7 @@ procedure doInputUI
 
             @addShared_UI_0: "Element", "Context"
 
-            comment: "GROUPING FACTORS (COLUMN HEADERS)"
+            comment: "GROUPING FACTORS (COLUMN HEADERS OR NUMBERS)"
             comment: "Leave ""Comparison factor"" blank if you don't need to " +
             ... "compare the same sound under different conditions."
             sentence: "Sequencing factor (x-Axis)", iFactor$

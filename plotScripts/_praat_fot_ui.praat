@@ -22,7 +22,7 @@ procedure doInputUI
                 inputUnits = 1
             endif
 
-            comment: "GROUPING FACTORS (COLUMN HEADERS)"
+            comment: "GROUPING FACTORS (COLUMN HEADERS OR NUMBERS)"
             sentence: "Repetition column", repFactor$
             sentence: "Main factor (levels compared by colour)", oFactor$
             sentence: "Sequencing factor (shown along time axis)", iFactor$

@@ -42,7 +42,7 @@ Tables created from **Create Table from nested TextGrid tiers** are very useful 
 
 ## A Quick tutorial using the sample data  
 In Praat's Objects window:
-* Use **New > AERoPlot > Load example sound and text grid** to load the example Sound and TextGrid.
+* Use **Praat > AERoPlot > Load example sound and text grid** to load the example Sound and TextGrid.
 * Select both the Sound and TextGrid objects
 * Use **Create Table from nested TextGrid tiers** to convert the nested TextGrid tiers to a data table
 * Select the **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
@@ -100,15 +100,54 @@ new `-TestDirectory` to check tier name and number resolution, ambiguity and
 type errors, and vowel duration extraction. The runner also accepts an optional
 `-SampleTextGrid` argument for the documented 35-row sample regression.
 
-### Interface separation in progress
+### Interfaces
+
+Every workflow has the same functions behind up to three interfaces. Interface
+code only collects settings; shared code validates them and does the work.
+
+1. **Praat interface** (default): the native pause windows. It is the fallback
+   whenever another interface cannot be used.
+2. **Command-line interface**: `plotScripts\cli_table.praat`,
+   `cli_pitch_plus.praat` and `cli_spectrogram.praat` use Praat `form` fields so
+   they can be run with `Praat --run`. All fields are positional, and the output
+   path and an overwrite flag are always supplied, so nothing is asked
+   interactively. Dropdown fields take the option text (for example `F1 and F2`
+   or `300 dpi`), and tick boxes take 0 or 1. F1-F2, Ladefoged and
+   formants-over-time forms are not available yet.
+3. **Windows interface** (Create Table, PitchPlus and Spectrogram only): see
+   below.
+
+Choose between the Praat and Windows interfaces with **Praat > AERoPlot >
+Use Praat interface** or **Use Windows interface**. These two entries appear
+on Windows only; elsewhere the Praat interface is the only one, so there is
+nothing to choose. The choice
+is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
+(not Windows, Praat older than 6.4.60 or the helper has not been built), the
+Praat interface is used silently. F1-F2, Ladefoged and formants-over-time always
+use the Praat interface.
+
+Optional text fields (such as the point tier, vowel-duration tier, title and
+TextGrid in the PitchPlus and Spectrogram forms) are switched off by leaving
+them blank or entering `none` or `null` in any capitalisation. Required fields
+never accept these values, and `0` is not an off value.
+
+Tiers can be given by name or number in Create Table and the PitchPlus and
+Spectrogram forms. The F1-F2, Ladefoged and formants-over-time dialogs accept a
+Table column header or column number in their column fields. If a header is
+itself a number that differs from its position, the number is ambiguous; use
+descriptive headers. A missing column is reported with the list of real headers.
+
+`tests\interface_helpers.praat` (run with `--pref-dir` set to a new folder and
+that folder as its argument) checks off values, column resolution and the saved
+preference. `tests\cli_forms_isolated.ps1` runs the command-line forms against
+sample files (`-Praat`, a new `-TestDirectory` and `-SampleDirectory`).
 
 The main native Praat dialog procedures for F1-F2, Ladefoged, formants over
 time, and Create Table live in separate `_praat_*_ui.praat` files. PitchPlus and
-Spectrogram share a plotting script with separate native and Windows dialog
-procedures. These adapters still use the existing shared variables and settings;
-the shared filtering, colour, saving and warning prompts have not yet been
-separated from their processing procedures. There is no global UI preference
-or automatic fallback yet.
+Spectrogram share a plotting script with separate native, Windows and form
+dialog procedures. These adapters still use the existing shared variables and
+settings; the shared filtering, colour, saving and warning prompts have not yet
+been separated from their processing procedures.
 
 On Windows, `tests\praat_ui_refactor_isolated.ps1` exercises the native
 PitchPlus and Spectrogram draw-and-exit paths and opens and exits the initial
@@ -142,8 +181,8 @@ To try this source version on Windows:
 
 ### Create Table
 
-Select one Sound and one TextGrid, then choose **Create Table (Windows UI
-prototype)...** under **AERoPlot**. The dialog lists the actual tier names and
+Select one Sound and one TextGrid, choose **Use Windows interface** as above,
+then choose **Create Table from nested TextGrid tiers** under **AERoPlot**. The dialog lists the actual tier names and
 creates a Table in the same Praat session.
 
 Choose a base tier and, optionally, additional tiers. Additional tiers are
@@ -163,19 +202,19 @@ but needs further usability and error-handling work before release.
 
 ### PitchPlus and Spectrogram
 
-The **PitchPlus (Windows UI prototype)...** and **Spectrogram (Windows UI
-prototype)...** actions are available for a Sound, with or without a TextGrid.
+With **Use Windows interface** chosen, the **PitchPlus** and **Spectrogram**
+actions are available for a Sound, with or without a TextGrid, and open a
+Windows dialog.
 They expose the existing plot settings in a Windows dialog, including the
 TextGrid crop/display controls when a TextGrid is selected. Spectrogram hides
 PitchPlus-only controls. **Draw** redraws and reopens the dialog; **Draw & Exit**
 draws once and closes it. Praat's existing plotting procedures still do the
-analysis and drawing, and the original **PitchPlus** and **Spectrogram**
-actions keep their Praat pause forms.
+analysis and drawing; with **Use Praat interface** the same actions keep their
+Praat pause forms.
 
 The Windows dialog is synchronous: Praat waits while it is open. Plot settings
-use the existing PitchPlus settings file, so the two front ends share remembered
-general settings. These are experimental duplicate actions; the Windows
-interface does not replace the original actions or change their behavior.
+use the existing PitchPlus settings file, so the interfaces share remembered
+general settings.
 
 The Windows UI tests in [tests](tests) require Windows, Praat, and the .NET
 Framework compiler. `tests\windows_plot_ui_isolated.ps1` builds the helper into

@@ -98,11 +98,16 @@ procedure warnLongRecording: .sound
     .duration = Get total duration
     .proceed = 1
     if .duration > .warningSeconds
-        beginPause: "Long recording"
-            comment: "This recording is " + fixed$(.duration, 1) +
+        if variableExists("aeroNonInteractive")
+            appendInfoLine: "Note: this recording is " + fixed$(.duration, 1) +
             ... " seconds long and may take a long time to process."
-        .choice = endPause: "Cancel", "Continue", 2
-        .proceed = .choice = 2
+        else
+            beginPause: "Long recording"
+                comment: "This recording is " + fixed$(.duration, 1) +
+                ... " seconds long and may take a long time to process."
+            .choice = endPause: "Cancel", "Continue", 2
+            .proceed = .choice = 2
+        endif
     endif
     selectObject: .originalSelection#
 endproc

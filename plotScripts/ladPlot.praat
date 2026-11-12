@@ -25,7 +25,8 @@ while keepGoing
     if keepGoing = 1
         @doInputUI
     endif
-    @validateTable: tableID$, headerList$
+    @validateTable: tableID$, "f1Col$,f2Col$,f3Col$,f4Col$,oFactor$,iFactor$"
+    headerList$ = validateTable.headers$
     @processInputUI
 
     @doOutputUI
@@ -760,4 +761,5 @@ endproc
 
 include _aeroplotFns.praat
 include _genFnBank.praat
+include _ui_common.praat
 include _praat_lad_ui.praat

@@ -11,20 +11,30 @@
 
 if not variableExists("aeroPrototypeInclude")
     @checkPraatVersion
-    firstPass = 1
-    @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
-    @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
-    @main
+    @getUIMode
+    if getUIMode.mode$ = "windows"
+        runScript: "windowsTablePrototype.praat"
+    else
+        firstPass = 1
+        @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
+        @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
+        @main
+    endif
 endif
 
 procedure main
     .curVersion$ = "1.5.0.2"
-    @defineVars
+    if variableExists("aeroNonInteractive")
+        # Command-line form: settings come from cli_table.praat, not a dialog.
+        @formTableSettings
+    else
+        @defineVars
 
-    @ui
+        @ui
 
-    @writeVars:
-    ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+        @writeVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    endif
 
     @getObject: ui.gridID$, "textGrid", "main"
     @getObject: ui.soundID$, "sound", "main"
@@ -87,6 +97,14 @@ endproc
 
 ## CONVERSION OF NESTED TEXTGRID TO TABLE
 procedure resolveTableTierSettings: .textGrid
+    @isOffValue: ui.formantTier$
+    if isOffValue.off
+        ui.formantTier$ = ""
+    endif
+    @isOffValue: ui.vowelDur$
+    if isOffValue.off
+        ui.vowelDur$ = ""
+    endif
     @resolveTierReference: .textGrid, ui.lowestTier$, "Base tier", "any"
     ui.lowestTier$ = resolveTierReference.name$
     .baseIsInterval = resolveTierReference.interval
@@ -110,69 +128,6 @@ procedure resolveTableTierSettings: .textGrid
     endif
     if ui.vowelDur$ != "" and ui.formantTier$ != "" and ui.formants2tabulate and .baseIsInterval
         exitScript: "Base tier: vowel duration requires a point tier."
-    endif
-endproc
-
-procedure resolveTierReference: .textGrid, .reference$, .field$, .type$
-    .reference$ = replace_regex$(.reference$, "^[ \t\r\n]+|[ \t\r\n]+$", "", 0)
-    if .reference$ = ""
-        exitScript: .field$ + ": enter a tier name or number."
-    endif
-    selectObject: .textGrid
-    .count = Get number of tiers
-    .nameMatch = 0
-    .matches = 0
-    for .i to .count
-        .candidate$ = Get tier name: .i
-        if .candidate$ = .reference$
-            .nameMatch = .i
-            .matches += 1
-        endif
-    endfor
-    if .matches > 1
-        exitScript: .field$ + ": multiple tiers are named """ + .reference$ + """. Give them unique names."
-    endif
-    .numberMatch = 0
-    if index_regex(.reference$, "^[0-9]+$") != 0
-        .number = number(.reference$)
-        if .number >= 1 and .number <= .count
-            .numberMatch = .number
-        endif
-    endif
-    if .numberMatch and .nameMatch and .numberMatch != .nameMatch
-        exitScript: .field$ + ": """ + .reference$ + """ refers to tier number " +
-        ... string$(.numberMatch) + " and a different tier named """ + .reference$ +
-        ... """. Please rename the numeric tier to avoid confusion."
-    endif
-    .tier = .numberMatch
-    if not .tier
-        .tier = .nameMatch
-    endif
-    if not .tier
-        exitScript: .field$ + ": no tier matches """ + .reference$ + """. Enter an existing tier name or number."
-    endif
-    .interval = Is interval tier: .tier
-    if .type$ = "interval" and not .interval
-        exitScript: .field$ + ": """ + .reference$ + """ must identify an interval tier."
-    elsif .type$ = "point" and .interval
-        exitScript: .field$ + ": """ + .reference$ + """ must identify a point tier."
-    endif
-    .name$ = Get tier name: .tier
-    if .name$ = "" or index(.name$, ",") != 0
-        exitScript: .field$ + ": the selected tier needs a non-empty name without commas."
-    endif
-    .actualMatches = 0
-    for .i to .count
-        .candidate$ = Get tier name: .i
-        if .candidate$ = .name$
-            .actualMatches += 1
-        endif
-    endfor
-    if .actualMatches > 1
-        exitScript: .field$ + ": multiple tiers are named """ + .name$ + """. Give them unique names."
-    endif
-    if index_regex(.name$, "^[0-9]+$") != 0
-        appendInfoLine: "Warning: tier """ + .name$ + """ has a numeric name. Use a descriptive name to avoid confusion with tier numbers."
     endif
 endproc
 
@@ -492,4 +447,5 @@ endproc
 
 include _genFnBank.praat
 include _aeroplotFns.praat
+include _ui_common.praat
 include _praat_table_ui.praat

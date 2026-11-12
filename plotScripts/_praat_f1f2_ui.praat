@@ -7,7 +7,7 @@ procedure doInputUI
 
             @addShared_UI_0: "Context", "Element"
 
-            comment: "GROUPING FACTORS (COLUMN HEADERS)"
+            comment: "GROUPING FACTORS (COLUMN HEADERS OR NUMBERS)"
             #sentence Main_factor (determines colour)
             #sentence Secondary_factor (used for grouping by sub-category)
             sentence: "Main factor (determines colour)", oFactor$

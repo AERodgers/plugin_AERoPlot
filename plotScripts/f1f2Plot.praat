@@ -22,9 +22,7 @@ while keepGoing
     if keepGoing = 1
         @doInputUI
     endif
-    @validateTable:
-        ... tableID$,
-        ... "'oFactor$', 'iFactor$', 'f1Col$', 'f2Col$'"
+    @validateTable: tableID$, "oFactor$,iFactor$,f1Col$,f2Col$"
     @processInputUI
 
     @doOutputUI
@@ -610,4 +608,5 @@ endproc
 
 include _aeroplotFns.praat
 include _genFnBank.praat
+include _ui_common.praat
 include _praat_f1f2_ui.praat

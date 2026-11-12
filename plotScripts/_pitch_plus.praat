@@ -173,8 +173,15 @@
 
     longRecordingConfirmed = 0
     windowsPlotUI = 0
-    if variableExists("aeroWindowsPlotUI")
+    formPlotUI = 0
+    if variableExists("aeroFormPlotUI")
+        formPlotUI = 1
+    elsif variableExists("aeroWindowsPlotUI")
         windowsPlotUI = aeroWindowsPlotUI
+    else
+        # Use the saved interface preference; fall back silently to Praat.
+        @getUIMode
+        windowsPlotUI = getUIMode.mode$ = "windows"
     endif
     if windowsPlotUI
         @windowsPlotInitialize
@@ -182,7 +189,9 @@
     repeat
     minimum_F0 = minimum_f0
     maximum_F0 = maximum_f0
-    if windowsPlotUI
+    if formPlotUI
+        @formPlotDialog
+    elsif windowsPlotUI
         @windowsPlotDialog
     else
         @praatPlotDialog
@@ -193,7 +202,9 @@
     endif
     minimum_f0 = minimum_F0
     maximum_f0 = maximum_F0
-    @writeVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
+    if not formPlotUI
+        @writeVars: pitch_plus_vars_dir$ + "/", "pitch_plus.var"
+    endif
     selectObject: original_state#
 
     draw_plot_type = plot_type
@@ -296,6 +307,10 @@ endif
 
 selectObject: original_state#
 until clicked = 3
+
+if formPlotUI
+    @formPlotFinish
+endif
 
 
 # PitchPlus functions
@@ -1154,5 +1169,7 @@ procedure uninterpolate: .sound, .pitch_obj, .minF0, .maxF0
 endproc
 
 include _genFnBank.praat
+include _ui_common.praat
 include _praat_pitch_ui.praat
 include _windows_pitch_ui.praat
+include _form_pitch_ui.praat

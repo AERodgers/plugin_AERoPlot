@@ -16,7 +16,7 @@
 # v.1.5.0.0
 
 # Table functions
-procedure validateTable:  .tableID$, .headers$
+procedure validateTable:  .tableID$, .vars$
     # Get target table
     if number(tableID$) == round(number(tableID$)) and number(tableID$) >= 0
         if !number(tableID$)
@@ -81,6 +81,21 @@ procedure validateTable:  .tableID$, .headers$
         exitScript: "Cannot find valid table."
     endif
 
+    # Accept column names or numbers; replace entries with the real headers.
+    @resolveColumnVariables: table, .vars$
+    .headers$ = resolveColumnVariables.list$
+    .resolveError$ = resolveColumnVariables.error$
+    if .resolveError$ != ""
+        removeObject: table
+        if variableExists("tableID$")
+            if string$(number(tableID$)) = tableID$
+                selectObject: 'tableID$'
+            endif
+        endif
+        @selectTableID
+        exitScript: .resolveError$ + newline$
+    endif
+
     # Check column headers
     @csvLine2Array: .headers$, "validateTable.size", "validateTable.array$"
     .parityCheck = 1
@@ -90,6 +105,13 @@ procedure validateTable:  .tableID$, .headers$
     endfor
     # Reject table without headers listed in input UI
     if ! .parityCheck
+        selectObject: table
+        .numCols = Get number of columns
+        .available$ = ""
+        for .i to .numCols
+            .colLabel$ = Get column label: .i
+            .available$ += newline$ + tab$ + string$(.i) + ". " + .colLabel$
+        endfor
         removeObject: table
         .warning$ = newline$
         for .i to .size
@@ -105,9 +127,11 @@ procedure validateTable:  .tableID$, .headers$
         endif
         @selectTableID
         exitScript: "Please check the grouping factors in the first menu " +
-        ... "or the column headers in your table. Also, make sure you have " +
+        ... "or the column headers in your table. Enter a column header or " +
+        ... "column number. Also, make sure you have " +
         ... " selected the correct ""Table format"" (CSV or tab-delimited)." +
-        ... .warning$ + newline$
+        ... .warning$ + newline$ + newline$ +
+        ... "Column headers in your table:" + .available$ + newline$
     endif
 endproc
 

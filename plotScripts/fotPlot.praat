@@ -22,7 +22,9 @@ while keepGoing
         @doInputUI
     endif
     @validateTable: tableID$,
-        ... headerList$ + ",'repFactor$'"
+        ... "timeCol$,f1Col$,f2Col$,f3Col$,f4Col$,oFactor$,iFactor$,repFactor$"
+    headerList$ = "'timeCol$','f1Col$','f2Col$','f3Col$','f4Col$'," +
+    ... "'oFactor$','iFactor$'"
     @processInputUI
     @doOutputUI
     @hideObjs: "table", preferencesDirectory$ +
@@ -698,4 +700,5 @@ endproc
 
 include _aeroplotFns.praat
 include _genFnBank.praat
+include _ui_common.praat
 include _praat_fot_ui.praat
