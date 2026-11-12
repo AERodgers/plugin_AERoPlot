@@ -55,10 +55,13 @@ additional tiers with commas. Numeric tier names can be confused with tier
 positions; if an entry matches two different tiers, rename the numeric tier
 before continuing. Duplicate tier names also need to be made unique.
 
-The optional point-tier field is validated but formant measurements still use
-the base tier's times. To add `Vowel.dur`, enter both optional tier fields and
-use a point tier as the base tier. Durations use the existing calculation from
-the rounded TextGrid table times, in milliseconds.
+Formants are measured on the base tier: at each point for a point tier, or as
+the mean of the defined values (in the chosen Hertz or Bark scale) across the
+interval for an interval tier. To get one row per point inside a longer
+segment, use the finest point tier as the base tier. The optional **Duration
+tier** (any interval tier) adds a `[tierName]_dur` column in seconds, holding
+the length of the interval that contains each row. Older saved settings for the
+separate point-tier field are ignored.
 
 When both a Sound and TextGrid are selected, both interfaces offer separate dropdowns for the interval tier used to crop the plot to its first and last non-empty intervals, and the tier shown with the spectrogram. Point tiers are available for display but not cropping. Choose **Do not crop** to use the full Sound duration, or **No TextGrid** in the display menu to hide the tier. The boundary checkbox controls dotted extensions of tier boundaries or points over the plot; separators in the tier itself remain visible. The TextGrid font can be selected independently; **Times** uses Praat's Times serif face. Axis and TextGrid text use 12 pt, and the title uses 16 pt. Without a selected TextGrid, the TextGrid controls are hidden and the full Sound duration is used. The interfaces share remembered general settings and the boundary checkbox; TextGrid tier selections and font are not remembered between runs. Existing PitchPlotPlus or C3PoGram settings are migrated on first use, leaving the old settings file intact. Spectrogram does not change PitchPlus's contour or spectrogram-toggle preferences.
 
@@ -126,7 +129,7 @@ is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
 Praat interface is used silently. F1-F2, Ladefoged and formants-over-time always
 use the Praat interface.
 
-Optional text fields (such as the point tier, vowel-duration tier, title and
+Optional text fields (such as the duration tier, title and
 TextGrid in the PitchPlus and Spectrogram forms) are switched off by leaving
 them blank or entering `none` or `null` in any capitalisation. Required fields
 never accept these values, and `0` is not an off value.
@@ -186,12 +189,15 @@ then choose **Create Table from nested TextGrid tiers** under **AERoPlot**. The 
 creates a Table in the same Praat session.
 
 Choose a base tier and, optionally, additional tiers. Additional tiers are
-processed in their TextGrid order. Only table extraction is supported in this
-prototype; there is no formant extraction or saved settings yet. Tier names
+processed in their TextGrid order. The dialog also offers an optional
+**Duration** tier, formant extraction (F1 to F4, in Hertz or Bark) with the
+`To Formant (Burg)` settings, and remembers its settings between runs. The
+settings are shown in two columns so the dialog fits on one screen; the
+formant analysis fields appear only when formants are selected. Tier names
 must be unique and cannot be empty, contain leading/trailing or repeated
 spaces, commas, quotes, wildcard characters, tabs or line breaks. Table names
 must start with an English letter and use only English letters, digits and
-underscores. The prototype cannot handle very long lists of tier names. Use the
+underscores. The Windows dialog cannot handle very long lists of tier names. Use the
 original action if these restrictions are unsuitable.
 
 Praat waits while the Windows dialog is open, so its windows will not respond
@@ -261,7 +267,7 @@ it once with its `Base tier times only` argument set to `yes` and once with
 `Element` as the base tier and `Speaker`,
 `Context`, and `Segment` as additional tiers, in that order. In the original
 dialog, name the Table `native_comparison`, choose no formants, and clear the
-point-tier and vowel-duration fields. Match the timing checkbox to the script
+duration-tier field. Match the timing checkbox to the script
 argument in both dialogs. The test expects 35 rows and either 5 or 9 columns.
 
 ### Asynchronous integration experiment

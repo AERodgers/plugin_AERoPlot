@@ -35,24 +35,24 @@ function Assert-True($ok, $name, $detail) {
 
 # Table: success, tier by number, optional off values
 $table = Join-Path $out 't.Table'
-$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '0', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', '7', '6', 'Hertz', '0', '5000', '5', '0.025', '50')
+$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '0', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', '6', 'Hertz', '0', '5000', '5', '0.025', '50')
 Assert-True (($r.Code -eq 0) -and (Test-Path $table)) 'Table success' $r.Text
 $header = (Get-Content -LiteralPath $table -TotalCount 1)
-Assert-True (($header -match 'Vowel\.dur') -and ($header -match 'F1') -and ($header -match 'F2')) 'Table columns' $header
+Assert-True (($header -match 'Segment_dur') -and ($header -match 'F1') -and ($header -match 'F2')) 'Table columns' $header
 
-$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '0', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', '7', '6', 'Hertz', '0', '5000', '5', '0.025', '50')
+$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '0', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', '6', 'Hertz', '0', '5000', '5', '0.025', '50')
 Assert-True (($r.Code -ne 0) -and ($r.Text -match 'exist|overwrite')) 'Table refuses overwrite' $r.Text
 
-$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '1', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', 'NONE', 'null', 'Hertz', '0', '5000', '5', '0.025', '50')
-Assert-True (($r.Code -eq 0) -and ((Get-Content -LiteralPath $table -TotalCount 1) -notmatch 'Vowel\.dur')) 'Table off values and overwrite' $r.Text
+$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, $table, '1', '8', '1, 2, 3, 4, 5, 6, 7', '1', 'F1 and F2', 'null', 'Hertz', '0', '5000', '5', '0.025', '50')
+Assert-True (($r.Code -eq 0) -and ((Get-Content -LiteralPath $table -TotalCount 1) -notmatch '_dur')) 'Table off values and overwrite' $r.Text
 
-$r = Invoke-Cli 'cli_table.praat' @((Join-Path $out 'missing.TextGrid'), $wav, (Join-Path $out 'x.Table'), '0', '8', '1', '1', 'F1', 'none', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
+$r = Invoke-Cli 'cli_table.praat' @((Join-Path $out 'missing.TextGrid'), $wav, (Join-Path $out 'x.Table'), '0', '8', '1', '1', 'F1', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
 Assert-True (($r.Code -ne 0) -and -not (Test-Path (Join-Path $out 'x.Table'))) 'Table missing TextGrid' $r.Text
 
-$r = Invoke-Cli 'cli_table.praat' @($grid, 'none', (Join-Path $out 'y.Table'), '0', '8', '1', '1', 'F1', 'none', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
+$r = Invoke-Cli 'cli_table.praat' @($grid, 'none', (Join-Path $out 'y.Table'), '0', '8', '1', '1', 'F1', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
 Assert-True (($r.Code -ne 0) -and -not (Test-Path (Join-Path $out 'y.Table'))) 'Table formants need a Sound' $r.Text
 
-$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, (Join-Path $out 'z.Table'), '0', 'NoSuchTier', '1', '1', 'None', 'none', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
+$r = Invoke-Cli 'cli_table.praat' @($grid, $wav, (Join-Path $out 'z.Table'), '0', 'NoSuchTier', '1', '1', 'None', 'none', 'Hertz', '0', '5000', '5', '0.025', '50')
 Assert-True (($r.Code -ne 0) -and -not (Test-Path (Join-Path $out 'z.Table'))) 'Table unknown tier' $r.Text
 
 # PitchPlus and Spectrogram: success and error cases

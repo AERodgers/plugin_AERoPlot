@@ -112,10 +112,9 @@ endproc
 
 ## CONVERSION OF NESTED TEXTGRID TO TABLE
 procedure resolveTableTierSettings: .textGrid
-    @isOffValue: ui.formantTier$
-    if isOffValue.off
-        ui.formantTier$ = ""
-    endif
+    # Older settings may hold a point tier for formant times; formants are now
+    # always measured on the base tier, so it is ignored.
+    ui.formantTier$ = ""
     @isOffValue: ui.vowelDur$
     if isOffValue.off
         ui.vowelDur$ = ""
@@ -123,26 +122,87 @@ procedure resolveTableTierSettings: .textGrid
     @resolveTierReference: .textGrid, ui.lowestTier$, "Base tier", "any"
     ui.lowestTier$ = resolveTierReference.name$
     .baseIsInterval = resolveTierReference.interval
+    .baseTier = resolveTierReference.tier
     @csvLine2Array: ui.otherTiers$, "resolveTableTierSettings.count", "resolveTableTierSettings.entries$"
     .resolved$ = ""
     for .i to .count
         @resolveTierReference: .textGrid, .entries$[.i], "Other tiers", "any"
+        @tierNested: .textGrid, .baseTier, resolveTierReference.tier
+        if not tierNested.ok
+            exitScript: "Other tiers: """ + resolveTierReference.name$ +
+            ... """ lies inside the base tier, so it cannot fill a column. " +
+            ... "Remove it, or choose a finer base tier."
+        endif
         if .resolved$ != ""
             .resolved$ += ","
         endif
         .resolved$ += resolveTierReference.name$
     endfor
     ui.otherTiers$ = .resolved$
-    if ui.formantTier$ != ""
-        @resolveTierReference: .textGrid, ui.formantTier$, "Point tier for formant measurement times", "point"
-        ui.formantTier$ = resolveTierReference.name$
-    endif
     if ui.vowelDur$ != ""
-        @resolveTierReference: .textGrid, ui.vowelDur$, "Interval tier for vowel duration measurements", "interval"
+        @resolveTierReference: .textGrid, ui.vowelDur$, "Duration tier", "interval"
         ui.vowelDur$ = resolveTierReference.name$
     endif
-    if ui.vowelDur$ != "" and ui.formantTier$ != "" and ui.formants2tabulate and .baseIsInterval
-        exitScript: "Base tier: vowel duration requires a point tier."
+endproc
+
+# Can the other tier supply a column for the base tier? True when at least one
+# labelled base item lies inside some item of the other tier. Tiers that sit
+# inside the base tier (for example points inside a segment) never qualify.
+procedure tierNested: .grid, .base, .other
+    .eps = 0.000000001
+    selectObject: .grid
+    .baseInt = Is interval tier: .base
+    .otherInt = Is interval tier: .other
+    .nb = 0
+    if .baseInt
+        .n = Get number of intervals: .base
+        for .i to .n
+            .l$ = Get label of interval: .base, .i
+            if .l$ != ""
+                .nb += 1
+                .ba[.nb] = Get start time of interval: .base, .i
+                .bb[.nb] = Get end time of interval: .base, .i
+            endif
+        endfor
+    else
+        .n = Get number of points: .base
+        for .i to .n
+            .l$ = Get label of point: .base, .i
+            if .l$ != ""
+                .nb += 1
+                .ba[.nb] = Get time of point: .base, .i
+                .bb[.nb] = .ba[.nb]
+            endif
+        endfor
+    endif
+    .no = 0
+    if .otherInt
+        .no = Get number of intervals: .other
+        for .i to .no
+            .oa[.i] = Get start time of interval: .other, .i
+            .ob[.i] = Get end time of interval: .other, .i
+        endfor
+    else
+        .no = Get number of points: .other
+        for .i to .no
+            .oa[.i] = Get time of point: .other, .i
+            .ob[.i] = .oa[.i]
+        endfor
+    endif
+    .ok = 1
+    if .nb > 0
+        .ok = 0
+        .j = 1
+        .i = 1
+        while .i <= .nb and not .ok and .no > 0
+            while .j < .no and .ob[.j] < .bb[.i] - .eps
+                .j += 1
+            endwhile
+            if .oa[.j] <= .ba[.i] + .eps and .ob[.j] >= .bb[.i] - .eps
+                .ok = 1
+            endif
+            .i += 1
+        endwhile
     endif
 endproc
 
@@ -281,33 +341,33 @@ procedure tiers2Table:
 
 
 
-    if (ui.vowelDur$ != "") and (ui.formantTier$ != "") and (ui.formants2tabulate)
+    # Duration (in seconds) of the interval of the chosen tier that contains each row.
+    if ui.vowelDur$ != ""
         selectObject: .gridTable
 
-        .vowelTable = Extract rows where column (text):
+        .durTable = Extract rows where column (text):
         ... "tier",
         ... "is equal to",
         ... ui.vowelDur$
 
         .num_rows = Get number of rows
-        for .i to .num_rows
-            .v_t_min[.i] = Get value: .i, "tmin"
-            .v_t_max[.i] = Get value: .i, "tmax"
-            .v_t_dur[.i] = number(fixed$((.v_t_max[.i] - .v_t_min[.i]), 3))*1000
-        endfor
-
-        .t_name$ = "'.hierArray$[1]'_t"
+        .durCol$ = ui.vowelDur$ + "_dur"
         selectObject: '.output$'
-        Append column: "Vowel.dur"
+        Append column: .durCol$
         for .i to .num_rows
-        Formula: "Vowel.dur",
-            ... "if (self[.t_name$] >= .v_t_min[.i]) and " +
-            ...    "(self[.t_name$] <= .v_t_max[.i])" +
-            ... "then .v_t_dur[.i] " +
-            ... "else self " +
+            selectObject: .durTable
+            .v_t_min = Get value: .i, "tmin"
+            .v_t_max = Get value: .i, "tmax"
+            .v_t_dur = number(fixed$(.v_t_max - .v_t_min, 4))
+            selectObject: '.output$'
+            Formula: .durCol$,
+            ... "if (self[.main_tmin$] >= .v_t_min) and " +
+            ...    "(self[.main_tmax$] <= .v_t_max) " +
+            ... "then .v_t_dur " +
+            ... "else self$ " +
             ... "endif"
         endfor
-    removeObject: .vowelTable
+        removeObject: .durTable
     endif
 
     removeObject: .gridTable
@@ -357,21 +417,27 @@ procedure formantsSought:
         for .f to .maxFormantsSought
             selectObject: .formantObj
 
-            # Formant extraction must work for both point and interval tiers.
+            # Point tiers give one sample at the point. Interval tiers give the
+            # mean of the defined samples taken every time step across the
+            # interval (one midpoint sample if it is shorter than a step).
             .curTotTPs = 0
             .curTotF = 0
-            .curTP = .startTP
-            .keepon = 100
-            while .curTP <= .endTP and .keepon
-                .curF = Get value at time: .f, .curTP, .scale$, "Linear"
+            .span = .endTP - .startTP
+            if .span < .timeStep
+                .numSamples = 1
+                .firstTP = (.startTP + .endTP) / 2
+            else
+                .numSamples = floor(.span / .timeStep) + 1
+                .firstTP = .startTP
+            endif
+            for .s to .numSamples
+                .curF = Get value at time: .f, .firstTP + (.s - 1) * .timeStep, .scale$, "Linear"
                 if .curF != undefined
                     .curTotF += .curF
                     .curTotTPs += 1
                 endif
-                .curTP += .timeStep
-                .keepon -= 1
-            endwhile
-            if .curF != undefined
+            endfor
+            if .curTotTPs > 0
                 .meanF = .curTotF / .curTotTPs
             else
                 .meanF = undefined

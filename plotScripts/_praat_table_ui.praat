@@ -26,6 +26,11 @@ procedure ui
             ... .otherTiers$
             boolean: "Base tier times only", .baseTierTimeOnly
 
+            comment: "OPTIONAL DURATION"
+            comment: "Adds a [tierName]_dur column (seconds) with the length of the"
+            comment: "interval of this tier that contains each row. Leave blank for none."
+            sentence: "Duration tier", .vowelDur$
+
             comment: "OPTIONAL FORMANT PROCESSING"
             optionMenu: "Formants to tabulate", .formants2tabulate
                 option: "None"
@@ -34,18 +39,12 @@ procedure ui
                 option: "F1 - F3"
                 option: "F1 - F4"
                 #option: "F1 - F5"
-
-            comment: "Formants use the base tier times; the point tier is checked but"
-            comment: "does not select different measurement times."
-            comment: "Vowel duration requires a point base tier and both fields below."
-            sentence: "Point tier for Formant measurement times", .formantTier$
-            sentence: "Interval tier for vowel duration measurements", .vowelDur$
-
-            comment: "Output scale"
             optionMenu: "frequency scale", .scale
-            option: "Hertz"
-            option: "Bark"
+                option: "Hertz"
+                option: "Bark"
 
+            comment: "Formants are measured at each base tier point, or averaged"
+            comment: "across each base tier interval."
             comment: "Parameters for ""To Formant (Burg)..."""
             real: "Time step (s)", .timeStep
             natural: "Maximum formant (Hz)", .maxFormantHz
@@ -94,8 +93,8 @@ procedure ui
     .soundID$ = sound_file_address_or_object_number$
     .formants2tabulate = formants_to_tabulate
 
-    .formantTier$ = point_tier_for_Formant_measurement_times$
-    .vowelDur$ = interval_tier_for_vowel_duration_measurements$
+    .formantTier$ = ""
+    .vowelDur$ = duration_tier$
 
     .maxNumFormants = .formants2tabulate - 1
     .scale = frequency_scale
@@ -151,13 +150,18 @@ procedure instructions
     '.a$' "------------------"
     '.a$' "Formants are estimated at times referenced by the base tier."
     '.a$' "If the base tier is an interval tier, estimates will represent"
-    '.a$' "mean formant estimates during that interval. If it is a point tier,"
-    '.a$' "estimates will be taking at each marked point."
-    '.a$' "The separate point-tier field is validated but does not change"
-    '.a$' "the base tier times used for formant measurements."
-    '.a$' "To include vowel duration, enter a point-tier reference and an"
-    '.a$' "interval-tier reference; the base tier must be a point tier."
-
+    '.a$' "the mean of the defined formant estimates during that interval"
+    '.a$' "(in the chosen frequency scale). If it is a point tier,"
+    '.a$' "estimates will be taken at each marked point."
+    '.a$' "For one row per point inside a longer segment, use the finest"
+    '.a$' "point tier as the base tier."
+    '.a$' ""
+    '.a$' "DURATION"
+    '.a$' "--------"
+    '.a$' "To include a duration, enter an interval tier in ""Duration tier""."
+    '.a$' "The table gets a column [tierName]_dur (in seconds) holding the"
+    '.a$' "length of the interval of that tier containing each row."
+    '.a$' ""
     '.a$' "To estimate formant values:"
     '.a$' "  6. Input the speech waveform and analysis parameter data."
     '.a$' ""

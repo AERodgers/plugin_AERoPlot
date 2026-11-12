@@ -14,8 +14,7 @@ form AERoPlot: Create Table from nested TextGrid tiers (command line)
         option F1 and F2
         option F1 - F3
         option F1 - F4
-    sentence Point_tier none
-    sentence Vowel_duration_tier none
+    sentence Duration_tier none
     optionmenu Frequency_scale 1
         option Hertz
         option Bark
@@ -38,8 +37,7 @@ cli_baseTier$ = base_tier$
 cli_otherTiers$ = other_tiers$
 cli_baseTierTimeOnly = base_tier_times_only
 cli_formants = formants_to_tabulate
-cli_pointTier$ = point_tier$
-cli_vowelDurTier$ = vowel_duration_tier$
+cli_vowelDurTier$ = duration_tier$
 cli_scale = frequency_scale
 cli_timeStep = time_step
 cli_maxFormantHz = maximum_formant
@@ -96,7 +94,7 @@ procedure formTableSettings
     endif
     ui.baseTierTimeOnly = cli_baseTierTimeOnly
     ui.formants2tabulate = cli_formants
-    ui.formantTier$ = cli_pointTier$
+    ui.formantTier$ = ""
     ui.vowelDur$ = cli_vowelDurTier$
     ui.maxNumFormants = ui.formants2tabulate - 1
     ui.scale = cli_scale

@@ -21,8 +21,14 @@ foreach ($name in @('table_tier_reference_error.praat', 'table_tier_sample.praat
 $source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_tier_references.praat'))
 $source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
 [IO.File]::WriteAllText((Join-Path $scripts 'table_tier_references.praat'), $source, (New-Object Text.UTF8Encoding($false)))
+$source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_formant_average.praat'))
+$source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
+[IO.File]::WriteAllText((Join-Path $scripts 'table_formant_average.praat'), $source, (New-Object Text.UTF8Encoding($false)))
 
-$cases = @(@{ Script='table_tier_references.praat'; Marker='Table tier reference tests passed.'; Args=@() })
+$cases = @(
+    @{ Script='table_tier_references.praat'; Marker='Table tier reference tests passed.'; Args=@() },
+    @{ Script='table_formant_average.praat'; Marker='Formant averaging test passed.'; Args=@() }
+)
 if ($SampleTextGrid -ne '') {
     if (-not (Test-Path -LiteralPath $SampleTextGrid)) {
         throw 'The sample TextGrid was not found.'

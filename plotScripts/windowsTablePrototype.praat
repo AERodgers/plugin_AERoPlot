@@ -51,13 +51,25 @@ procedure runWindowsTablePrototype
                 exitScript: "The Windows interface requires unique tier names. Use the Praat interface instead."
             endif
         endfor
-        if .i > 1
+    endfor
+    # Each tier line ends with one 0/1 per possible base tier: can this tier fill a column for that base?
+    for .t to wtNumberOfTiers
+        .nested$ = ""
+        for .b to wtNumberOfTiers
+            if .b = .t
+                .nested$ += "1"
+            else
+                @tierNested: wtGrid, .b, .t
+                .nested$ += string$(tierNested.ok)
+            endif
+        endfor
+        if .t > 1
             wtTiers$ += newline$
         endif
-        if wtTierIsInterval[.i]
-            wtTiers$ += "I" + tab$ + wtTier$[.i]
+        if wtTierIsInterval[.t]
+            wtTiers$ += "I" + tab$ + wtTier$[.t] + tab$ + .nested$
         else
-            wtTiers$ += "P" + tab$ + wtTier$[.i]
+            wtTiers$ += "P" + tab$ + wtTier$[.t] + tab$ + .nested$
         endif
     endfor
     selectObject: wtSound
@@ -77,7 +89,6 @@ procedure windowsTableDialog
     .base = 1
     .others$ = "-"
     .formants = 1
-    .point = 0
     .duration = 0
     .saved = 0
     for .i to wtNumberOfTiers
@@ -108,9 +119,6 @@ procedure windowsTableDialog
             .others$ = .list$
         endif
         for .i to wtNumberOfTiers
-            if wtTier$[.i] = ui.formantTier$ and not wtTierIsInterval[.i]
-                .point = .i
-            endif
             if wtTier$[.i] = ui.vowelDur$ and wtTierIsInterval[.i]
                 .duration = .i
             endif
@@ -119,7 +127,7 @@ procedure windowsTableDialog
     .scale = min(max(round(ui.scale), 1), 2)
     .settings$ = .name$ + tab$ + string$(.base) + tab$ + .others$ + tab$ +
     ... string$(ui.baseTierTimeOnly <> 0) + tab$ + string$(.formants) + tab$ +
-    ... string$(.point) + tab$ + string$(.duration) + tab$ + string$(.scale) + tab$ +
+    ... string$(.duration) + tab$ + string$(.scale) + tab$ +
     ... string$(ui.timeStep) + tab$ + string$(ui.maxFormantHz) + tab$ +
     ... string$(ui.numFormants) + tab$ + string$(ui.windowLen) + tab$ +
     ... string$(ui.preEmph)
@@ -131,7 +139,7 @@ procedure windowsTableDialog
             exit
         endif
     endif
-    if size(.fields$#) != 14 or .fields$#[1] != "OK"
+    if size(.fields$#) != 13 or .fields$#[1] != "OK"
         exitScript: "The Windows interface returned an invalid response; no Table was created."
     endif
     if index_regex(.fields$#[2], "^[A-Za-z][A-Za-z0-9_]*$") = 0 or
@@ -140,22 +148,17 @@ procedure windowsTableDialog
     ... index_regex(.fields$#[5], "^[01]$") = 0 or
     ... index_regex(.fields$#[6], "^[1-5]$") = 0 or
     ... index_regex(.fields$#[7], "^[0-9]+$") = 0 or
-    ... index_regex(.fields$#[8], "^[0-9]+$") = 0 or
-    ... index_regex(.fields$#[9], "^[12]$") = 0
+    ... index_regex(.fields$#[8], "^[12]$") = 0
         exitScript: "The Windows interface returned invalid Table settings; no Table was created."
     endif
-    for .i from 10 to 14
+    for .i from 9 to 13
         if index_regex(.fields$#[.i], "^[0-9]+(\.[0-9]+)?$") = 0
             exitScript: "The Windows interface returned invalid analysis settings; no Table was created."
         endif
     endfor
     .baseIndex = number(.fields$#[3])
-    .pointIndex = number(.fields$#[7])
-    .durationIndex = number(.fields$#[8])
-    if .baseIndex > wtNumberOfTiers or .pointIndex > wtNumberOfTiers or .durationIndex > wtNumberOfTiers
-        exitScript: "The Windows interface returned invalid tier settings; no Table was created."
-    endif
-    if .pointIndex > 0 and wtTierIsInterval[.pointIndex]
+    .durationIndex = number(.fields$#[7])
+    if .baseIndex > wtNumberOfTiers or .durationIndex > wtNumberOfTiers
         exitScript: "The Windows interface returned invalid tier settings; no Table was created."
     endif
     if .durationIndex > 0 and not wtTierIsInterval[.durationIndex]
@@ -181,10 +184,6 @@ procedure windowsTableDialog
             .others$ += wtTier$[.index]
         endfor
     endif
-    if .pointIndex > 0 and .durationIndex > 0 and .fields$#[6] != "1" and wtTierIsInterval[.baseIndex]
-        exitScript: "Base tier: vowel duration requires a point tier."
-    endif
-
     ui.gridID$ = string$(wtGrid)
     ui.soundID$ = string$(wtSound)
     ui.output$ = .fields$#[2]
@@ -195,16 +194,15 @@ procedure windowsTableDialog
     ui.maxNumFormants = ui.formants2tabulate - 1
     ui.formantTier$ = ""
     ui.vowelDur$ = ""
-    if .pointIndex > 0 and .durationIndex > 0
-        ui.formantTier$ = wtTier$[.pointIndex]
+    if .durationIndex > 0
         ui.vowelDur$ = wtTier$[.durationIndex]
     endif
-    ui.scale = number(.fields$#[9])
-    ui.timeStep = number(.fields$#[10])
-    ui.maxFormantHz = number(.fields$#[11])
-    ui.numFormants = number(.fields$#[12])
-    ui.windowLen = number(.fields$#[13])
-    ui.preEmph = number(.fields$#[14])
+    ui.scale = number(.fields$#[8])
+    ui.timeStep = number(.fields$#[9])
+    ui.maxFormantHz = number(.fields$#[10])
+    ui.numFormants = number(.fields$#[11])
+    ui.windowLen = number(.fields$#[12])
+    ui.preEmph = number(.fields$#[13])
     if ui.maxFormantHz <= 0 or ui.numFormants <= 0 or ui.windowLen <= 0 or ui.preEmph <= 0
         exitScript: "The Windows interface returned invalid analysis settings; no Table was created."
     endif
