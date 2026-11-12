@@ -29,7 +29,58 @@ procedure windowsPlotInitialize
         selectObject: original_state#
 endproc
 
+# Windows dialog that stays open while Praat remains usable. The dialog asks
+# Praat to run windowsPlotCallback.praat whenever Draw is pressed.
+procedure windowsPlotLaunch
+        @windowsPlotBuildArgs
+        windowsPlotCallbackScript$ = replace$(defaultDirectory$ + "/windowsPlotCallback.praat", "\", "/", 0)
+        if not fileReadable(windowsPlotCallbackScript$)
+            exitScript: "The Windows plot callback script was not found. Use the Praat interface instead."
+        endif
+        asynchronous runSubprocess: windowsPlotUIExe$, "PLOT", plot_interface$,
+            ... windowsPlotSoundName$, windowsPlotGridName$,
+            ... windowsPlotTiers$, windowsPlotIntervalTiers$,
+            ... windowsPlotTitleArg$, windowsPlotSettings$,
+            ... windowsPlotTempDir$, "ASYNC", preferencesDirectory$,
+            ... windowsPlotCallbackScript$, string$(sound), string$(grid),
+            ... string$(pitch_obj)
+endproc
+
+# Runs inside Praat when the dialog asks for a plot (see windowsPlotCallback.praat).
+procedure asyncPlotDialog
+        windowsPlotResponseFile$ = windowsPlotTempDir$ + "/plot-response-" + asyncPlotToken$ + ".txt"
+        if not fileReadable(windowsPlotResponseFile$)
+            exitScript: "The plot request from the Windows dialog could not be found."
+        endif
+        windowsPlotResponse$ = readFile$(windowsPlotResponseFile$)
+        deleteFile: windowsPlotResponseFile$
+        @windowsPlotApplyResponse
+        clicked = 3
+endproc
+
+# Restores the user's selection, which may have changed while the dialog was open.
+procedure asyncPlotFinish
+        # Objects removed in the meantime are skipped.
+        for .i to size(asyncPlotPrevious#)
+            if .i = 1
+                nocheck selectObject: asyncPlotPrevious#[.i]
+            else
+                nocheck plusObject: asyncPlotPrevious#[.i]
+            endif
+        endfor
+endproc
 procedure windowsPlotDialog
+        @windowsPlotBuildArgs
+        windowsPlotResponse$ = runSubprocess$(
+            ... windowsPlotUIExe$, "PLOT", plot_interface$,
+            ... windowsPlotSoundName$, windowsPlotGridName$,
+            ... windowsPlotTiers$, windowsPlotIntervalTiers$,
+            ... windowsPlotTitleArg$, windowsPlotSettings$,
+            ... windowsPlotTempDir$)
+        @windowsPlotApplyResponse
+endproc
+
+procedure windowsPlotBuildArgs
         windowsPlotTiers$ = "-"
         windowsPlotIntervalTiers$ = "-"
         windowsPlotCropTier = 0
@@ -96,12 +147,9 @@ procedure windowsPlotDialog
             ... string$(windowsPlotDisplayTier) + tab$ +
             ... string$(textGrid_font) + tab$ +
             ... string$(show_TextGrid_boundaries)
-        windowsPlotResponse$ = runSubprocess$(
-            ... windowsPlotUIExe$, "PLOT", plot_interface$,
-            ... windowsPlotSoundName$, windowsPlotGridName$,
-            ... windowsPlotTiers$, windowsPlotIntervalTiers$,
-            ... windowsPlotTitleArg$, windowsPlotSettings$,
-            ... windowsPlotTempDir$)
+endproc
+
+procedure windowsPlotApplyResponse
         windowsPlotFields$# = splitByWhitespace$#(windowsPlotResponse$)
         if size(windowsPlotFields$#) = 1
             if windowsPlotFields$#[1] = "CANCEL"

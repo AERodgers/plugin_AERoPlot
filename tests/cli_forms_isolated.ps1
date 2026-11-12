@@ -72,4 +72,35 @@ $spec = Join-Path $out 's.png'
 $r = Invoke-Cli 'cli_spectrogram.praat' (& $specArgs $spec '0' $grid)
 Assert-True (($r.Code -eq 0) -and (Test-Path $spec)) 'Spectrogram success' $r.Text
 
+# Compare the saved CLI image with the viewport left in Praat, at several
+# widths and with and without the waveform and displayed TextGrid tier.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'plot_viewport.praat') -Destination $scripts
+Add-Type -AssemblyName System.Drawing
+$cases = @(
+    @{ Width = 4; Waveform = 0; Tier = 0; Height = 3.6 },
+    @{ Width = 8; Waveform = 1; Tier = 0; Height = 3.6 + 0.55 + 0.75 - (2.8 * 12 / 72) },
+    @{ Width = 7; Waveform = 0; Tier = 1; Height = 3.6 + (3.6 - 2 * (2.8 * 12 / 72)) / 4 },
+    @{ Width = 9; Waveform = 1; Tier = 1; Height = 3.6 + 0.55 + 0.75 - (2.8 * 12 / 72) + (3.6 - 2 * (2.8 * 12 / 72)) / 4 }
+)
+foreach ($case in $cases) {
+    $caseDir = Join-Path $out ("viewport-{0}-{1}-{2}" -f $case.Width, $case.Waveform, $case.Tier)
+    New-Item -ItemType Directory -Path $caseDir | Out-Null
+    $r = Invoke-Cli 'plot_viewport.praat' @($wav, $grid, $caseDir, $case.Width, $case.Waveform, $case.Tier)
+    Assert-True ($r.Code -eq 0) "Viewport plot $($case.Width)/$($case.Waveform)/$($case.Tier)" $r.Text
+    $cliImage = [System.Drawing.Image]::FromFile((Join-Path $caseDir 'cli.png'))
+    $viewportImage = [System.Drawing.Image]::FromFile((Join-Path $caseDir 'viewport.png'))
+    try {
+        $expectedWidth = $case.Width * 300
+        $expectedHeight = $case.Height * 300
+        $dimensionsOk = $cliImage.Width -eq $expectedWidth -and
+            [Math]::Abs($cliImage.Height - $expectedHeight) -le 1 -and
+            $viewportImage.Width -eq $cliImage.Width -and $viewportImage.Height -eq $cliImage.Height
+        $detail = "Expected ${expectedWidth}x~$expectedHeight; CLI: $($cliImage.Width)x$($cliImage.Height); viewport: $($viewportImage.Width)x$($viewportImage.Height)"
+        Assert-True $dimensionsOk "Viewport dimensions $($case.Width)/$($case.Waveform)/$($case.Tier)" $detail
+    } finally {
+        $cliImage.Dispose()
+        $viewportImage.Dispose()
+    }
+}
+
 Write-Host 'Command-line interface tests passed.'

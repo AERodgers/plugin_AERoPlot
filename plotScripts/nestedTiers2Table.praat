@@ -27,6 +27,15 @@ procedure main
     if variableExists("aeroNonInteractive")
         # Command-line form: settings come from cli_table.praat, not a dialog.
         @formTableSettings
+    elsif variableExists("aeroWindowsTableSettings")
+        # Windows dialog: settings are saved under the name the user chose, but the
+        # Table is built as a fixed variable name and renamed at the end.
+        @defineVars
+        @windowsTableDialog
+        @writeVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+        windowsTableUserName$ = ui.output$
+        ui.output$ = "windowsTableResult"
     else
         @defineVars
 
@@ -38,7 +47,9 @@ procedure main
 
     @getObject: ui.gridID$, "textGrid", "main"
     @getObject: ui.soundID$, "sound", "main"
-    @resolveTableTierSettings: .textGrid
+    if not variableExists("aeroWindowsTableSettings")
+        @resolveTableTierSettings: .textGrid
+    endif
     if ui.formants2tabulate > 1
         @warnLongRecording: .sound
         if not warnLongRecording.proceed
@@ -72,6 +83,10 @@ procedure main
     plusObject: .sound
     Remove
 
+    if variableExists("aeroWindowsTableSettings")
+        selectObject: windowsTableResult
+        Rename: windowsTableUserName$
+    endif
     firstPass = 0
     # @writeVars:
     # ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"

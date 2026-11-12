@@ -1,4 +1,4 @@
-# Experimental Windows-only interface. The original action remains available.
+# Windows-only Create Table dialog. The Praat dialog remains available.
 aeroPrototypeInclude = 1
 
 if not variableExists("aeroPrototypeTest")
@@ -8,110 +8,206 @@ endif
 procedure runWindowsTablePrototype
     @checkPraatVersion
     if environment$("OS") != "Windows_NT"
-        exitScript: "The AERoPlot Windows UI prototype only runs on Windows."
+        exitScript: "The AERoPlot Windows interface only runs on Windows."
     endif
     if checkPraatVersion.major < 6 or (checkPraatVersion.major = 6 and
     ... (checkPraatVersion.minor < 4 or
     ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch < 60)))
-        exitScript: "The Windows UI prototype requires Praat 6.4.60 or newer. The original Table action is still available."
+        exitScript: "The Windows interface requires Praat 6.4.60 or newer. Choose Praat > AERoPlot > Use Praat interface instead."
     endif
-    .exe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
-    if not fileReadable(.exe$)
-        exitScript: "The Windows UI prototype has not been built. See the prototype instructions in the AERoPlot README."
+    wtExe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+    if not fileReadable(wtExe$)
+        exitScript: "The Windows interface has not been built. See the Windows interface instructions in the AERoPlot README."
     endif
     if size(selected#()) != 2 or numberOfSelected("Sound") != 1 or numberOfSelected("TextGrid") != 1
         exitScript: "Select exactly one Sound and one TextGrid."
     endif
-    .sound = selected("Sound")
-    .grid = selected("TextGrid")
-    .soundName$ = selected$("Sound")
-    .gridName$ = selected$("TextGrid")
-    selectObject: .grid
-    .numberOfTiers = Get number of tiers
-    if .numberOfTiers = 0
-        selectObject: .sound
-        plusObject: .grid
+    wtSound = selected("Sound")
+    wtGrid = selected("TextGrid")
+    wtSoundName$ = selected$("Sound")
+    wtGridName$ = selected$("TextGrid")
+    selectObject: wtGrid
+    wtNumberOfTiers = Get number of tiers
+    if wtNumberOfTiers = 0
+        selectObject: wtSound
+        plusObject: wtGrid
         exitScript: "The selected TextGrid has no tiers."
     endif
-    .tiers$ = ""
-    for .i to .numberOfTiers
-        .tier$[.i] = Get tier name: .i
-        if .tier$[.i] = "" or .tier$[.i] = "?" or
-        ... index_regex(.tier$[.i], "[,'""*?\t\n\r]") != 0 or
-        ... index_regex(.tier$[.i], "(^[ ]|[ ]$|  )") != 0
-            selectObject: .sound
-            plusObject: .grid
-            exitScript: "This prototype cannot use empty tier names, leading/trailing or repeated spaces, commas, quotes, wildcards, tabs, or line breaks. Use the original Table action instead."
+    wtTiers$ = ""
+    for .i to wtNumberOfTiers
+        wtTier$[.i] = Get tier name: .i
+        wtTierIsInterval[.i] = Is interval tier: .i
+        if wtTier$[.i] = "" or wtTier$[.i] = "?" or
+        ... index_regex(wtTier$[.i], "[,'""*?\t\n\r]") != 0 or
+        ... index_regex(wtTier$[.i], "(^[ ]|[ ]$|  )") != 0
+            selectObject: wtSound
+            plusObject: wtGrid
+            exitScript: "The Windows interface cannot use empty tier names, leading/trailing or repeated spaces, commas, quotes, wildcards, tabs, or line breaks. Use the Praat interface instead."
         endif
         for .j to .i - 1
-            if .tier$[.i] = .tier$[.j]
-                selectObject: .sound
-                plusObject: .grid
-                exitScript: "The prototype requires unique tier names. Use the original Table action instead."
+            if wtTier$[.i] = wtTier$[.j]
+                selectObject: wtSound
+                plusObject: wtGrid
+                exitScript: "The Windows interface requires unique tier names. Use the Praat interface instead."
             endif
         endfor
         if .i > 1
-            .tiers$ += newline$
+            wtTiers$ += newline$
         endif
-        .tiers$ += .tier$[.i]
+        if wtTierIsInterval[.i]
+            wtTiers$ += "I" + tab$ + wtTier$[.i]
+        else
+            wtTiers$ += "P" + tab$ + wtTier$[.i]
+        endif
     endfor
-    selectObject: .sound
-    plusObject: .grid
-    if length(.tiers$) + length(.soundName$) + length(.gridName$) > 20000
-        exitScript: "The TextGrid's tier names are too long for the prototype. Use the original Table action instead."
+    selectObject: wtSound
+    plusObject: wtGrid
+    if length(wtTiers$) + length(wtSoundName$) + length(wtGridName$) > 20000
+        exitScript: "The TextGrid's tier names are too long for the Windows interface. Use the Praat interface instead."
     endif
-    .response$ = runSubprocess$(.exe$, .soundName$, .gridName$, .tiers$)
+    aeroWindowsTableSettings = 1
+    @main
+endproc
+
+# Replaces the pause window: shows the Windows dialog, then copies its values
+# into the settings the shared Table procedures expect.
+procedure windowsTableDialog
+    # Saved settings apply to the tiers only when the saved base tier is in this TextGrid.
+    .name$ = "aeroplot_table"
+    .base = 1
+    .others$ = "-"
+    .formants = 1
+    .point = 0
+    .duration = 0
+    .saved = 0
+    for .i to wtNumberOfTiers
+        if wtTier$[.i] = ui.lowestTier$
+            .saved = .i
+        endif
+    endfor
+    if .saved
+        .base = .saved
+        .name$ = ui.output$
+        if index_regex(.name$, "^[A-Za-z][A-Za-z0-9_]*$") = 0
+            .name$ = "aeroplot_table"
+        endif
+        .formants = min(max(round(ui.formants2tabulate), 1), 5)
+        @csvLine2Array: ui.otherTiers$, "windowsTableDialog.count", "windowsTableDialog.entry$"
+        .list$ = ""
+        for .j to .count
+            for .i to wtNumberOfTiers
+                if wtTier$[.i] = .entry$[.j] and .i != .base
+                    if .list$ != ""
+                        .list$ += ","
+                    endif
+                    .list$ += string$(.i)
+                endif
+            endfor
+        endfor
+        if .list$ != ""
+            .others$ = .list$
+        endif
+        for .i to wtNumberOfTiers
+            if wtTier$[.i] = ui.formantTier$ and not wtTierIsInterval[.i]
+                .point = .i
+            endif
+            if wtTier$[.i] = ui.vowelDur$ and wtTierIsInterval[.i]
+                .duration = .i
+            endif
+        endfor
+    endif
+    .scale = min(max(round(ui.scale), 1), 2)
+    .settings$ = .name$ + tab$ + string$(.base) + tab$ + .others$ + tab$ +
+    ... string$(ui.baseTierTimeOnly <> 0) + tab$ + string$(.formants) + tab$ +
+    ... string$(.point) + tab$ + string$(.duration) + tab$ + string$(.scale) + tab$ +
+    ... string$(ui.timeStep) + tab$ + string$(ui.maxFormantHz) + tab$ +
+    ... string$(ui.numFormants) + tab$ + string$(ui.windowLen) + tab$ +
+    ... string$(ui.preEmph)
+
+    .response$ = runSubprocess$(wtExe$, "TABLE", wtSoundName$, wtGridName$, wtTiers$, .settings$)
     .fields$# = splitByWhitespace$#(.response$)
     if size(.fields$#) = 1
         if .fields$#[1] = "CANCEL"
             exit
         endif
     endif
-    if size(.fields$#) != 5
-        exitScript: "The Windows UI returned an invalid response; no Table was created."
+    if size(.fields$#) != 14 or .fields$#[1] != "OK"
+        exitScript: "The Windows interface returned an invalid response; no Table was created."
     endif
-    if .fields$#[1] != "OK" or index_regex(.fields$#[2], "^[A-Za-z][A-Za-z0-9_]*$") = 0
-        exitScript: "The Windows UI returned invalid Table settings; no Table was created."
+    if index_regex(.fields$#[2], "^[A-Za-z][A-Za-z0-9_]*$") = 0 or
+    ... index_regex(.fields$#[3], "^[1-9][0-9]*$") = 0 or
+    ... index_regex(.fields$#[4], "^(-|[1-9][0-9]*(,[1-9][0-9]*)*)$") = 0 or
+    ... index_regex(.fields$#[5], "^[01]$") = 0 or
+    ... index_regex(.fields$#[6], "^[1-5]$") = 0 or
+    ... index_regex(.fields$#[7], "^[0-9]+$") = 0 or
+    ... index_regex(.fields$#[8], "^[0-9]+$") = 0 or
+    ... index_regex(.fields$#[9], "^[12]$") = 0
+        exitScript: "The Windows interface returned invalid Table settings; no Table was created."
     endif
-    if index_regex(.fields$#[3], "^[1-9][0-9]*$") = 0 or
-    ... index_regex(.fields$#[4], "^[01]$") = 0
-        exitScript: "The Windows UI returned invalid tier settings; no Table was created."
+    for .i from 10 to 14
+        if index_regex(.fields$#[.i], "^[0-9]+(\.[0-9]+)?$") = 0
+            exitScript: "The Windows interface returned invalid analysis settings; no Table was created."
+        endif
+    endfor
+    .baseIndex = number(.fields$#[3])
+    .pointIndex = number(.fields$#[7])
+    .durationIndex = number(.fields$#[8])
+    if .baseIndex > wtNumberOfTiers or .pointIndex > wtNumberOfTiers or .durationIndex > wtNumberOfTiers
+        exitScript: "The Windows interface returned invalid tier settings; no Table was created."
     endif
-    .base = number(.fields$#[3])
-    .times = number(.fields$#[4])
-    if .base != round(.base) or .base < 1 or .base > .numberOfTiers or (.times != 0 and .times != 1)
-        exitScript: "The Windows UI returned invalid tier settings; no Table was created."
+    if .pointIndex > 0 and wtTierIsInterval[.pointIndex]
+        exitScript: "The Windows interface returned invalid tier settings; no Table was created."
     endif
-    .hierarchy$ = .tier$[.base]
-    if .fields$#[5] != "-"
-        @csvLine2Array: .fields$#[5], "runWindowsTablePrototype.count", "runWindowsTablePrototype.index$"
-        for .i to .count
-            if index_regex(.index$[.i], "^[1-9][0-9]*$") = 0
-                exitScript: "The Windows UI returned invalid tier settings; no Table was created."
+    if .durationIndex > 0 and not wtTierIsInterval[.durationIndex]
+        exitScript: "The Windows interface returned invalid tier settings; no Table was created."
+    endif
+    .hasOthers = .fields$#[4] != "-"
+    .others$ = ""
+    if .hasOthers
+        @csvLine2Array: .fields$#[4], "windowsTableDialog.count", "windowsTableDialog.index$"
+        for .j to .count
+            .index = number(.index$[.j])
+            if .index > wtNumberOfTiers or .index = .baseIndex
+                exitScript: "The Windows interface returned invalid tier settings; no Table was created."
             endif
-            .index = number(.index$[.i])
-            if .index != round(.index) or .index < 1 or .index > .numberOfTiers or .index = .base
-                exitScript: "The Windows UI returned invalid tier settings; no Table was created."
-            endif
-            for .j to .i - 1
-                if .index$[.i] = .index$[.j]
-                    exitScript: "The Windows UI returned duplicate tiers; no Table was created."
+            for .k to .j - 1
+                if .index$[.j] = .index$[.k]
+                    exitScript: "The Windows interface returned duplicate tiers; no Table was created."
                 endif
             endfor
-            .hierarchy$ += "," + .tier$[.index]
+            if .others$ != ""
+                .others$ += ","
+            endif
+            .others$ += wtTier$[.index]
         endfor
     endif
-    @prototypeConvert: .grid, .hierarchy$, .fields$#[2], .times
-endproc
+    if .pointIndex > 0 and .durationIndex > 0 and .fields$#[6] != "1" and wtTierIsInterval[.baseIndex]
+        exitScript: "Base tier: vowel duration requires a point tier."
+    endif
 
-procedure prototypeConvert: .grid, .hierarchy$, .name$, .times
-    ui.baseTierTimeOnly = .times
-    ui.formants2tabulate = 0
-    ui.vowelDur$ = ""
+    ui.gridID$ = string$(wtGrid)
+    ui.soundID$ = string$(wtSound)
+    ui.output$ = .fields$#[2]
+    ui.lowestTier$ = wtTier$[.baseIndex]
+    ui.otherTiers$ = .others$
+    ui.baseTierTimeOnly = number(.fields$#[5])
+    ui.formants2tabulate = number(.fields$#[6])
+    ui.maxNumFormants = ui.formants2tabulate - 1
     ui.formantTier$ = ""
-    @tiers2Table: .grid, .hierarchy$, "prototypeResult"
-    selectObject: prototypeResult
-    Rename: .name$
+    ui.vowelDur$ = ""
+    if .pointIndex > 0 and .durationIndex > 0
+        ui.formantTier$ = wtTier$[.pointIndex]
+        ui.vowelDur$ = wtTier$[.durationIndex]
+    endif
+    ui.scale = number(.fields$#[9])
+    ui.timeStep = number(.fields$#[10])
+    ui.maxFormantHz = number(.fields$#[11])
+    ui.numFormants = number(.fields$#[12])
+    ui.windowLen = number(.fields$#[13])
+    ui.preEmph = number(.fields$#[14])
+    if ui.maxFormantHz <= 0 or ui.numFormants <= 0 or ui.windowLen <= 0 or ui.preEmph <= 0
+        exitScript: "The Windows interface returned invalid analysis settings; no Table was created."
+    endif
 endproc
 
 include nestedTiers2Table.praat

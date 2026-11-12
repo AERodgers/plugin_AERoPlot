@@ -6,6 +6,94 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
+internal sealed class AsyncPlotInfo
+{
+    public string PreferencesDirectory;
+    public string CallbackScript;
+    public int SoundId, GridId, PitchId;
+    public int PraatProcessId;
+}
+
+internal static class PraatLink
+{
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct ProcessBasicInformation
+    {
+        public IntPtr ExitStatus, PebBaseAddress, AffinityMask, BasePriority, UniqueProcessId, InheritedFromUniqueProcessId;
+    }
+    private delegate bool EnumCallback(IntPtr window, IntPtr context);
+    [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr process, int infoClass, ref ProcessBasicInformation info, int size, out int returned);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumCallback callback, IntPtr context);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wparam, IntPtr lparam, uint flags, uint timeout, out IntPtr result);
+
+    public static int ParentProcessId()
+    {
+        var info = new ProcessBasicInformation();
+        int returned;
+        if (NtQueryInformationProcess(System.Diagnostics.Process.GetCurrentProcess().Handle, 0, ref info,
+            System.Runtime.InteropServices.Marshal.SizeOf(info), out returned) != 0)
+            return 0;
+        return info.InheritedFromUniqueProcessId.ToInt32();
+    }
+
+    public static bool IsRunning(int processId)
+    {
+        try { return !System.Diagnostics.Process.GetProcessById(processId).HasExited; }
+        catch (ArgumentException) { return false; }
+    }
+
+    private static IntPtr FindShellWindow(int processId)
+    {
+        IntPtr found = IntPtr.Zero;
+        EnumWindows(delegate (IntPtr window, IntPtr context)
+        {
+            uint pid;
+            GetWindowThreadProcessId(window, out pid);
+            var name = new StringBuilder(256);
+            GetClassName(window, name, name.Capacity);
+            if (pid == (uint)processId && name.ToString().StartsWith("PraatShell1 ", StringComparison.Ordinal))
+            {
+                found = window;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
+    // Returns null on success, or a message for the user.
+    public static string Send(int processId, string preferencesDirectory, string script)
+    {
+        if (!IsRunning(processId))
+            return "Praat is no longer running.";
+        var window = FindShellWindow(processId);
+        if (window == IntPtr.Zero)
+            return "The Praat window could not be found.";
+        bool created;
+        using (var mutex = new System.Threading.Mutex(false, "AERoPlotPraatMessage", out created))
+        {
+            try { mutex.WaitOne(30000); } catch (System.Threading.AbandonedMutexException) { }
+            try
+            {
+                System.IO.File.WriteAllText(System.IO.Path.Combine(preferencesDirectory, "Message.txt"), script, new UTF8Encoding(false));
+                IntPtr result;
+                // SMTO_ABORTIFHUNG (2): gives up when Praat is not responding.
+                if (SendMessageTimeout(window, 0x8000, IntPtr.Zero, IntPtr.Zero, 2, 120000, out result) == IntPtr.Zero)
+                    return "Praat is busy or not responding. Finish what Praat is doing, then press Draw again.";
+                return null;
+            }
+            finally { try { mutex.ReleaseMutex(); } catch (ApplicationException) { } }
+        }
+    }
+}
+
 internal static class PlotUI
 {
     private const string EmptyTitle = "__AEROPLOT_EMPTY_TITLE__";
@@ -14,8 +102,24 @@ internal static class PlotUI
     {
         try
         {
-            if (args.Length != 9)
+            if (args.Length != 9 && !(args.Length == 15 && args[9] == "ASYNC"))
                 throw new ArgumentException("The plot interface received invalid input.");
+            AsyncPlotInfo asyncInfo = null;
+            if (args.Length == 15)
+            {
+                int soundId, gridId, pitchId;
+                if (!int.TryParse(args[12], out soundId) || !int.TryParse(args[13], out gridId) ||
+                    !int.TryParse(args[14], out pitchId) || !System.IO.Directory.Exists(args[10]) ||
+                    args[11].IndexOf('"') >= 0)
+                    throw new ArgumentException("The plot interface received invalid asynchronous input.");
+                asyncInfo = new AsyncPlotInfo {
+                    PreferencesDirectory = args[10], CallbackScript = args[11],
+                    SoundId = soundId, GridId = gridId, PitchId = pitchId,
+                    PraatProcessId = PraatLink.ParentProcessId()
+                };
+                if (asyncInfo.PraatProcessId <= 0)
+                    throw new ArgumentException("The Praat process could not be identified.");
+            }
 
             var settings = args[7].Split('\t');
             if (settings.Length != 16)
@@ -23,13 +127,12 @@ internal static class PlotUI
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            using (var window = new PlotWindow(args[1], args[2], args[3], args[4], args[5], args[6], args[8], settings))
-            {
-                if (window.ShowDialog() == DialogResult.OK)
-                    Console.Write(window.Result);
-                else
-                    Console.Write("CANCEL\n");
-            }
+            using (var window = new PlotWindow(args[1], args[2], args[3], args[4], args[5],             args[6], args[8], settings, asyncInfo))
+                        {
+                            var outcome = window.ShowDialog();
+                            if (asyncInfo == null)
+                                Console.Write(outcome == DialogResult.OK ? window.Result : "CANCEL\n");
+                        }
             return 0;
         }
         catch (Exception error)
@@ -86,8 +189,13 @@ internal sealed class PlotWindow : Form
     private readonly string resultDirectory;
     public string Result { get; private set; }
 
-    public PlotWindow(string mode, string soundName, string gridName, string tierNames, string intervalTierIds, string titleValue, string resultPath, string[] settings)
+    private readonly string mode;
+    private readonly AsyncPlotInfo async;
+
+    public PlotWindow(string mode, string soundName, string gridName, string tierNames, string intervalTierIds, string titleValue, string resultPath, string[] settings, AsyncPlotInfo asyncInfo)
     {
+        this.mode = mode;
+        async = asyncInfo;
         if (mode != "PitchPlus" && mode != "Spectrogram")
             throw new ArgumentException("The requested plot mode is not supported.");
         if (!System.IO.Directory.Exists(resultPath))
@@ -222,6 +330,8 @@ internal sealed class PlotWindow : Form
         int maximumHeight = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 60;
         ClientSize = new Size(660, Math.Max(400, Math.Min(desiredHeight, maximumHeight)));
         UpdatePlotControls();
+        if (async != null)
+            StartParentWatch();
     }
 
     private void SaveResult(int action)
@@ -272,10 +382,78 @@ internal sealed class PlotWindow : Form
             System.IO.Path.Combine(resultDirectory, "plot-title-" + titleToken + ".txt"),
             titleValue,
             Encoding.Unicode);
-        Result = "OK " + titleToken + " " +
+        var response = "OK " + titleToken + " " +
             String.Join(" ", values.ToArray()) + " " + action.ToString(CultureInfo.InvariantCulture) + "\n";
+        if (async != null)
+        {
+            RequestAsyncPlot(titleToken, response, action);
+            return;
+        }
+        Result = response;
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    // Asynchronous mode: Praat keeps running, so the response goes to a file and Praat is
+    // asked (via its message window) to run the plot callback script.
+    private void RequestAsyncPlot(string token, string response, int action)
+    {
+        System.IO.File.WriteAllText(
+            System.IO.Path.Combine(resultDirectory, "plot-response-" + token + ".txt"),
+            response, new UTF8Encoding(false));
+        string script = "runScript: \"" + async.CallbackScript + "\", \"" + token + "\", \"" + mode + "\", " +
+            async.SoundId + ", " + async.GridId + ", " + async.PitchId + "\n";
+        SetBusy(true);
+        var worker = new System.Threading.Thread(delegate ()
+        {
+            string problem = PraatLink.Send(async.PraatProcessId, async.PreferencesDirectory, script);
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    SetBusy(false);
+                    if (problem != null)
+                    {
+                        MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    if (action == 3)
+                    {
+                        DialogResult = DialogResult.OK;
+                        Close();
+                    }
+                });
+            }
+            catch (InvalidOperationException) { }
+        });
+        worker.IsBackground = true;
+        worker.Start();
+    }
+
+    private void SetBusy(bool busy)
+    {
+        foreach (var name in new[] { "DrawAndExit", "Draw" })
+        {
+            var found = Controls.Find(name, true);
+            if (found.Length > 0)
+                found[0].Enabled = !busy;
+        }
+        UseWaitCursor = busy;
+    }
+
+    private void StartParentWatch()
+    {
+        var timer = new Timer { Interval = 1000 };
+        timer.Tick += delegate
+        {
+            if (!PraatLink.IsRunning(async.PraatProcessId))
+            {
+                timer.Stop();
+                DialogResult = DialogResult.Cancel;
+                Close();
+            }
+        };
+        timer.Start();
     }
 
     private void UpdatePlotControls()

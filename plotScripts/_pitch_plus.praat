@@ -174,23 +174,38 @@
     longRecordingConfirmed = 0
     windowsPlotUI = 0
     formPlotUI = 0
+    asyncPlotCallback = 0
+    asyncPlotLaunch = 0
     if variableExists("aeroFormPlotUI")
         formPlotUI = 1
+    elsif variableExists("aeroAsyncPlotCallback")
+        windowsPlotUI = 1
+        asyncPlotCallback = 1
+        longRecordingConfirmed = 1
     elsif variableExists("aeroWindowsPlotUI")
         windowsPlotUI = aeroWindowsPlotUI
     else
         # Use the saved interface preference; fall back silently to Praat.
         @getUIMode
         windowsPlotUI = getUIMode.mode$ = "windows"
+        asyncPlotLaunch = windowsPlotUI
     endif
     if windowsPlotUI
         @windowsPlotInitialize
+    endif
+    if asyncPlotLaunch
+        # The dialog runs on its own; Praat stays usable and is asked to draw when needed.
+        @windowsPlotLaunch
+        selectObject: original_state#
+        exit
     endif
     repeat
     minimum_F0 = minimum_f0
     maximum_F0 = maximum_f0
     if formPlotUI
         @formPlotDialog
+    elsif asyncPlotCallback
+        @asyncPlotDialog
     elsif windowsPlotUI
         @windowsPlotDialog
     else
@@ -310,6 +325,9 @@ until clicked = 3
 
 if formPlotUI
     @formPlotFinish
+endif
+if asyncPlotCallback
+    @asyncPlotFinish
 endif
 
 

@@ -207,14 +207,34 @@ actions are available for a Sound, with or without a TextGrid, and open a
 Windows dialog.
 They expose the existing plot settings in a Windows dialog, including the
 TextGrid crop/display controls when a TextGrid is selected. Spectrogram hides
-PitchPlus-only controls. **Draw** redraws and reopens the dialog; **Draw & Exit**
+PitchPlus-only controls. **Draw** redraws and keeps the dialog open; **Draw & Exit**
 draws once and closes it. Praat's existing plotting procedures still do the
 analysis and drawing; with **Use Praat interface** the same actions keep their
 Praat pause forms.
 
-The Windows dialog is synchronous: Praat waits while it is open. Plot settings
+The Windows dialog for PitchPlus and Spectrogram is not modal: Praat stays
+usable while it is open. **Draw** sends a request to Praat, which draws the plot
+in the Picture window; the dialog stays open and its buttons are disabled until
+drawing finishes. **Draw & Exit** draws and then closes the dialog; **Cancel**
+closes it without drawing. The dialog closes by itself if Praat exits. If an
+input object is removed while the dialog is open, Praat reports it on the next
+Draw. After each Draw the Objects selection is restored to what it was and the
+Picture viewport covers the complete image, including any waveform and TextGrid
+tier, at the selected width. Plot settings
 use the existing PitchPlus settings file, so the interfaces share remembered
 general settings.
+
+Requests travel through Praat's `Message.txt` in its preferences folder, which
+is shared by every sender. Avoid running other tools that message Praat at the
+same time, and avoid starting other scripts while a plot is being drawn. Very
+long recordings are drawn without the long-recording warning in this mode. The
+explicit `windowsPitchPlusPrototype.praat` and `windowsSpectrogramPrototype.praat`
+scripts, used by the tests, and the Create Table dialog remain synchronous.
+
+`tests\windows_async_plot_isolated.ps1` checks the asynchronous plot dialog
+(Praat responsive while open, repeated Draw, Draw & Exit, selection restored,
+dialog closing when Praat exits). It takes the same `-Praat` and
+`-TestDirectory` arguments as the other Windows tests.
 
 The Windows UI tests in [tests](tests) require Windows, Praat, and the .NET
 Framework compiler. `tests\windows_plot_ui_isolated.ps1` builds the helper into
@@ -272,8 +292,8 @@ uses a shared `Message.txt`, so targeting a specific window is not sufficient
 to avoid interference between normal instances or other senders. Safe callback
 delivery, automatic helper lifecycle, simultaneous callbacks using shared
 preferences, and edits to input objects while the dialog is open remain
-unresolved. The Windows UI actions above remain synchronous; no asynchronous
-production callback is exposed.
+unresolved. The Create Table Windows dialog remains synchronous; the PitchPlus
+and Spectrogram dialogs use this mechanism (see above).
 
 ## Legacy Manual
 
