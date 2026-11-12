@@ -36,7 +36,7 @@ Add action command: "Table", 1, "", 0, "", 0, "F1F2 Plot...", "AERoPlot", 0, "pl
 ## AERoPlot Sound + TextGrid
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, " ", "", 0, ""
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "AERoPlot", "", 0, ""
-Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Create Table from nested TextGrid tiers", "AERoPlot", 0, "plotScripts/nestedTiers2Table.praat"
+Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Create Table", "AERoPlot", 0, "plotScripts/nestedTiers2Table.praat"
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "PitchPlus", "AERoPlot", 0, "plotScripts/pitch_plus.praat"
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Spectrogram", "AERoPlot", 0, "plotScripts/spectro_plus.praat"
 

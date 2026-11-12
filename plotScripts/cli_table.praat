@@ -1,4 +1,4 @@
-form AERoPlot: Create Table from nested TextGrid tiers (command line)
+form AERoPlot: Create Table (command line)
     comment All values are required positionally when run with Praat --run.
     comment Use "none" for the Sound file if no formants are wanted.
     sentence Textgrid_file

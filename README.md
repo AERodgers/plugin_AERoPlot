@@ -32,24 +32,43 @@ It can also draw the **intensity contour** alone or just the **spectrogram (and 
  
 ### **Plots from data tables**
 
-Create three plot types from tables generated with **Create Table from nested TextGrid tiers**, or from any well-formed, compatible table or table file:
+Create three plot types from tables generated with **Create Table**, or from any well-formed, compatible table or table file:
 
 * **F1–F2 plots**
 * **Formant plots** (2+ formants; called “Ladefoed plots” here)
 * **Formants-over-time plots** (similar to Ladefoed plots, with time on the x-axis)
 
-Tables created from **Create Table from nested TextGrid tiers** are very useful for extracting standard acoustic and TextGrid parameters.
+Tables created from **Create Table** are very useful for extracting standard acoustic and TextGrid parameters.
 
 ## A Quick tutorial using the sample data  
 In Praat's Objects window:
 * Use **Praat > AERoPlot > Load example sound and text grid** to load the example Sound and TextGrid.
 * Select both the Sound and TextGrid objects
-* Use **Create Table from nested TextGrid tiers** to convert the nested TextGrid tiers to a data table
+* Use **Create Table** to convert the nested TextGrid tiers to a data table
 * Select the **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
 * Select a **Sound** to access **PitchPlus** or **Spectrogram**, or select a Sound and TextGrid to include a TextGrid tier.
 (Note this is more suited to short sound files rather than the full sample data files.)
 
-In the original **Create Table from nested TextGrid tiers** dialog, tier fields
+### How Create Table reads a nested TextGrid
+
+Create Table turns the labels of a TextGrid into one table row per item of the
+**base tier**.
+
+* **Base tier**: the finest tier, with one row per interval or point. For example,
+  with tiers Speaker, Type, Segment, IPA and Element, where IPA points sit inside
+  Segment intervals, choose IPA or Element as the base tier. A Segment base would
+  give one row per segment, so segments with one or two formant points could not
+  fill the same columns.
+* **Other tiers**: tiers that contain the base tier (here Speaker, Type and
+  Segment). Each base item takes the label of the item that contains it, and each
+  tier becomes a column. Tiers that lie inside the base tier would give empty
+  columns, so they are not offered (Windows) or are rejected with a message.
+* **Duration tier** (optional): any interval tier. It adds a `[tierName]_dur`
+  column in seconds with the length of the interval containing each row.
+* **Formants** (optional): measured on the base tier, at each point for a point
+  tier, or averaged over the interval for an interval tier.
+
+In the original **Create Table** dialog, tier fields
 accept either a tier name or its number in the TextGrid. Separate multiple
 additional tiers with commas. Numeric tier names can be confused with tier
 positions; if an entry matches two different tiers, rename the numeric tier
@@ -191,7 +210,7 @@ To try this source version on Windows:
 ### Create Table
 
 Select one Sound and one TextGrid, choose **Use Windows interface** as above,
-then choose **Create Table from nested TextGrid tiers** under **AERoPlot**. The dialog lists the actual tier names and
+then choose **Create Table** under **AERoPlot**. The dialog lists the actual tier names and
 creates a Table in the same Praat session.
 
 Choose a base tier and, optionally, additional tiers. Additional tiers are
