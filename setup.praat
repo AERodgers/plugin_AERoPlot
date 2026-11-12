@@ -127,6 +127,22 @@ Add action command:
 ... "AERoPlot", 0,
 ... "plotScripts/windowsTablePrototype.praat"
 
+Add action command:
+... "Sound", 1,
+... "TextGrid", 1,
+... "", 0,
+... "PitchPlus (Windows UI prototype)...",
+... "AERoPlot", 0,
+... "plotScripts/windowsPitchPlusPrototype.praat"
+
+Add action command:
+... "Sound", 1,
+... "TextGrid", 1,
+... "", 0,
+... "Spectrogram (Windows UI prototype)...",
+... "AERoPlot", 0,
+... "plotScripts/windowsSpectrogramPrototype.praat"
+
 
 Add action command:
 ... "Sound", 1,
@@ -143,6 +159,22 @@ Add action command:
 ... "Spectrogram",
 ... "AERoPlot", 0,
 ... "plotScripts/spectro_plus.praat"
+
+Add action command:
+... "Sound", 1,
+... "", 0,
+... "", 0,
+... "PitchPlus (Windows UI prototype)...",
+... "AERoPlot", 0,
+... "plotScripts/windowsPitchPlusPrototype.praat"
+
+Add action command:
+... "Sound", 1,
+... "", 0,
+... "", 0,
+... "Spectrogram (Windows UI prototype)...",
+... "AERoPlot", 0,
+... "plotScripts/windowsSpectrogramPrototype.praat"
 
 ## AERoPlot Sound
 Add action command:

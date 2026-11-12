@@ -12,7 +12,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'The .NET Framework compiler was not found.' }
 $helper = Join-Path $testRoot 'AsyncProbe.exe'
-& $compiler /nologo /target:winexe /main:AsyncUiProbe /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll "/out:$helper" (Join-Path $root 'windows-ui\TableUI.cs') (Join-Path $PSScriptRoot 'async_ui_probe.cs')
+& $compiler /nologo /target:winexe /main:AsyncUiProbe /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll "/out:$helper" (Join-Path $root 'windows-ui\TableUI.cs') (Join-Path $root 'windows-ui\PlotUI.cs') (Join-Path $PSScriptRoot 'async_ui_probe.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Unable to compile the async probe.' }
 
 Add-Type -AssemblyName UIAutomationClient

@@ -10,6 +10,8 @@ internal static class Program
     {
         try
         {
+            if (args.Length > 0 && args[0] == "PLOT")
+                return PlotUI.Run(args);
             if (args.Length != 3)
                 throw new ArgumentException("Expected a Sound name, a TextGrid name, and a list of tiers.");
             string[] tiers = args[2].Split('\n');

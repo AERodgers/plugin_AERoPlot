@@ -49,6 +49,17 @@ In Praat's Objects window:
 * Select a **Sound** to access **PitchPlus** or **Spectrogram**, or select a Sound and TextGrid to include a TextGrid tier.
 (Note this is more suited to short sound files rather than the full sample data files.)
 
+In the original **Create Table from nested TextGrid tiers** dialog, tier fields
+accept either a tier name or its number in the TextGrid. Separate multiple
+additional tiers with commas. Numeric tier names can be confused with tier
+positions; if an entry matches two different tiers, rename the numeric tier
+before continuing. Duplicate tier names also need to be made unique.
+
+The optional point-tier field is validated but formant measurements still use
+the base tier's times. To add `Vowel.dur`, enter both optional tier fields and
+use a point tier as the base tier. Durations use the existing calculation from
+the rounded TextGrid table times, in milliseconds.
+
 When both a Sound and TextGrid are selected, both interfaces offer separate dropdowns for the interval tier used to crop the plot to its first and last non-empty intervals, and the tier shown with the spectrogram. Point tiers are available for display but not cropping. Choose **Do not crop** to use the full Sound duration, or **No TextGrid** in the display menu to hide the tier. The boundary checkbox controls dotted extensions of tier boundaries or points over the plot; separators in the tier itself remain visible. The TextGrid font can be selected independently; **Times** uses Praat's Times serif face. Axis and TextGrid text use 12 pt, and the title uses 16 pt. Without a selected TextGrid, the TextGrid controls are hidden and the full Sound duration is used. The interfaces share remembered general settings and the boundary checkbox; TextGrid tier selections and font are not remembered between runs. Existing PitchPlotPlus or C3PoGram settings are migrated on first use, leaving the old settings file intact. Spectrogram does not change PitchPlus's contour or spectrogram-toggle preferences.
 
 Choose **Draw** to draw and reopen the settings with all choices intact, including TextGrid choices for the current run. Each redraw replaces the previous picture. Choose **Draw & Exit** to draw and finish, or **Cancel** to finish without drawing again.
@@ -84,26 +95,56 @@ For formants-over-time plots with relative time, each combination of main factor
 
 The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus interactive PitchPlus and Spectrogram smoke tests. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the plot smoke tests from Praat's GUI; their settings windows require choosing **Draw**, **Draw & Exit**, or **Cancel**.
 
-## Experimental Windows Table interface
+On Windows, run `tests\table_tier_references_isolated.ps1` with `-Praat` and a
+new `-TestDirectory` to check tier name and number resolution, ambiguity and
+type errors, and vowel duration extraction. The runner also accepts an optional
+`-SampleTextGrid` argument for the documented 35-row sample regression.
 
-This branch contains a **proof of concept**, not a finished installer. It adds
-**Create Table (Windows UI prototype)...** alongside the existing action when a
-Sound and TextGrid are selected. The dialog lists the actual tier names and
-creates a Table in the same Praat session. The original action remains
-available for formant extraction and its other options.
+### Interface separation in progress
+
+The main native Praat dialog procedures for F1-F2, Ladefoged, formants over
+time, and Create Table live in separate `_praat_*_ui.praat` files. PitchPlus and
+Spectrogram share a plotting script with separate native and Windows dialog
+procedures. These adapters still use the existing shared variables and settings;
+the shared filtering, colour, saving and warning prompts have not yet been
+separated from their processing procedures. There is no global UI preference
+or automatic fallback yet.
+
+On Windows, `tests\praat_ui_refactor_isolated.ps1` exercises the native
+PitchPlus and Spectrogram draw-and-exit paths and opens and exits the initial
+native dialogs for the other four workflows. It runs in an interactive desktop
+and requires a new test directory:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\praat_ui_refactor_isolated.ps1 -Praat "C:\Program Files\Praat\Praat.exe" -TestDirectory "C:\temp\aeroplot-native-ui-test"
+```
+
+The test saves PitchPlus and Spectrogram images in the test directory for
+comparison. It does not yet test the complete table or formant-plot workflows.
+
+## Experimental Windows interfaces
+
+These Windows Forms interfaces are **proofs of concept, not a finished
+installer**. They are launched from Praat, while Praat remains responsible for
+processing and drawing. The original Praat dialogs remain available.
 
 To try this source version on Windows:
 
 1. Use Praat 6.4.60 or newer. The prototype was tested with Praat 6.4.60.
 2. Before copying the plugin to the Praat preferences folder, double-click
-   `windows-ui\build.cmd` in the extracted plugin folder. It compiles the dialog
-   using the .NET Framework 4 compiler included with many Windows installations;
-   the compiler must be present. The generated executable is not included in
-   source downloads. If building fails, the original Praat-only action remains
-   available.
+   `windows-ui\build.cmd` in the extracted plugin folder. It builds the shared
+   Windows dialog helper using the .NET Framework 4 compiler; the compiler must
+   be present. The generated `windows-ui\bin\AERoPlotWindowsUI.exe` is not
+   included in source downloads. If building fails, the original Praat actions
+   remain available.
 3. Copy the complete folder, including `windows-ui\bin`, into the Praat
-   preferences folder as described above and restart Praat. Select one Sound
-   and one TextGrid, then select the prototype action under **AERoPlot**.
+   preferences folder as described above and restart Praat.
+
+### Create Table
+
+Select one Sound and one TextGrid, then choose **Create Table (Windows UI
+prototype)...** under **AERoPlot**. The dialog lists the actual tier names and
+creates a Table in the same Praat session.
 
 Choose a base tier and, optionally, additional tiers. Additional tiers are
 processed in their TextGrid order. Only table extraction is supported in this
@@ -120,10 +161,37 @@ Praat is forcibly closed while the dialog is open, close the dialog separately.
 This synchronous design avoids sending a command to a different Praat session,
 but needs further usability and error-handling work before release.
 
-The interactive tests in [tests](tests) exercise the dialog, cancellation and
-nested tiers; they require Windows, a built executable under an isolated
-`--pref-dir` in `plugin_AERoPlot/windows-ui/bin`, and user or UI automation
-interaction. They are separate from the existing batch tests.
+### PitchPlus and Spectrogram
+
+The **PitchPlus (Windows UI prototype)...** and **Spectrogram (Windows UI
+prototype)...** actions are available for a Sound, with or without a TextGrid.
+They expose the existing plot settings in a Windows dialog, including the
+TextGrid crop/display controls when a TextGrid is selected. Spectrogram hides
+PitchPlus-only controls. **Draw** redraws and reopens the dialog; **Draw & Exit**
+draws once and closes it. Praat's existing plotting procedures still do the
+analysis and drawing, and the original **PitchPlus** and **Spectrogram**
+actions keep their Praat pause forms.
+
+The Windows dialog is synchronous: Praat waits while it is open. Plot settings
+use the existing PitchPlus settings file, so the two front ends share remembered
+general settings. These are experimental duplicate actions; the Windows
+interface does not replace the original actions or change their behavior.
+
+The Windows UI tests in [tests](tests) require Windows, Praat, and the .NET
+Framework compiler. `tests\windows_plot_ui_isolated.ps1` builds the helper into
+a new isolated preferences folder and automates Table, PitchPlus, Spectrogram,
+redraw, no-TextGrid, title, and cancellation checks. Run it from the repository
+root in an interactive desktop, using a test directory that does not already
+exist:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows_plot_ui_isolated.ps1 -Praat "C:\Program Files\Praat\Praat.exe" -TestDirectory "C:\temp\aeroplot-plot-ui-test"
+```
+
+The test opens and controls several Praat and dialog windows, and leaves its
+isolated test files for inspection. The table prototype's example comparison
+test is described below; all UI tests are separate from the existing batch
+tests.
 
 The example comparison test runs both interfaces on the example Sound and
 TextGrid and compares the complete tab-separated Tables. It requires a Praat
@@ -165,7 +233,8 @@ uses a shared `Message.txt`, so targeting a specific window is not sufficient
 to avoid interference between normal instances or other senders. Safe callback
 delivery, automatic helper lifecycle, simultaneous callbacks using shared
 preferences, and edits to input objects while the dialog is open remain
-unresolved. The synchronous prototype above remains the only available action.
+unresolved. The Windows UI actions above remain synchronous; no asynchronous
+production callback is exposed.
 
 ## Legacy Manual
 

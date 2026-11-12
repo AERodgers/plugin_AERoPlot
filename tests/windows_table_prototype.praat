@@ -22,3 +22,7 @@ plusObject: grid
 assert numberOfSelected() = 2
 removeObject: table, sound, grid
 writeInfoLine: "Windows Table prototype test passed."
+result$ = environment$("AEROPLOT_TEST_RESULT")
+if result$ != ""
+    writeFileLine: result$, "PASS"
+endif

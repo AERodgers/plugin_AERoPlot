@@ -15,7 +15,7 @@ procedure runWindowsTablePrototype
     ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch < 60)))
         exitScript: "The Windows UI prototype requires Praat 6.4.60 or newer. The original Table action is still available."
     endif
-    .exe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotTableUI.exe"
+    .exe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
     if not fileReadable(.exe$)
         exitScript: "The Windows UI prototype has not been built. See the prototype instructions in the AERoPlot README."
     endif
