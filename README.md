@@ -108,8 +108,9 @@ type errors, and vowel duration extraction. The runner also accepts an optional
 Every workflow has the same functions behind up to three interfaces. Interface
 code only collects settings; shared code validates them and does the work.
 
-1. **Praat interface** (default): the native pause windows. It is the fallback
-   whenever another interface cannot be used.
+1. **Praat interface**: the native pause windows. It is the fallback
+   whenever another interface cannot be used, and the default everywhere except
+   on Windows.
 2. **Command-line interface**: `plotScripts\cli_table.praat`,
    `cli_pitch_plus.praat` and `cli_spectrogram.praat` use Praat `form` fields so
    they can be run with `Praat --run`. All fields are positional, and the output
@@ -117,17 +118,22 @@ code only collects settings; shared code validates them and does the work.
    interactively. Dropdown fields take the option text (for example `F1 and F2`
    or `300 dpi`), and tick boxes take 0 or 1. F1-F2, Ladefoged and
    formants-over-time forms are not available yet.
-3. **Windows interface** (Create Table, PitchPlus and Spectrogram only): see
-   below.
+3. **Windows interface** (Create Table, PitchPlus and Spectrogram only; the
+   default on Windows): see below.
 
 Choose between the Praat and Windows interfaces with **Praat > AERoPlot >
 Use Praat interface** or **Use Windows interface**. These two entries appear
 on Windows only; elsewhere the Praat interface is the only one, so there is
-nothing to choose. The choice
+nothing to choose. Until you choose, Windows uses the Windows interface when it
+is usable. The choice
 is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
 (not Windows, Praat older than 6.4.60 or the helper has not been built), the
 Praat interface is used silently. F1-F2, Ladefoged and formants-over-time always
 use the Praat interface.
+
+When Praat starts on Windows the plug-in also launches the helper once in the
+background, so that the first dialog is not delayed by Windows checking the
+program.
 
 Optional text fields (such as the duration tier, title and
 TextGrid in the PitchPlus and Spectrogram forms) are switched off by leaving

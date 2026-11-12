@@ -1,6 +1,9 @@
 procedure ui
     .done = 0
     .comment$ = ""
+    if variableExists("ui.notice$")
+        .comment$ = ui.notice$
+    endif
 
     while !.done
         textgrid_address_or_object_number$ = .gridID$

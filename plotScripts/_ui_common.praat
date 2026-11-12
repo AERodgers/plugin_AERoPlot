@@ -16,12 +16,12 @@ endproc
 # otherwise the Praat interface is used silently.
 procedure getUIMode
     .file$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ui_mode.txt"
-    .preference$ = "praat"
+    .preference$ = "windows"
     if fileReadable(.file$)
         .saved$ = readFile$(.file$)
         .saved$ = lowerCase$(replace_regex$(.saved$, "^[ \t\r\n]+|[ \t\r\n]+$", "", 0))
-        if .saved$ = "windows"
-            .preference$ = "windows"
+        if .saved$ = "praat"
+            .preference$ = "praat"
         endif
     endif
     .mode$ = "praat"
@@ -69,64 +69,95 @@ endproc
 # the name of a different tier the entry is ambiguous and the user must rename.
 # Returns .tier, .interval (1 for interval tiers) and .name$.
 procedure resolveTierNumber: .textGrid, .reference$, .field$, .type$
+    .error$ = ""
+    .tier = 0
+    .interval = 0
+    .name$ = ""
     .reference$ = replace_regex$(.reference$, "^[ \t\r\n]+|[ \t\r\n]+$", "", 0)
     if .reference$ = ""
-        exitScript: .field$ + ": enter a tier name or number."
+        .error$ = .field$ + ": enter a tier name or number."
     endif
-    selectObject: .textGrid
-    .count = Get number of tiers
-    .nameMatch = 0
-    .matches = 0
-    for .i to .count
-        .candidate$ = Get tier name: .i
-        if .candidate$ = .reference$
-            .nameMatch = .i
-            .matches += 1
-        endif
-    endfor
-    if .matches > 1
-        exitScript: .field$ + ": multiple tiers are named """ + .reference$ + """. Give them unique names."
-    endif
-    .numberMatch = 0
-    if index_regex(.reference$, "^[0-9]+$") != 0
-        .number = number(.reference$)
-        if .number >= 1 and .number <= .count
-            .numberMatch = .number
-        endif
-    endif
-    if .numberMatch and .nameMatch and .numberMatch != .nameMatch
-        exitScript: .field$ + ": """ + .reference$ + """ refers to tier number " +
-        ... string$(.numberMatch) + " and a different tier named """ + .reference$ +
-        ... """. Please rename the numeric tier to avoid confusion."
-    endif
-    .tier = .numberMatch
-    if not .tier
-        .tier = .nameMatch
-    endif
-    if not .tier
-        exitScript: .field$ + ": no tier matches """ + .reference$ + """. Enter an existing tier name or number."
-    endif
-    .interval = Is interval tier: .tier
-    if .type$ = "interval" and not .interval
-        exitScript: .field$ + ": """ + .reference$ + """ must identify an interval tier."
-    elsif .type$ = "point" and .interval
-        exitScript: .field$ + ": """ + .reference$ + """ must identify a point tier."
-    endif
-    .name$ = Get tier name: .tier
-    if .name$ != ""
-        .actualMatches = 0
+    if .error$ = ""
+        selectObject: .textGrid
+        .count = Get number of tiers
+        .nameMatch = 0
+        .matches = 0
         for .i to .count
             .candidate$ = Get tier name: .i
-            if .candidate$ = .name$
-                .actualMatches += 1
+            if .candidate$ = .reference$
+                .nameMatch = .i
+                .matches += 1
             endif
         endfor
-        if .actualMatches > 1
-            exitScript: .field$ + ": multiple tiers are named """ + .name$ + """. Give them unique names."
+        if .matches > 1
+            .error$ = .field$ + ": multiple tiers are named """ + .reference$ + """. Give them unique names."
         endif
     endif
-    if index_regex(.name$, "^[0-9]+$") != 0
-        appendInfoLine: "Warning: tier """ + .name$ + """ has a numeric name. Use a descriptive name to avoid confusion with tier numbers."
+    if .error$ = ""
+        .numberMatch = 0
+        if index_regex(.reference$, "^[0-9]+$") != 0
+            .number = number(.reference$)
+            if .number >= 1 and .number <= .count
+                .numberMatch = .number
+            endif
+        endif
+        if .numberMatch and .nameMatch and .numberMatch != .nameMatch
+            .error$ = .field$ + ": """ + .reference$ + """ refers to tier number " +
+            ... string$(.numberMatch) + " and a different tier named """ + .reference$ +
+            ... """. Please rename the numeric tier to avoid confusion."
+        endif
+    endif
+    if .error$ = ""
+        .tier = .numberMatch
+        if not .tier
+            .tier = .nameMatch
+        endif
+        if not .tier
+            .error$ = .field$ + ": no tier matches """ + .reference$ + """. Enter an existing tier name or number."
+        endif
+    endif
+    if .error$ = ""
+        .interval = Is interval tier: .tier
+        if .type$ = "interval" and not .interval
+            .error$ = .field$ + ": """ + .reference$ + """ must identify an interval tier."
+        elsif .type$ = "point" and .interval
+            .error$ = .field$ + ": """ + .reference$ + """ must identify a point tier."
+        endif
+    endif
+    if .error$ = ""
+        .name$ = Get tier name: .tier
+        if .name$ != ""
+            .actualMatches = 0
+            for .i to .count
+                .candidate$ = Get tier name: .i
+                if .candidate$ = .name$
+                    .actualMatches += 1
+                endif
+            endfor
+            if .actualMatches > 1
+                .error$ = .field$ + ": multiple tiers are named """ + .name$ + """. Give them unique names."
+            endif
+        endif
+    endif
+    if .error$ = ""
+        if index_regex(.name$, "^[0-9]+$") != 0
+            appendInfoLine: "Warning: tier """ + .name$ + """ has a numeric name. Use a descriptive name to avoid confusion with tier numbers."
+        endif
+    else
+        @settingError: .error$
+    endif
+endproc
+
+# Report a problem with the user's settings. Normally the script stops with the
+# message. When the caller has set aeroSoftErrors = 1 it is only recorded in
+# the caller's .error$, so the caller can clean up and ask again.
+procedure settingError: .message$
+    .soft = 0
+    if variableExists("aeroSoftErrors")
+        .soft = aeroSoftErrors
+    endif
+    if not .soft
+        exitScript: .message$
     endif
 endproc
 
@@ -136,8 +167,10 @@ procedure resolveTierReference: .textGrid, .reference$, .field$, .type$
     .tier = resolveTierNumber.tier
     .interval = resolveTierNumber.interval
     .name$ = resolveTierNumber.name$
-    if .name$ = "" or index(.name$, ",") != 0
-        exitScript: .field$ + ": the selected tier needs a non-empty name without commas."
+    .error$ = resolveTierNumber.error$
+    if .error$ = "" and (.name$ = "" or index(.name$, ",") != 0)
+        .error$ = .field$ + ": the selected tier needs a non-empty name without commas."
+        @settingError: .error$
     endif
 endproc
 

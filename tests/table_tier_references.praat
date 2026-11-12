@@ -50,6 +50,25 @@ assert tierNested.ok = 1
 asserterror lies inside the base tier
 runScript: "table_tier_reference_error.praat", "lowerTier"
 
+# With soft errors the problem is reported and the settings stay as entered.
+aeroSoftErrors = 1
+ui.lowestTier$ = "Segment"
+ui.otherTiers$ = "IPA"
+ui.vowelDur$ = ""
+@resolveTableTierSettings: grid
+assert index(resolveTableTierSettings.error$, "lies inside the base tier") > 0
+assert ui.lowestTier$ = "Segment"
+assert ui.otherTiers$ = "IPA"
+ui.otherTiers$ = "99"
+@resolveTableTierSettings: grid
+assert index(resolveTableTierSettings.error$, "no tier matches") > 0
+ui.lowestTier$ = "Element"
+ui.otherTiers$ = "Segment"
+ui.vowelDur$ = "IPA"
+@resolveTableTierSettings: grid
+assert index(resolveTableTierSettings.error$, "must identify an interval tier") > 0
+aeroSoftErrors = 0
+
 @resolveTierReference: grid, " Segment ", "Test", "interval"
 assert resolveTierReference.tier = 1
 @resolveTierReference: grid, "2", "Test", "point"

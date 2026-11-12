@@ -61,7 +61,8 @@ assert preferencesDirectory$ = prefs$
 prefFile$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ui_mode.txt"
 assert not fileReadable(prefFile$)
 @getUIMode
-assert getUIMode.preference$ = "praat"
+# Windows is the default choice; with no helper program it silently falls back.
+assert getUIMode.preference$ = "windows"
 assert getUIMode.mode$ = "praat"
 
 @setUIMode: "windows"
@@ -76,12 +77,12 @@ assert getUIMode.mode$ = "praat"
 assert getUIMode.preference$ = "praat"
 
 # The menu scripts write the same preference.
-writeFile: prefFile$, "  WINDOWS " + newline$
-@getUIMode
-assert getUIMode.preference$ = "windows"
-writeFile: prefFile$, "something else"
+writeFile: prefFile$, "  PRAAT " + newline$
 @getUIMode
 assert getUIMode.preference$ = "praat"
+writeFile: prefFile$, "something else"
+@getUIMode
+assert getUIMode.preference$ = "windows"
 deleteFile: prefFile$
 
 writeInfoLine: "Interface helper tests passed."

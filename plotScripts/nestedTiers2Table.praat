@@ -46,14 +46,32 @@ procedure main
     endif
 
     @getObject: ui.gridID$, "textGrid", "main"
-    @getObject: ui.soundID$, "sound", "main"
+    @getSoundIfAny
     if not variableExists("aeroWindowsTableSettings")
+        # A bad tier setting must not leave copies in the Objects list. The
+        # command line reports it and stops; the pause window asks again.
+        aeroSoftErrors = 1
         @resolveTableTierSettings: .textGrid
+        while resolveTableTierSettings.error$ != ""
+            .message$ = resolveTableTierSettings.error$
+            @removeCopies: .textGrid, .sound
+            if variableExists("aeroNonInteractive")
+                exitScript: .message$
+            endif
+            ui.notice$ = .message$
+            @ui
+            @writeVars:
+            ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+            @getObject: ui.gridID$, "textGrid", "main"
+            @getSoundIfAny
+            @resolveTableTierSettings: .textGrid
+        endwhile
+        aeroSoftErrors = 0
     endif
     if ui.formants2tabulate > 1
         @warnLongRecording: .sound
         if not warnLongRecording.proceed
-            removeObject: {.textGrid, .sound}
+            @removeCopies: .textGrid, .sound
             exit
         endif
     endif
@@ -80,7 +98,9 @@ procedure main
 
 
     selectObject: .textGrid
-    plusObject: .sound
+    if .sound
+        plusObject: .sound
+    endif
     Remove
 
     if variableExists("aeroWindowsTableSettings")
@@ -90,6 +110,22 @@ procedure main
     firstPass = 0
     # @writeVars:
     # ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+endproc
+
+# The Sound is only needed for formants; a blank entry means none.
+procedure getSoundIfAny
+    main.sound = 0
+    if ui.soundID$ != ""
+        @getObject: ui.soundID$, "sound", "main"
+    endif
+endproc
+
+procedure removeCopies: .textGrid, .sound
+    selectObject: .textGrid
+    if .sound
+        plusObject: .sound
+    endif
+    Remove
 endproc
 
 ## UI-RELATED PROCEDURES
@@ -112,6 +148,7 @@ endproc
 
 ## CONVERSION OF NESTED TEXTGRID TO TABLE
 procedure resolveTableTierSettings: .textGrid
+    .error$ = ""
     # Older settings may hold a point tier for formant times; formants are now
     # always measured on the base tier, so it is ignored.
     ui.formantTier$ = ""
@@ -120,28 +157,44 @@ procedure resolveTableTierSettings: .textGrid
         ui.vowelDur$ = ""
     endif
     @resolveTierReference: .textGrid, ui.lowestTier$, "Base tier", "any"
-    ui.lowestTier$ = resolveTierReference.name$
-    .baseIsInterval = resolveTierReference.interval
+    .error$ = resolveTierReference.error$
+    .newBase$ = resolveTierReference.name$
     .baseTier = resolveTierReference.tier
     @csvLine2Array: ui.otherTiers$, "resolveTableTierSettings.count", "resolveTableTierSettings.entries$"
     .resolved$ = ""
     for .i to .count
-        @resolveTierReference: .textGrid, .entries$[.i], "Other tiers", "any"
-        @tierNested: .textGrid, .baseTier, resolveTierReference.tier
-        if not tierNested.ok
-            exitScript: "Other tiers: """ + resolveTierReference.name$ +
-            ... """ lies inside the base tier, so it cannot fill a column. " +
-            ... "Remove it, or choose a finer base tier."
+        if .error$ = ""
+            @resolveTierReference: .textGrid, .entries$[.i], "Other tiers", "any"
+            .error$ = resolveTierReference.error$
         endif
-        if .resolved$ != ""
-            .resolved$ += ","
+        if .error$ = ""
+            @tierNested: .textGrid, .baseTier, resolveTierReference.tier
+            if not tierNested.ok
+                .error$ = "Other tiers: """ + resolveTierReference.name$ +
+                ... """ lies inside the base tier, so it cannot fill a column. " +
+                ... "Remove it, or choose a finer base tier."
+                @settingError: .error$
+            endif
         endif
-        .resolved$ += resolveTierReference.name$
+        if .error$ = ""
+            if .resolved$ != ""
+                .resolved$ += ","
+            endif
+            .resolved$ += resolveTierReference.name$
+        endif
     endfor
-    ui.otherTiers$ = .resolved$
-    if ui.vowelDur$ != ""
+    .newDur$ = ui.vowelDur$
+    if .error$ = "" and ui.vowelDur$ != ""
         @resolveTierReference: .textGrid, ui.vowelDur$, "Duration tier", "interval"
-        ui.vowelDur$ = resolveTierReference.name$
+        .error$ = resolveTierReference.error$
+        .newDur$ = resolveTierReference.name$
+    endif
+    # Settings are only replaced by their resolved names when all are valid, so
+    # an interface can show the user's original entries again.
+    if .error$ = ""
+        ui.lowestTier$ = .newBase$
+        ui.otherTiers$ = .resolved$
+        ui.vowelDur$ = .newDur$
     endif
 endproc
 

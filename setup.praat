@@ -18,6 +18,10 @@ if environment$("OS") = "Windows_NT"
     Add menu command: "Objects", "Praat", "--", "AERoPlot", 1, ""
     Add menu command: "Objects", "Praat", "Use Praat interface", "AERoPlot", 1, "plotScripts/usePraatUI.praat"
     Add menu command: "Objects", "Praat", "Use Windows interface", "AERoPlot", 1, "plotScripts/useWindowsUI.praat"
+    # Wake the helper in the background so the first dialog opens quickly.
+    if fileReadable(preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe")
+        nocheck asynchronous runSubprocess: preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe", "WARMUP"
+    endif
 endif
 
 # Action Commands

@@ -12,6 +12,13 @@ internal static class Program
     {
         try
         {
+            if (args.Length > 0 && args[0] == "WARMUP")
+            {
+                // Started in the background when Praat opens, so that Windows has
+                // already checked this program and loaded Windows Forms later.
+                using (new Form()) { }
+                return 0;
+            }
             if (args.Length > 0 && args[0] == "PLOT")
                 return PlotUI.Run(args);
             if (args.Length > 0 && args[0] == "TABLE")
