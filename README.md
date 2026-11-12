@@ -137,8 +137,8 @@ code only collects settings; shared code validates them and does the work.
    interactively. Dropdown fields take the option text (for example `F1 and F2`
    or `300 dpi`), and tick boxes take 0 or 1. F1-F2, Ladefoged and
    formants-over-time forms are not available yet.
-3. **Windows interface** (Create Table, PitchPlus and Spectrogram only; the
-   default on Windows): see below.
+3. **Windows interface** (Create Table, PitchPlus, Spectrogram and F1-F2 only;
+   the default on Windows): see below.
 
 Choose between the Praat and Windows interfaces with **Praat > AERoPlot >
 Use Praat interface** or **Use Windows interface**. These two entries appear
@@ -147,8 +147,9 @@ nothing to choose. Until you choose, Windows uses the Windows interface when it
 is usable. The choice
 is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
 (not Windows, Praat older than 6.4.60 or the helper has not been built), the
-Praat interface is used silently. F1-F2, Ladefoged and formants-over-time always
-use the Praat interface.
+Praat interface is used silently. Ladefoged and formants-over-time always
+use the Praat interface. F1-F2 uses the Windows interface when one Table is
+selected and the Praat interface otherwise (for example to read a table file).
 
 When Praat starts on Windows the plug-in also launches the helper once in the
 background, so that the first dialog is not delayed by Windows checking the
@@ -230,6 +231,36 @@ until the dialog is closed. Cancel leaves the original selection intact. If
 Praat is forcibly closed while the dialog is open, close the dialog separately.
 This synchronous design avoids sending a command to a different Praat session,
 but needs further usability and error-handling work before release.
+
+### F1-F2 plot
+
+With one Table selected, **F1-F2 plot** opens a Windows dialog that stays open
+while Praat remains usable.
+
+* **Data**: dropdowns of the table's columns for the main and secondary factors
+  and for F1 and F2. F1 and F2 are pre-selected from numeric columns whose names
+  look like them (`F1`, `f1`, `Formant1`, `F_1_Hz`, but not `F10`). Bark is
+  chosen when the names say Bark or all F2 values are below 30.
+* **Include**: tick the levels of each factor to draw. **Add filter** keeps only
+  chosen values of any other column.
+* **Plot**: title, size, legend and the F1 and F2 ranges (reset when the input
+  units change).
+* **Appearance**: **Font**, **Output units**, **Save folder** and **Colour
+  settings** open small dialogs and show the current choice. Colour re-sorting
+  applies once, at the next **Draw**. Choosing manual re-sorting, matching
+  levels to colours or adding a scheme opens the familiar Praat window.
+* **Layers**: how to mark data points, show means, the core level, the most
+  prominent layer, ellipses and arrows.
+
+**Draw** keeps the dialog open; **Draw & Exit** draws and closes it. **Save
+image** saves the plot now shown in the Picture window under **Save name** in
+the save folder; drawing alone never writes a file. Settings are remembered in
+`data\vars\f1f1Plot.var`, shared with the Praat interface. The source is
+`windows-ui\TablePlotUI.cs`, with the Praat side in
+`plotScripts\_windows_f1f2_ui.praat`.
+`tests\windows_f1f2_isolated.ps1` checks the dialog (Draw, Save image, Draw &
+Exit, selection restored) with the same `-Praat` and `-TestDirectory`
+arguments as the other Windows tests.
 
 ### PitchPlus and Spectrogram
 

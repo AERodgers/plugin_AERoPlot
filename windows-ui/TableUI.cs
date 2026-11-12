@@ -23,6 +23,8 @@ internal static class Program
                 return PlotUI.Run(args);
             if (args.Length > 0 && args[0] == "TABLE")
                 return TableUI.Run(args);
+            if (args.Length > 0 && args[0] == "TABLEPLOT")
+                return TablePlotUI.Run(args);
             throw new ArgumentException("The requested interface is not supported.");
         }
         catch (Exception error)
