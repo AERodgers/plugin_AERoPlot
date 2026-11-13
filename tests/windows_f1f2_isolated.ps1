@@ -190,6 +190,36 @@ try {
     if ((Get-Content -LiteralPath $currentPalette -Raw) -eq (Get-Content -LiteralPath $defaultPalette -Raw)) {
         throw 'Re-sorting did not change the palette.'
     }
+    $sortedPalette = Get-Content -LiteralPath $currentPalette -Raw
+    foreach ($tag in 'brightness-first', 'brightness-second') {
+        Click-Button $dialog 'Draw'
+        Wait-Idle $dialog
+        $report = Get-Report $praatProcess.Id $tag
+        if ($report.Picture -le 5000) { throw "The $tag plot is empty." }
+        if ((Get-Content -LiteralPath $currentPalette -Raw) -ne $sortedPalette) {
+            throw 'The brightness-sorted palette changed on redraw.'
+        }
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'brightness-first-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'brightness-second-picture.png')).Hash) {
+        throw 'Redrawing changed the brightness-sorted plot.'
+    }
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort by maximal perceptual difference'
+    Wait-Idle $dialog
+    $sortedPalette = Get-Content -LiteralPath $currentPalette -Raw
+    foreach ($tag in 'difference-first', 'difference-second') {
+        Click-Button $dialog 'Draw'
+        Wait-Idle $dialog
+        $report = Get-Report $praatProcess.Id $tag
+        if ($report.Picture -le 5000) { throw "The $tag plot is empty." }
+        if ((Get-Content -LiteralPath $currentPalette -Raw) -ne $sortedPalette) {
+            throw 'The perceptually sorted palette changed on redraw.'
+        }
+    }
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'difference-first-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'difference-second-picture.png')).Hash) {
+        throw 'Redrawing changed the perceptually sorted plot.'
+    }
     Choose-ColourMode $dialog $dialogProcess.Id 'Restore the original default palette'
     Wait-Idle $dialog
     if ((Get-Content -LiteralPath $currentPalette -Raw) -ne (Get-Content -LiteralPath $defaultPalette -Raw)) {
@@ -211,13 +241,13 @@ try {
     $afterCancel = Get-Report $praatProcess.Id 'after-colour-cancel'
     if ($afterCancel.Report -notmatch '^1\s+other$') { throw 'Selection was not restored after cancelling colour settings.' }
 
-    # Matching opens immediately and its choices survive until the next draw.
-    Choose-ColourMode $dialog $dialogProcess.Id 'Match levels to colours in the next plot (a Praat window opens)'
+    # Matching opens immediately and its choices survive repeated draws.
+    Choose-ColourMode $dialog $dialogProcess.Id 'Match levels to colours for this dialog (a Praat window opens)'
     Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Colours choices for each*'; $null -ne $script:praatWindow } 'the Praat colour matching window'
     Click-Button $script:praatWindow 'Continue'
     Wait-Idle $dialog
     $matchFiles = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\temp\f1f2-ui') -Filter 'f1f2-colours-*.txt')
-    if ($matchFiles.Count -ne 1) { throw 'Colour matches were not saved for the next draw.' }
+    if ($matchFiles.Count -ne 1) { throw 'Colour matches were not saved for this dialog.' }
     $matches = Get-Content -LiteralPath $matchFiles[0].FullName
     if ($matches[1] -ne "m`t1") { throw "Colour matches have unexpected contents: $($matches -join ', ')" }
     $matches[1] = "m`t2"
@@ -230,7 +260,7 @@ try {
     if ($script:drawn.Picture -le 5000) { throw 'The first plot is empty.' }
     if ($dialogProcess.HasExited) { throw 'The dialog closed after Draw.' }
     if ($script:drawn.Report -notmatch '^1\s+other$') { throw "Selection not restored after Draw: $($script:drawn.Report)" }
-    if (Test-Path -LiteralPath $matchFiles[0].FullName) { throw 'Colour matches were not consumed by Draw.' }
+    if (-not (Test-Path -LiteralPath $matchFiles[0].FullName)) { throw 'Colour matches were discarded by Draw.' }
     if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'default-colours-picture.png')).Hash -eq
         (Get-FileHash -LiteralPath (Join-Path $testRoot 'draw1-picture.png')).Hash) {
         throw 'The saved colour match did not affect the plot.'
@@ -238,9 +268,37 @@ try {
     Click-Button $dialog 'Draw'
     Wait-Idle $dialog
     $next = Get-Report $praatProcess.Id 'after-colour-match'
-    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'default-colours-picture.png')).Hash -ne
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'draw1-picture.png')).Hash -ne
         (Get-FileHash -LiteralPath (Join-Path $testRoot 'after-colour-match-picture.png')).Hash) {
-        throw 'Colour matching affected more than one plot.'
+        throw 'Colour matching did not survive the second draw.'
+    }
+    Click-Button $dialog 'Save image'
+    Wait-Idle $dialog
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort manually (a Praat window opens)'
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Reorder Default Colour Sequence*'; $null -ne $script:praatWindow } 'the Praat reorder window'
+    Click-Button $script:praatWindow 'Exit'
+    Wait-Idle $dialog
+    if (-not (Test-Path -LiteralPath $matchFiles[0].FullName)) { throw 'Cancelling discarded colour matches.' }
+    Choose-ColourMode $dialog $dialogProcess.Id 'No change'
+    Wait-Idle $dialog
+    if (-not (Test-Path -LiteralPath $matchFiles[0].FullName)) { throw 'No change discarded colour matches.' }
+    Click-Button $dialog 'Draw'
+    Wait-Idle $dialog
+    $afterNoChange = Get-Report $praatProcess.Id 'after-no-change'
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'draw1-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'after-no-change-picture.png')).Hash) {
+        throw 'No change altered the matched colours.'
+    }
+
+    Choose-ColourMode $dialog $dialogProcess.Id 'Restore the original default palette'
+    Wait-Idle $dialog
+    if (Test-Path -LiteralPath $matchFiles[0].FullName) { throw 'Restoring the default did not clear colour matches.' }
+    Click-Button $dialog 'Draw'
+    Wait-Idle $dialog
+    $restored = Get-Report $praatProcess.Id 'restored-colours'
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'default-colours-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'restored-colours-picture.png')).Hash) {
+        throw 'Restoring the default did not restore the plot colours.'
     }
 
     # Save image writes a PNG into the default folder.
@@ -255,11 +313,25 @@ try {
     $remembered = Get-Content -LiteralPath (Join-Path $vars 'f1f1Plot.var') -Raw
     if ($remembered -notmatch 'f1Col\$\s+F1' -or $remembered -notmatch 'f2Col\$\s+F2') { throw 'F1 and F2 columns were not remembered.' }
 
-    # Draw & Exit draws and closes the dialog.
+    # Draw & Exit uses the current matches and clears the session file.
+    Choose-ColourMode $dialog $dialogProcess.Id 'Match levels to colours for this dialog (a Praat window opens)'
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Colours choices for each*'; $null -ne $script:praatWindow } 'the Praat colour matching window'
+    Click-Button $script:praatWindow 'Continue'
+    Wait-Idle $dialog
+    $matchFiles = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\temp\f1f2-ui') -Filter 'f1f2-colours-*.txt')
+    if ($matchFiles.Count -ne 1) { throw 'Colour matches were not saved for Draw & Exit.' }
+    $matches = Get-Content -LiteralPath $matchFiles[0].FullName
+    $matches[1] = "m`t2"
+    [IO.File]::WriteAllLines($matchFiles[0].FullName, [string[]]$matches, (New-Object Text.UTF8Encoding($false)))
     Click-Button $dialog 'Draw & Exit'
     Wait-Until { $dialogProcess.HasExited } 'the dialog to close' 30
     $final = Get-Report $praatProcess.Id 'final'
     if ($final.Picture -lt 5000) { throw 'The final plot is empty.' }
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'draw1-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'final-picture.png')).Hash) {
+        throw 'Draw & Exit did not use the matched colours.'
+    }
+    if (Test-Path -LiteralPath $matchFiles[0].FullName) { throw 'Colour matches were left after closing the dialog.' }
     if ($final.Report -notmatch '^1\s+other$') { throw "Selection not restored after Draw & Exit: $($final.Report)" }
     if (-not $praatProcess.Responding) { throw 'Praat is not responding after the dialog closed.' }
     $left = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\temp\f1f2-ui') -Filter 'f1f2-response-*.txt' -ErrorAction SilentlyContinue)

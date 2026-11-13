@@ -249,9 +249,11 @@ while Praat remains usable.
 * **Appearance**: **Font**, **Output units**, **Save folder** and **Colour
   settings** open small dialogs and show the current choice. Colour changes
   apply when you press **OK**; manual re-sorting, matching levels to colours
-  and adding a scheme open their Praat windows immediately. Matching applies
-  to the next plot only. **Restore the original default palette** restores the
-  original colours and ordering without deleting custom schemes.
+  and adding a scheme open their Praat windows immediately. Matched colours
+  remain in use across redraws until changed or this dialog closes. Selecting
+  another palette or sorting option clears the matches.
+  **Restore the original default palette** restores the original colours and
+  ordering without deleting custom schemes.
 * **Layers**: how to mark data points, show means, the core level, the most
   prominent layer, ellipses and arrows.
 

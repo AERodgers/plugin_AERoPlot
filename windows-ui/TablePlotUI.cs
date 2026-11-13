@@ -135,7 +135,7 @@ internal sealed class F1F2Window : Form
     private static readonly string[] FontSizes = { "8", "10", "12", "14", "16", "18" };
     private static readonly string[] ColourModes = {
         "No change", "Re-sort by brightness", "Re-sort by maximal perceptual difference",
-        "Re-sort manually (a Praat window opens)", "Match levels to colours in the next plot (a Praat window opens)",
+        "Re-sort manually (a Praat window opens)", "Match levels to colours for this dialog (a Praat window opens)",
         "Restore the original default palette" };
     private const string None = "(none)";
 
@@ -163,7 +163,7 @@ internal sealed class F1F2Window : Form
     private bool loading = true;
     private bool refreshing;
     private bool busy;
-    private bool pendingColourMatch;
+    private bool activeColourMatch;
     private string matchedFactor;
 
     public F1F2Window(PlotTable table, Dictionary<string, string> initial, string tempDirectory, AsyncPlotInfo async)
@@ -558,7 +558,7 @@ internal sealed class F1F2Window : Form
         bool bark = inputUnits.SelectedIndex == 1;
         unitsSummary.Text = bark ? "Bark (input and output)" : OutputUnitNames[outputUnits - 1];
         folderSummary.Text = saveFolder.Length == 0 ? "Default folder" : saveFolder;
-        colourSummary.Text = pendingColourMatch ? "Custom colours for the next plot" :
+        colourSummary.Text = activeColourMatch ? "Custom colours for this dialog" :
             ColourModes[colourMode - 1].Split('(')[0].Trim() + (addColourScheme ? "; add or change scheme" : "");
     }
 
@@ -778,7 +778,7 @@ internal sealed class F1F2Window : Form
             MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        if ((action == 1 || action == 3) && pendingColourMatch && mainFactor.Text != matchedFactor)
+        if ((action == 1 || action == 3) && activeColourMatch && mainFactor.Text != matchedFactor)
         {
             MessageBox.Show(this, "The custom colours were chosen for " + matchedFactor +
                 ". Choose colours again for the current main factor before drawing.", Text,
@@ -833,7 +833,7 @@ internal sealed class F1F2Window : Form
         {
             string failure = PraatLink.Send(async.PraatProcessId, async.PreferencesDirectory, script);
             bool cancelled = false;
-            if (action == 4 && failure == null)
+            if (action != 2 && failure == null)
             {
                 try
                 {
@@ -849,7 +849,7 @@ internal sealed class F1F2Window : Form
                         waited += 200;
                     }
                     if (result != "OK" && result != "CANCELLED")
-                        failure = "The colour settings did not complete. Check Praat for an error.";
+                        failure = "The request did not complete. Check Praat for an error.";
                     else
                     {
                         System.IO.File.Delete(completion);
@@ -878,16 +878,14 @@ internal sealed class F1F2Window : Form
                     {
                         if (!cancelled)
                         {
-                            pendingColourMatch = colourMode == 5;
-                            matchedFactor = requestFactor;
+                            if (colourMode != 1 || addColourScheme)
+                            {
+                                activeColourMatch = colourMode == 5;
+                                matchedFactor = requestFactor;
+                            }
                         }
                         colourMode = 1;
                         addColourScheme = false;
-                        RefreshSummaries();
-                    }
-                    else if (action == 1 || action == 3)
-                    {
-                        pendingColourMatch = false;
                         RefreshSummaries();
                     }
                     if (action == 3)

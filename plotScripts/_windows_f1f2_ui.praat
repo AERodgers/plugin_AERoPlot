@@ -192,7 +192,7 @@ procedure windowsF1F2Colours: .tempDir$
         for .i to oLevels
             appendFileLine: .matchFile$, oLevel$[.i], tab$, oColour[.i]
         endfor
-    elsif fileReadable(.matchFile$)
+    elsif (modify_colour_scheme != 1 or changeAddColSch) and fileReadable(.matchFile$)
         deleteFile: .matchFile$
     endif
     removeObject: table
@@ -243,10 +243,6 @@ procedure windowsF1F2Draw: .tempDir$
 
     @drawf1f2Plot
     removeObject: table
-    if fileReadable(.matchFile$)
-        deleteFile: .matchFile$
-    endif
-
     viewPort$ = "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
     writeFile: .tempDir$ + "/f1f2-view.txt", viewPort$, newline$, fontM, newline$
 

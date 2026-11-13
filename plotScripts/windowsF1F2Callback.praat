@@ -29,6 +29,6 @@ for i to size(f1f2Previous#)
         nocheck plusObject: f1f2Previous#[i]
     endif
 endfor
-if cbAction = 4
+if cbAction = 1 or cbAction = 3 or cbAction = 4
     writeFile: preferencesDirectory$ + "/plugin_AERoPlot/data/temp/f1f2-ui/f1f2-complete-" + cbToken$ + ".txt", "OK"
 endif
