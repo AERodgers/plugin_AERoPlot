@@ -36,8 +36,8 @@ It can also draw the **intensity contour** alone or just the **spectrogram (and 
 Create three plot types from tables generated with **Create Table**, or from any well-formed, compatible table or table file:
 
 * **F1–F2 plots**
-* **Formant plots** (2+ formants; called “Ladefoed plots” here)
-* **Formants-over-time plots** (similar to Ladefoed plots, with time on the x-axis)
+* **Formant plots** (2+ formants; called “Ladefoged plots” here)
+* **Formants-over-time plots** (similar to Ladefoged plots, with time on the x-axis)
 
 Tables created from **Create Table** are very useful for extracting standard acoustic and TextGrid parameters.
 
