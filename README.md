@@ -11,7 +11,7 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
     - The folder name may differ if the ZIP was downloaded from a different branch.
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
-4. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open. This will only happen one.
+4. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open. This will only happen once.
 
 ## **Functionality**
 
