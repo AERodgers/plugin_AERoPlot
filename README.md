@@ -11,6 +11,7 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
     - The folder name may differ if the ZIP was downloaded from a different branch.
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
+4. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open. This will only happen one.
 
 ## **Functionality**
 
@@ -246,9 +247,11 @@ while Praat remains usable.
 * **Plot**: title, size, legend and the F1 and F2 ranges (reset when the input
   units change).
 * **Appearance**: **Font**, **Output units**, **Save folder** and **Colour
-  settings** open small dialogs and show the current choice. Colour re-sorting
-  applies once, at the next **Draw**. Choosing manual re-sorting, matching
-  levels to colours or adding a scheme opens the familiar Praat window.
+  settings** open small dialogs and show the current choice. Colour changes
+  apply when you press **OK**; manual re-sorting, matching levels to colours
+  and adding a scheme open their Praat windows immediately. Matching applies
+  to the next plot only. **Restore the original default palette** restores the
+  original colours and ordering without deleting custom schemes.
 * **Layers**: how to mark data points, show means, the core level, the most
   prominent layer, ellipses and arrows.
 

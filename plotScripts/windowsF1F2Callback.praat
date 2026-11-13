@@ -1,12 +1,12 @@
 # Called by the Windows F1-F2 dialog (through Praat's message window) when the
-# user presses Draw, Draw & Exit or Save image. Not a menu command.
+# user presses Draw, Draw & Exit, Save image or applies colour settings.
 form AERoPlot Windows F1-F2 request
     word cbToken
     integer cbTable
     integer cbAction
 endform
 
-if not index_regex(cbToken$, "^[a-f0-9]{32}$") or cbAction < 1 or cbAction > 3
+if not index_regex(cbToken$, "^[a-f0-9]{32}$") or cbAction < 1 or cbAction > 4
     exitScript: "The plot request from the Windows dialog was not valid."
 endif
 aeroPrototypeInclude = 1
@@ -29,3 +29,6 @@ for i to size(f1f2Previous#)
         nocheck plusObject: f1f2Previous#[i]
     endif
 endfor
+if cbAction = 4
+    writeFile: preferencesDirectory$ + "/plugin_AERoPlot/data/temp/f1f2-ui/f1f2-complete-" + cbToken$ + ".txt", "OK"
+endif

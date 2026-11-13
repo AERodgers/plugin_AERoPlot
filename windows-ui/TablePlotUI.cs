@@ -135,7 +135,8 @@ internal sealed class F1F2Window : Form
     private static readonly string[] FontSizes = { "8", "10", "12", "14", "16", "18" };
     private static readonly string[] ColourModes = {
         "No change", "Re-sort by brightness", "Re-sort by maximal perceptual difference",
-        "Re-sort manually (a Praat window opens)", "Match levels to colours in this plot only (a Praat window opens)" };
+        "Re-sort manually (a Praat window opens)", "Match levels to colours in the next plot (a Praat window opens)",
+        "Restore the original default palette" };
     private const string None = "(none)";
 
     private readonly PlotTable table;
@@ -143,6 +144,7 @@ internal sealed class F1F2Window : Form
     private readonly AsyncPlotInfo async;
     private readonly Dictionary<string, string> initial;
     private readonly string tableName;
+    private readonly string colourSession = Guid.NewGuid().ToString("N");
 
     private ComboBox mainFactor, secondFactor, f1Column, f2Column, inputUnits;
     private CheckedListBox mainLevels, secondLevels;
@@ -153,13 +155,16 @@ internal sealed class F1F2Window : Form
     private CheckBox showLegend, showArrows;
     private ComboBox tokenMarking, showMeans, coreLevel, topLayer, ellipses;
     private Label fontSummary, unitsSummary, folderSummary, colourSummary;
-    private Button drawButton, drawExitButton, saveButton;
+    private Button drawButton, drawExitButton, saveButton, colourButton;
     private int fontChoice, baseSize, outputUnits, colourMode;
     private bool addColourScheme;
     private string saveFolder;
     private int previousUnits;
     private bool loading = true;
     private bool refreshing;
+    private bool busy;
+    private bool pendingColourMatch;
+    private string matchedFactor;
 
     public F1F2Window(PlotTable table, Dictionary<string, string> initial, string tempDirectory, AsyncPlotInfo async)
     {
@@ -184,6 +189,22 @@ internal sealed class F1F2Window : Form
         RefreshLevels(secondLevels, secondFactor.Text, true);
         RefreshCoreLevels();
         StartParentWatch();
+        FormClosing += delegate (object sender, FormClosingEventArgs e)
+        {
+            if (busy && PraatLink.IsRunning(async.PraatProcessId))
+            {
+                e.Cancel = MessageBox.Show(this,
+                    "A request is still running. Close this window anyway? You may still need to finish the Praat window.",
+                    Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes;
+            }
+        };
+        FormClosed += delegate
+        {
+            string path = System.IO.Path.Combine(tempDirectory, "f1f2-colours-" + colourSession + ".txt");
+            try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+            catch (System.IO.IOException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            catch (UnauthorizedAccessException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
     }
 
     private string Get(string key, string fallback)
@@ -309,7 +330,7 @@ internal sealed class F1F2Window : Form
         var folderButton = new Button { Text = "Save folder\u2026", Location = new Point(12, 86), Size = new Size(130, 28) };
         folderButton.Click += delegate { ChooseFolder(); };
         folderSummary = new Label { Location = new Point(152, 91), Size = new Size(275, 20), AutoEllipsis = true };
-        var colourButton = new Button { Text = "Colour settings\u2026", Location = new Point(12, 118), Size = new Size(130, 28) };
+        colourButton = new Button { Text = "Colour settings\u2026", Location = new Point(12, 118), Size = new Size(130, 28) };
         colourButton.Click += delegate { ChooseColours(); };
         colourSummary = new Label { Location = new Point(152, 123), Size = new Size(275, 20), AutoEllipsis = true };
         look.Controls.AddRange(new Control[] { fontButton, fontSummary, unitsButton, unitsSummary, folderButton, folderSummary, colourButton, colourSummary });
@@ -537,7 +558,8 @@ internal sealed class F1F2Window : Form
         bool bark = inputUnits.SelectedIndex == 1;
         unitsSummary.Text = bark ? "Bark (input and output)" : OutputUnitNames[outputUnits - 1];
         folderSummary.Text = saveFolder.Length == 0 ? "Default folder" : saveFolder;
-        colourSummary.Text = ColourModes[colourMode - 1].Split('(')[0].Trim() + (addColourScheme ? "; add or change scheme" : "");
+        colourSummary.Text = pendingColourMatch ? "Custom colours for the next plot" :
+            ColourModes[colourMode - 1].Split('(')[0].Trim() + (addColourScheme ? "; add or change scheme" : "");
     }
 
     private Form SmallDialog(string text, int width, int height)
@@ -625,9 +647,9 @@ internal sealed class F1F2Window : Form
 
     private void ChooseColours()
     {
-        using (var form = SmallDialog("Colour settings", 480, 250))
+        using (var form = SmallDialog("Colour settings", 500, 280))
         {
-            form.Controls.Add(Caption("Applied the next time you press Draw:", 12, 8, 440));
+            form.Controls.Add(Caption("Changes are applied when you press OK:", 12, 8, 470));
             var buttons = new List<RadioButton>();
             for (int i = 0; i < ColourModes.Length; i++)
             {
@@ -635,14 +657,21 @@ internal sealed class F1F2Window : Form
                 buttons.Add(radio);
                 form.Controls.Add(radio);
             }
-            var add = new CheckBox { Text = "Add or change a colour scheme (a Praat window opens)", Location = new Point(24, 170), AutoSize = true, Checked = addColourScheme };
+            var add = new CheckBox { Text = "Add or change a colour scheme (a Praat window opens)", Location = new Point(24, 200), AutoSize = true, Checked = addColourScheme };
             form.Controls.Add(add);
-            OkCancel(form, 210);
+            buttons[5].CheckedChanged += delegate
+            {
+                if (buttons[5].Checked) add.Checked = false;
+                add.Enabled = !buttons[5].Checked;
+            };
+            add.Enabled = !buttons[5].Checked;
+            OkCancel(form, 240);
             if (form.ShowDialog(this) == DialogResult.OK)
             {
                 colourMode = buttons.FindIndex(b => b.Checked) + 1;
                 addColourScheme = add.Checked;
                 RefreshSummaries();
+                Request(4);
             }
         }
     }
@@ -722,7 +751,7 @@ internal sealed class F1F2Window : Form
         return value.ToString(CultureInfo.InvariantCulture);
     }
 
-    private string CheckInput()
+    private string CheckInput(bool coloursOnly)
     {
         if (f1Column.SelectedIndex < 0 || f2Column.SelectedIndex < 0)
             return "Choose a numeric column for F1 and for F2. The table needs at least two numeric columns.";
@@ -734,21 +763,29 @@ internal sealed class F1F2Window : Form
             return "Tick at least one level of the main factor.";
         if (secondFactor.Text != None && secondFactor.Text != mainFactor.Text && secondLevels.CheckedItems.Count == 0)
             return "Tick at least one level of the secondary factor.";
-        if (minF1.Value >= maxF1.Value || minF2.Value >= maxF2.Value)
+        if (!coloursOnly && (minF1.Value >= maxF1.Value || minF2.Value >= maxF2.Value))
             return "Each maximum must be greater than its minimum.";
-        if (saveName.Text.Trim().Length == 0)
+        if (!coloursOnly && saveName.Text.Trim().Length == 0)
             return "Enter a save name.";
         return null;
     }
 
     private void Request(int action)
     {
-        string problem = action == 2 ? null : CheckInput();
+        string problem = action == 2 ? null : CheckInput(action == 4);
         if (problem != null)
         {
             MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
+        if ((action == 1 || action == 3) && pendingColourMatch && mainFactor.Text != matchedFactor)
+        {
+            MessageBox.Show(this, "The custom colours were chosen for " + matchedFactor +
+                ". Choose colours again for the current main factor before drawing.", Text,
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        string requestFactor = mainFactor.Text;
         var lines = new List<string>();
         Action<string, string> put = delegate (string key, string value) { lines.Add(key + "\t" + Clean(value)); };
         bool useSecond = secondFactor.Text != None && secondFactor.Text != mainFactor.Text;
@@ -776,8 +813,9 @@ internal sealed class F1F2Window : Form
         put("dataPointsOnTop", topLayer.SelectedIndex.ToString(CultureInfo.InvariantCulture));
         put("saveDir$", saveFolder);
         put("saveName$", saveName.Text.Trim());
-        put("sorting", colourMode.ToString(CultureInfo.InvariantCulture));
-        put("changeAddColSch", addColourScheme ? "1" : "0");
+        put("sorting", (action == 4 ? colourMode : 1).ToString(CultureInfo.InvariantCulture));
+        put("changeAddColSch", action == 4 && addColourScheme ? "1" : "0");
+        put("colourSession$", colourSession);
         AddKeep(lines, mainFactor.Text, mainLevels);
         if (useSecond)
             AddKeep(lines, secondFactor.Text, secondLevels);
@@ -786,6 +824,7 @@ internal sealed class F1F2Window : Form
                 lines.Add("keep\t" + Clean(pair.Key) + "\t" + Clean(level));
 
         string token = Guid.NewGuid().ToString("N");
+        string completion = System.IO.Path.Combine(tempDirectory, "f1f2-complete-" + token + ".txt");
         System.IO.File.WriteAllText(System.IO.Path.Combine(tempDirectory, "f1f2-response-" + token + ".txt"),
             string.Join("\n", lines.ToArray()) + "\n", new UTF8Encoding(false));
         string script = "runScript: \"" + async.CallbackScript + "\", \"" + token + "\", " + async.SoundId + ", " + action + "\n";
@@ -793,6 +832,38 @@ internal sealed class F1F2Window : Form
         var worker = new System.Threading.Thread(delegate ()
         {
             string failure = PraatLink.Send(async.PraatProcessId, async.PreferencesDirectory, script);
+            bool cancelled = false;
+            if (action == 4 && failure == null)
+            {
+                try
+                {
+                    int waited = 0;
+                    string result = "";
+                    while (result != "OK" && result != "CANCELLED" &&
+                        PraatLink.IsRunning(async.PraatProcessId) && waited < 600000)
+                    {
+                        if (System.IO.File.Exists(completion))
+                            result = System.IO.File.ReadAllText(completion).Trim();
+                        if (result == "OK" || result == "CANCELLED") break;
+                        System.Threading.Thread.Sleep(200);
+                        waited += 200;
+                    }
+                    if (result != "OK" && result != "CANCELLED")
+                        failure = "The colour settings did not complete. Check Praat for an error.";
+                    else
+                    {
+                        System.IO.File.Delete(completion);
+                        cancelled = result == "CANCELLED";
+                    }
+                    if (IsDisposed)
+                    {
+                        string path = System.IO.Path.Combine(tempDirectory, "f1f2-colours-" + colourSession + ".txt");
+                        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                    }
+                }
+                catch (System.IO.IOException e) { failure = "Could not read the colour settings result: " + e.Message; }
+                catch (UnauthorizedAccessException e) { failure = "Could not read the colour settings result: " + e.Message; }
+            }
             try
             {
                 BeginInvoke((MethodInvoker)delegate
@@ -803,10 +874,22 @@ internal sealed class F1F2Window : Form
                         MessageBox.Show(this, failure, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
                         return;
                     }
-                    // Colour changes apply once.
-                    colourMode = 1;
-                    addColourScheme = false;
-                    RefreshSummaries();
+                    if (action == 4)
+                    {
+                        if (!cancelled)
+                        {
+                            pendingColourMatch = colourMode == 5;
+                            matchedFactor = requestFactor;
+                        }
+                        colourMode = 1;
+                        addColourScheme = false;
+                        RefreshSummaries();
+                    }
+                    else if (action == 1 || action == 3)
+                    {
+                        pendingColourMatch = false;
+                        RefreshSummaries();
+                    }
                     if (action == 3)
                     {
                         DialogResult = DialogResult.OK;
@@ -830,9 +913,11 @@ internal sealed class F1F2Window : Form
 
     private void SetBusy(bool busy)
     {
+        this.busy = busy;
         drawButton.Enabled = !busy;
         drawExitButton.Enabled = !busy;
         saveButton.Enabled = !busy;
+        colourButton.Enabled = !busy;
         UseWaitCursor = busy;
     }
 

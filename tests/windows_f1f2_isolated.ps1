@@ -80,6 +80,39 @@ function Get-Dialog([int]$ProcessId) {
         [System.Windows.Automation.Condition]::TrueCondition) |
         Where-Object { $_.Current.ProcessId -eq $ProcessId } | Select-Object -First 1
 }
+function Get-Window([int]$ProcessId, [string]$Name) {
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $_.Current.ProcessId -eq $ProcessId }
+    foreach ($window in $windows) {
+        if ($window.Current.Name -like $Name) { return $window }
+        $child = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition) |
+            Where-Object { $_.Current.Name -like $Name -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Window' } |
+            Select-Object -First 1
+        if ($null -ne $child) { return $child }
+    }
+}
+function Choose-ColourMode($Dialog, [int]$ProcessId, [string]$Mode, [switch]$AddScheme) {
+    Click-Button $Dialog ('Colour settings' + [char]0x2026)
+    Wait-Until { $script:colourWindow = Get-Window $ProcessId 'Colour settings'; $null -ne $script:colourWindow } 'colour settings'
+    $radio = $script:colourWindow.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $_.Current.Name -eq $Mode -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.RadioButton' } |
+        Select-Object -First 1
+    if ($null -eq $radio) { throw "Colour option '$Mode' not found." }
+    $radio.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    if ($AddScheme) {
+        $check = $script:colourWindow.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition) |
+            Where-Object { $_.Current.Name -eq 'Add or change a colour scheme (a Praat window opens)' } |
+            Select-Object -First 1
+        if ($null -eq $check) { throw 'The colour scheme option was not found.' }
+        $check.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    }
+    Click-Button $script:colourWindow 'OK'
+}
 function Click-Button($Dialog, [string]$Name, [switch]$NoClick) {
     $button = $null
     for ($i = 0; $i -lt 50 -and $null -eq $button; $i++) {
@@ -115,7 +148,8 @@ try {
     $ready = Join-Path $testRoot 'ready.txt'
     $start = Join-Path $plugin 'tests\f1f2_start.praat'
     $praatProcess = Start-Process -FilePath $praatExe -WorkingDirectory (Join-Path $plugin 'tests') -PassThru `
-        -ArgumentList @('--new-send', '--no-plugins', '--no-pref-files', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"")
+        -ArgumentList @('--new-send', '--no-plugins', '--no-pref-files', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"") `
+        -RedirectStandardOutput (Join-Path $testRoot 'praat.stdout.txt') -RedirectStandardError (Join-Path $testRoot 'praat.stderr.txt')
     $owned.Add($praatProcess)
     Wait-Until { Test-Path -LiteralPath $ready } 'the start script'
 
@@ -134,16 +168,80 @@ try {
     $before = Get-Report $praatProcess.Id 'before'
     if ($before.Report -notmatch '^1\s+other$') { throw "Unexpected selection before drawing: $($before.Report)" }
 
+    # Manual reordering opens immediately, before any plot is drawn.
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort manually (a Praat window opens)'
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Reorder Default Colour Sequence*'; $null -ne $script:praatWindow } 'the Praat reorder window'
+    Click-Button $script:praatWindow 'Continue'
+    Wait-Idle $dialog
+
+    Choose-ColourMode $dialog $dialogProcess.Id 'No change' -AddScheme
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Add or Change colour scheme*'; $null -ne $script:praatWindow } 'the Praat colour scheme window'
+    Click-Button $script:praatWindow 'Continue'
+    Wait-Idle $dialog
+
+    # Restore the original palette, not merely the radio button selection.
+    $paletteDir = Join-Path $plugin 'data\palettes'
+    $currentPalette = Join-Path $paletteDir 'current.palette'
+    $defaultPalette = Join-Path $paletteDir 'Adjusted_CB_Qualitative_Set1.palette'
+    $customPalette = Join-Path $paletteDir 'test-custom.palette'
+    [IO.File]::WriteAllText($customPalette, "custom palette", (New-Object Text.UTF8Encoding($false)))
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort by brightness'
+    Wait-Idle $dialog
+    if ((Get-Content -LiteralPath $currentPalette -Raw) -eq (Get-Content -LiteralPath $defaultPalette -Raw)) {
+        throw 'Re-sorting did not change the palette.'
+    }
+    Choose-ColourMode $dialog $dialogProcess.Id 'Restore the original default palette'
+    Wait-Idle $dialog
+    if ((Get-Content -LiteralPath $currentPalette -Raw) -ne (Get-Content -LiteralPath $defaultPalette -Raw)) {
+        throw 'The original palette was not restored.'
+    }
+    if ((Get-Content -LiteralPath $customPalette -Raw) -ne 'custom palette') {
+        throw 'Restoring the default changed a custom palette.'
+    }
+
+    Click-Button $dialog 'Draw'
+    Wait-Idle $dialog
+    $baseline = Get-Report $praatProcess.Id 'default-colours'
+
+    # Cancelling a Praat colour window must leave the dialog usable.
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort manually (a Praat window opens)'
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Reorder Default Colour Sequence*'; $null -ne $script:praatWindow } 'the Praat reorder window'
+    Click-Button $script:praatWindow 'Exit'
+    Wait-Idle $dialog
+    $afterCancel = Get-Report $praatProcess.Id 'after-colour-cancel'
+    if ($afterCancel.Report -notmatch '^1\s+other$') { throw 'Selection was not restored after cancelling colour settings.' }
+
+    # Matching opens immediately and its choices survive until the next draw.
+    Choose-ColourMode $dialog $dialogProcess.Id 'Match levels to colours in the next plot (a Praat window opens)'
+    Wait-Until { $script:praatWindow = Get-Window $praatProcess.Id '*Colours choices for each*'; $null -ne $script:praatWindow } 'the Praat colour matching window'
+    Click-Button $script:praatWindow 'Continue'
+    Wait-Idle $dialog
+    $matchFiles = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\temp\f1f2-ui') -Filter 'f1f2-colours-*.txt')
+    if ($matchFiles.Count -ne 1) { throw 'Colour matches were not saved for the next draw.' }
+    $matches = Get-Content -LiteralPath $matchFiles[0].FullName
+    if ($matches[1] -ne "m`t1") { throw "Colour matches have unexpected contents: $($matches -join ', ')" }
+    $matches[1] = "m`t2"
+    [IO.File]::WriteAllLines($matchFiles[0].FullName, [string[]]$matches, (New-Object Text.UTF8Encoding($false)))
+
     # Draw keeps the dialog open and draws in Praat.
     Click-Button $dialog 'Draw'
     Wait-Idle $dialog
-    $script:drawn = $null
-    Wait-Until {
-        $script:drawn = Get-Report $praatProcess.Id 'draw1'
-        $script:drawn.Picture -gt 5000
-    } 'the first plot' 60
+    $script:drawn = Get-Report $praatProcess.Id 'draw1'
+    if ($script:drawn.Picture -le 5000) { throw 'The first plot is empty.' }
     if ($dialogProcess.HasExited) { throw 'The dialog closed after Draw.' }
     if ($script:drawn.Report -notmatch '^1\s+other$') { throw "Selection not restored after Draw: $($script:drawn.Report)" }
+    if (Test-Path -LiteralPath $matchFiles[0].FullName) { throw 'Colour matches were not consumed by Draw.' }
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'default-colours-picture.png')).Hash -eq
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'draw1-picture.png')).Hash) {
+        throw 'The saved colour match did not affect the plot.'
+    }
+    Click-Button $dialog 'Draw'
+    Wait-Idle $dialog
+    $next = Get-Report $praatProcess.Id 'after-colour-match'
+    if ((Get-FileHash -LiteralPath (Join-Path $testRoot 'default-colours-picture.png')).Hash -ne
+        (Get-FileHash -LiteralPath (Join-Path $testRoot 'after-colour-match-picture.png')).Hash) {
+        throw 'Colour matching affected more than one plot.'
+    }
 
     # Save image writes a PNG into the default folder.
     $images = Join-Path $plugin 'data\AERoPlot_Images'

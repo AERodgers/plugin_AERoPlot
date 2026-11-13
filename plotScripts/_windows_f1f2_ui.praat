@@ -80,6 +80,8 @@ procedure windowsF1F2Run
     @windowsF1F2Apply: .response$
     if cbAction = 2
         @windowsF1F2Save: .tempDir$
+    elsif cbAction = 4
+        @windowsF1F2Colours: .tempDir$
     else
         @windowsF1F2Draw: .tempDir$
     endif
@@ -90,7 +92,7 @@ procedure windowsF1F2Apply: .response$
     .allowed$ = " oFactor$ iFactor$ useInnerFactor f1Col$ f2Col$ inputUnits title$ " +
     ... "plotSize minF1 maxF1 minF2 maxF2 showLegend fontChoice baseSize outputUnits " +
     ... "tokenMarking showMeans ellipsisSDs showArrows coreLevelName$ dataPointsOnTop " +
-    ... "saveDir$ saveName$ sorting changeAddColSch "
+    ... "saveDir$ saveName$ sorting changeAddColSch colourSession$ "
     keepCount = 0
     coreLevelName$ = ""
     .rest$ = .response$
@@ -135,7 +137,7 @@ procedure windowsF1F2Apply: .response$
     @processShared_UIs
 endproc
 
-procedure windowsF1F2Draw: .tempDir$
+procedure windowsF1F2Prepare
     tableID$ = string$(cbTable)
     tableFormat = 1
     @validateTable: tableID$, "oFactor$,iFactor$,f1Col$,f2Col$"
@@ -159,20 +161,91 @@ procedure windowsF1F2Draw: .tempDir$
             coreLevel = .i
         endif
     endfor
+endproc
 
+procedure windowsF1F2Colours: .tempDir$
+    if not index_regex(colourSession$, "^[a-f0-9]{32}$")
+        exitScript: "The colour settings request was not valid."
+    endif
+    @windowsF1F2Prepare
     .dir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/palettes/"
+    .matchFile$ = .tempDir$ + "/f1f2-colours-" + colourSession$ + ".txt"
+    if modify_colour_scheme = 6
+        .default$ = .dir$ + "Adjusted_CB_Qualitative_Set1.palette"
+        if not fileReadable(.default$)
+            exitScript: "The original default colour palette could not be found."
+        endif
+        writeFile: .dir$ + "current.palette", readFile$(.default$)
+    endif
     .pause = changeAddColSch or makeNewColSeq or altColrMatch
     if .pause
         @hideObjs: "table", preferencesDirectory$ +
         ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
+        aeroColourRequest = 1
     endif
     @setupColours: .dir$, "colrPalFile$", "curPalette", table, altColrMatch
     if .pause
         @retrieveObjs: "hiddenTx"
     endif
+    if altColrMatch
+        writeFileLine: .matchFile$, oFactor$
+        for .i to oLevels
+            appendFileLine: .matchFile$, oLevel$[.i], tab$, oColour[.i]
+        endfor
+    elsif fileReadable(.matchFile$)
+        deleteFile: .matchFile$
+    endif
+    removeObject: table
+endproc
+
+procedure windowsF1F2CancelColours
+    @retrieveObjs: "hiddenTx"
+    removeObject: table
+    for .i to size(f1f2Previous#)
+        if .i = 1
+            nocheck selectObject: f1f2Previous#[.i]
+        else
+            nocheck plusObject: f1f2Previous#[.i]
+        endif
+    endfor
+    writeFile: preferencesDirectory$ + "/plugin_AERoPlot/data/temp/f1f2-ui/f1f2-complete-" + cbToken$ + ".txt", "CANCELLED"
+endproc
+
+procedure windowsF1F2Draw: .tempDir$
+    if not index_regex(colourSession$, "^[a-f0-9]{32}$")
+        exitScript: "The colour settings request was not valid."
+    endif
+    @windowsF1F2Prepare
+    .dir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/palettes/"
+    @setupColours: .dir$, "colrPalFile$", "curPalette", table, 0
+    .matchFile$ = .tempDir$ + "/f1f2-colours-" + colourSession$ + ".txt"
+    if fileReadable(.matchFile$)
+        .matches = Read Strings from raw text file: .matchFile$
+        .factor$ = Get string: 1
+        if .factor$ = oFactor$
+            .count = Get number of strings
+            for .j from 2 to .count
+                .line$ = Get string: .j
+                .tab = index(.line$, tab$)
+                if .tab > 0
+                    .level$ = left$(.line$, .tab - 1)
+                    .colour = number(mid$(.line$, .tab + 1, length(.line$)))
+                    for .i to oLevels
+                        if oLevel$[.i] = .level$ and .colour >= 1 and .colour <= curPaletteSize
+                            oColour[.i] = .colour
+                        endif
+                    endfor
+                endif
+            endfor
+        endif
+        removeObject: .matches
+    endif
 
     @drawf1f2Plot
     removeObject: table
+    if fileReadable(.matchFile$)
+        deleteFile: .matchFile$
+    endif
 
     viewPort$ = "'left', 'right', 'top' - 'titleAdjust', 'bottom'"
     writeFile: .tempDir$ + "/f1f2-view.txt", viewPort$, newline$, fontM, newline$
