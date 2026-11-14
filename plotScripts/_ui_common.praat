@@ -12,11 +12,12 @@ procedure isOffValue: .text$
 endproc
 
 # Saved interface preference ("praat" or "windows") and what is really usable.
-# The Windows interface is only used when it is chosen AND available here;
-# otherwise the Praat interface is used silently.
+# The Windows interface is only used when it is chosen AND available here.
 procedure getUIMode
     .file$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ui_mode.txt"
     .preference$ = "windows"
+    .reason$ = ""
+    .hasSavedPreference = fileReadable(.file$)
     if fileReadable(.file$)
         .saved$ = readFile$(.file$)
         .saved$ = lowerCase$(replace_regex$(.saved$, "^[ \t\r\n]+|[ \t\r\n]+$", "", 0))
@@ -27,22 +28,45 @@ procedure getUIMode
     .mode$ = "praat"
     if .preference$ = "windows"
         @windowsUIAvailable
+        .reason$ = windowsUIAvailable.reason$
         if windowsUIAvailable.ok
             .mode$ = "windows"
+        elsif environment$("OS") = "Windows_NT" and
+        ... (.hasSavedPreference or windowsUIAvailable.helperMissing)
+            .reason$ = windowsUIAvailable.reason$
+            @showUIModeMessage: "The Windows interface is unavailable. " +
+            ... .reason$ + " AERoPlot will continue with the standard Praat interface. " +
+            ... "This fallback will be remembered. After fixing the issue, choose Praat > AERoPlot > Use Windows interface to re-enable it."
+            @setUIMode: "praat"
+            .preference$ = "praat"
         endif
     endif
 endproc
 
 procedure windowsUIAvailable
     .ok = 0
-    if environment$("OS") = "Windows_NT"
+    .helperMissing = 0
+    .reason$ = ""
+    if environment$("OS") != "Windows_NT"
+        .reason$ = "The Windows interface is available only on Windows."
+    else
         @checkPraatVersion
         .recent = checkPraatVersion.major > 6 or
         ... (checkPraatVersion.major = 6 and (checkPraatVersion.minor > 4 or
         ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch >= 60)))
-        if .recent and fileReadable(preferencesDirectory$ +
-        ... "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe")
-            .ok = 1
+        if not .recent
+            .reason$ = "The Windows interface requires Praat 6.4.60 or newer; this installation is running Praat " +
+            ... praatVersion$ + ". Update Praat, or choose Use Praat interface."
+        else
+            .exe$ = preferencesDirectory$ +
+            ... "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+            if fileReadable(.exe$)
+                .ok = 1
+            else
+                .helperMissing = 1
+                .reason$ = "The Windows helper is missing from " + .exe$ +
+                ... ". Reinstall the complete plug-in folder, including windows-ui/bin/AERoPlotWindowsUI.exe."
+            endif
         endif
     endif
 endproc

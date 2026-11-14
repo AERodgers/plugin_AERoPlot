@@ -58,19 +58,33 @@ removeObject: table
 prefs$ = prefs_directory$
 assert prefs$ != ""
 assert preferencesDirectory$ = prefs$
+aeroNonInteractive = 1
 prefFile$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ui_mode.txt"
 assert not fileReadable(prefFile$)
 @getUIMode
-# Windows is the default choice; with no helper program it silently falls back.
-assert getUIMode.preference$ = "windows"
-assert getUIMode.mode$ = "praat"
+# Windows is the default choice; if the helper is unavailable, Praat reports
+# why it is using the standard interface instead and remembers the fallback.
+if windowsUIAvailable.ok
+    assert getUIMode.preference$ = "windows"
+    assert getUIMode.mode$ = "windows"
+else
+    assert getUIMode.preference$ = "praat"
+    assert getUIMode.mode$ = "praat"
+    assert getUIMode.reason$ != ""
+    assert readFile$(prefFile$) = "praat"
+endif
 
 @setUIMode: "windows"
 assert fileReadable(prefFile$)
 @getUIMode
-assert getUIMode.preference$ = "windows"
-# No helper program in the test folder, so Windows must silently fall back.
-assert getUIMode.mode$ = "praat"
+if windowsUIAvailable.ok
+    assert getUIMode.preference$ = "windows"
+    assert getUIMode.mode$ = "windows"
+else
+    assert getUIMode.preference$ = "praat"
+    assert getUIMode.mode$ = "praat"
+    assert getUIMode.reason$ != ""
+endif
 
 @setUIMode: "praat"
 @getUIMode

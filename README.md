@@ -11,7 +11,7 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
     - The folder name may differ if the ZIP was downloaded from a different branch.
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
-4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface.
+4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface. If the helper is missing, AERoPlot explains what is unavailable and continues with the native interface.
 5. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open while the Windows helper warms up. This will only happen once.
 
 ## **Functionality**
@@ -147,9 +147,13 @@ Use Praat interface** or **Use Windows interface**. These two entries appear
 on Windows only; elsewhere the Praat interface is the only one, so there is
 nothing to choose. Until you choose, Windows uses the Windows interface when it
 is usable. The choice
-is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
-(not Windows, Praat older than 6.4.60 or the helper has not been built), the
-Praat interface is used silently. F1-F2 and Ladefoged use the Windows
+is remembered in `data\vars\ui_mode.txt`. If Windows was selected but is no
+longer usable, AERoPlot explains why and continues with the Praat interface,
+remembering that fallback to avoid repeated warnings. When the bundled helper
+is missing on Windows, the same explanation is shown even before an interface
+has been selected. After fixing the issue, choose **Use Windows interface** to
+re-enable it; that menu command reports the specific prerequisite that is
+missing. F1-F2 and Ladefoged use the Windows
 interface when one Table is selected and the Praat interface otherwise (for
 example to read a table file). Formants-over-time still uses the Praat
 interface.
