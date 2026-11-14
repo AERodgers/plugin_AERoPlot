@@ -95,14 +95,14 @@ internal sealed class PlotTable
 
 internal static class TablePlotUI
 {
-    // Arguments: TABLEPLOT, settings file, temporary folder, Praat preferences folder,
+    // Arguments: plot mode, settings file, temporary folder, Praat preferences folder,
     // callback script, Table object number.
     public static int Run(string[] args)
     {
         int tableId;
         if (args.Length != 6 || !System.IO.File.Exists(args[1]) || !System.IO.Directory.Exists(args[2]) ||
             !System.IO.Directory.Exists(args[3]) || args[4].IndexOf('"') >= 0 || !int.TryParse(args[5], out tableId))
-            throw new ArgumentException("The F1-F2 plot interface received invalid input.");
+            throw new ArgumentException("The table plot interface received invalid input.");
         var settings = new Dictionary<string, string>();
         foreach (var line in System.IO.File.ReadAllLines(args[1], new UTF8Encoding(false)))
         {
@@ -116,12 +116,20 @@ internal static class TablePlotUI
             throw new ArgumentException("The Praat process could not be identified.");
         string tablePath;
         if (!settings.TryGetValue("tableFile", out tablePath))
-            throw new ArgumentException("The F1-F2 plot interface did not receive the table.");
+            throw new ArgumentException("The table plot interface did not receive the table.");
         var table = PlotTable.Load(tablePath);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        using (var window = new F1F2Window(table, settings, args[2], info))
-            window.ShowDialog();
+        if (args[0] == "TABLELAD")
+        {
+            using (var window = new LadefogedWindow(table, settings, args[2], info))
+                window.ShowDialog();
+        }
+        else
+        {
+            using (var window = new F1F2Window(table, settings, args[2], info))
+                window.ShowDialog();
+        }
         return 0;
     }
 }
@@ -197,6 +205,7 @@ internal sealed class F1F2Window : Form
                     "A request is still running. Close this window anyway? You may still need to finish the Praat window.",
                     Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes;
             }
+
         };
         FormClosed += delegate
         {
@@ -917,6 +926,866 @@ internal sealed class F1F2Window : Form
         saveButton.Enabled = !busy;
         colourButton.Enabled = !busy;
         UseWaitCursor = busy;
+    }
+
+    private void StartParentWatch()
+    {
+        var timer = new Timer { Interval = 1000 };
+        timer.Tick += delegate
+        {
+            if (!PraatLink.IsRunning(async.PraatProcessId))
+            {
+                timer.Stop();
+                DialogResult = DialogResult.Cancel;
+                Close();
+            }
+        };
+        timer.Start();
+    }
+}
+internal sealed class LadefogedWindow : Form
+{
+    private static readonly string[] OutputUnitNames = {
+        "Hertz", "Hertz (displayed re bark scale)", "Hertz (displayed logarithmically)",
+        "kHz", "kHz (displayed re bark scale)", "kHz (displayed logarithmically)" };
+    private static readonly string[] FontNames = { "Helvetica", "Times", "Courier", "Palatino" };
+    private static readonly string[] FontSizes = { "8", "10", "12", "14", "16", "18" };
+    private static readonly string[] ColourModes = {
+        "No change", "Re-sort by brightness", "Re-sort by maximal perceptual difference",
+        "Re-sort manually (a Praat window opens)", "Match levels to colours for this dialog (a Praat window opens)",
+        "Restore the original default palette" };
+    private const string None = "(none)";
+
+    private readonly PlotTable table;
+    private readonly string tempDirectory;
+    private readonly AsyncPlotInfo async;
+    private readonly Dictionary<string, string> initial;
+    private readonly string tableName;
+    private readonly string colourSession = Guid.NewGuid().ToString("N");
+    private readonly Dictionary<string, HashSet<string>> filters = new Dictionary<string, HashSet<string>>();
+
+    private ComboBox sequenceFactor, comparisonFactor, formantA, formantB, formantC, formantD;
+    private ComboBox inputUnits, xAxisLabels, tokenMarking, averages, topLayer;
+    private CheckedListBox sequenceLevels, comparisonLevels;
+    private ListBox filterList;
+    private TextBox title, saveName;
+    private NumericUpDown maxFrequency, plotHeight;
+    private CheckBox showLegend, showFormantsInLegend, addJitter, showAverageValues, showBoxplots, showArrows, spreadLevels;
+    private Label fontSummary, unitsSummary, folderSummary, colourSummary, maximumFrequencyLabel;
+    private Button drawButton, drawExitButton, saveButton, colourButton;
+    private int fontChoice, baseSize, outputUnits, colourMode;
+    private bool addColourScheme, loading = true, refreshing, busy, activeColourMatch;
+    private string saveFolder, matchedFactor;
+
+    public LadefogedWindow(PlotTable table, Dictionary<string, string> initial, string tempDirectory, AsyncPlotInfo async)
+    {
+        this.table = table;
+        this.initial = initial;
+        this.tempDirectory = tempDirectory;
+        this.async = async;
+        tableName = Get("tableName", "Table");
+        Text = "AERoPlot: Ladefoged plot (" + tableName + ")";
+        Font = SystemFonts.MessageBoxFont;
+        AutoScaleMode = AutoScaleMode.Font;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        StartPosition = FormStartPosition.CenterScreen;
+        ClientSize = new Size(900, 660);
+        BuildControls();
+        LoadInitialValues();
+        loading = false;
+        RefreshSummaries();
+        RefreshLevels(sequenceLevels, sequenceFactor.Text, true);
+        RefreshLevels(comparisonLevels, comparisonFactor.Text, true);
+        RefreshXAxisOptions();
+        if (xAxisLabels.Items.Count > 0)
+            xAxisLabels.SelectedIndex = Math.Max(0, Math.Min(xAxisLabels.Items.Count - 1, GetInt("xAxisFactor", 1) - 1));
+        UpdateSpreadEnabled();
+        UpdateFrequencyLabel();
+        StartParentWatch();
+        FormClosing += delegate (object sender, FormClosingEventArgs e)
+        {
+            if (busy && PraatLink.IsRunning(async.PraatProcessId))
+            {
+                e.Cancel = MessageBox.Show(this,
+                    "A request is still running. Close this window anyway? You may still need to finish the Praat window.",
+                    Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes;
+            }
+        };
+        FormClosed += delegate
+        {
+            string path = System.IO.Path.Combine(tempDirectory, "lad-colours-" + colourSession + ".txt");
+            try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+            catch (System.IO.IOException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            catch (UnauthorizedAccessException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        };
+    }
+
+    private string Get(string key, string fallback)
+    {
+        string value;
+        return initial.TryGetValue(key, out value) && value.Length > 0 ? value : fallback;
+    }
+
+    private int GetInt(string key, int fallback)
+    {
+        int value;
+        return int.TryParse(Get(key, ""), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) ? value : fallback;
+    }
+
+    private decimal GetNumber(string key, decimal fallback)
+    {
+        decimal value;
+        return decimal.TryParse(Get(key, ""), NumberStyles.Float, CultureInfo.InvariantCulture, out value) ? value : fallback;
+    }
+
+    private static string Clean(string value)
+    {
+        return (value ?? "").Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
+    }
+
+    private static string Num(decimal value)
+    {
+        return value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static decimal Clamp(decimal value, NumericUpDown control)
+    {
+        return Math.Max(control.Minimum, Math.Min(control.Maximum, value));
+    }
+
+    private static GroupBox Group(string text, int x, int y, int width, int height)
+    {
+        return new GroupBox { Text = text, Location = new Point(x, y), Size = new Size(width, height) };
+    }
+
+    private static Label Caption(string text, int x, int y, int width)
+    {
+        return new Label { Text = text, Location = new Point(x, y + 3), Size = new Size(width, 20), AutoEllipsis = true };
+    }
+
+    private static ComboBox Drop(int x, int y, int width, IEnumerable<string> items)
+    {
+        var combo = new ComboBox { Location = new Point(x, y), Width = width, DropDownStyle = ComboBoxStyle.DropDownList };
+        combo.Items.AddRange(items.Cast<object>().ToArray());
+        return combo;
+    }
+
+    private static NumericUpDown Number(int x, int y, int width, decimal minimum, decimal maximum, int decimals)
+    {
+        return new NumericUpDown { Location = new Point(x, y), Width = width, Minimum = minimum, Maximum = maximum, DecimalPlaces = decimals };
+    }
+
+    private void BuildControls()
+    {
+        var columns = table.Columns.Where(c => c.Length > 0).ToArray();
+        var numericColumns = columns.Where(c => table.IsNumeric(table.IndexOf(c))).ToArray();
+
+        var data = Group("Data", 10, 6, 430, 244);
+        data.Controls.Add(Caption("Sequencing factor (x-axis)", 12, 24, 145));
+        sequenceFactor = Drop(160, 24, 250, columns);
+        data.Controls.Add(sequenceFactor);
+        data.Controls.Add(Caption("Comparison factor (colour)", 12, 54, 145));
+        comparisonFactor = Drop(160, 54, 250, new[] { None }.Concat(columns));
+        data.Controls.Add(comparisonFactor);
+        data.Controls.Add(Caption("Formant A", 12, 84, 145));
+        formantA = Drop(160, 84, 250, numericColumns);
+        data.Controls.Add(formantA);
+        data.Controls.Add(Caption("Formant B", 12, 114, 145));
+        formantB = Drop(160, 114, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(formantB);
+        data.Controls.Add(Caption("Formant C", 12, 144, 145));
+        formantC = Drop(160, 144, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(formantC);
+        data.Controls.Add(Caption("Formant D", 12, 174, 145));
+        formantD = Drop(160, 174, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(formantD);
+        data.Controls.Add(Caption("Input units", 12, 204, 145));
+        inputUnits = Drop(160, 204, 250, new[] { "Hertz", "Bark" });
+        data.Controls.Add(inputUnits);
+        Controls.Add(data);
+
+        var include = Group("Include", 10, 256, 430, 354);
+        include.Controls.Add(Caption("Sequencing levels", 12, 20, 190));
+        sequenceLevels = new CheckedListBox { Location = new Point(12, 46), Size = new Size(196, 128), CheckOnClick = true };
+        include.Controls.Add(sequenceLevels);
+        include.Controls.Add(Caption("Comparison levels", 220, 20, 190));
+        comparisonLevels = new CheckedListBox { Location = new Point(220, 46), Size = new Size(196, 128), CheckOnClick = true };
+        include.Controls.Add(comparisonLevels);
+        AddLevelButtons(include, sequenceLevels, 12, 178);
+        AddLevelButtons(include, comparisonLevels, 220, 178);
+        include.Controls.Add(Caption("Filters on other columns", 12, 210, 300));
+        filterList = new ListBox { Location = new Point(12, 236), Size = new Size(404, 58) };
+        include.Controls.Add(filterList);
+        var addFilter = new Button { Text = "Add filter\u2026", Location = new Point(12, 304), Size = new Size(110, 28) };
+        addFilter.Click += delegate { AddFilter(); };
+        include.Controls.Add(addFilter);
+        var removeFilter = new Button { Text = "Remove filter", Location = new Point(130, 304), Size = new Size(110, 28) };
+        removeFilter.Click += delegate
+        {
+            if (filterList.SelectedItem != null)
+            {
+                filters.Remove(filterList.SelectedItem.ToString().Split(':')[0]);
+                RefreshFilterList();
+                RefreshXAxisOptions();
+            }
+        };
+        include.Controls.Add(removeFilter);
+        Controls.Add(include);
+
+        var plot = Group("Plot", 450, 6, 440, 176);
+        plot.Controls.Add(Caption("Title", 12, 22, 100));
+        title = new TextBox { Location = new Point(120, 22), Width = 300 };
+        plot.Controls.Add(title);
+        plot.Controls.Add(Caption("Plot height (inches)", 12, 52, 140));
+        plotHeight = Number(160, 52, 80, 0.1m, 20, 1);
+        plot.Controls.Add(plotHeight);
+        maximumFrequencyLabel = Caption("Maximum frequency", 12, 82, 140);
+        plot.Controls.Add(maximumFrequencyLabel);
+        maxFrequency = Number(160, 82, 100, 1, 20000, 0);
+        plot.Controls.Add(maxFrequency);
+        plot.Controls.Add(Caption("X-axis labels from", 12, 112, 140));
+        xAxisLabels = Drop(160, 112, 250, new string[0]);
+        plot.Controls.Add(xAxisLabels);
+        showLegend = new CheckBox { Text = "Show legend", Location = new Point(12, 144), AutoSize = true };
+        showFormantsInLegend = new CheckBox { Text = "Show formants in legend", Location = new Point(160, 144), AutoSize = true };
+        plot.Controls.Add(showLegend);
+        plot.Controls.Add(showFormantsInLegend);
+        Controls.Add(plot);
+
+        var look = Group("Appearance", 450, 188, 440, 150);
+        var fontButton = new Button { Text = "Font\u2026", Location = new Point(12, 22), Size = new Size(130, 28) };
+        fontButton.Click += delegate { ChooseFont(); };
+        fontSummary = new Label { Location = new Point(152, 27), Size = new Size(275, 20), AutoEllipsis = true };
+        var unitsButton = new Button { Text = "Output units\u2026", Location = new Point(12, 54), Size = new Size(130, 28) };
+        unitsButton.Click += delegate { ChooseOutputUnits(); };
+        unitsSummary = new Label { Location = new Point(152, 59), Size = new Size(275, 20), AutoEllipsis = true };
+        var folderButton = new Button { Text = "Save folder\u2026", Location = new Point(12, 86), Size = new Size(130, 28) };
+        folderButton.Click += delegate { ChooseFolder(); };
+        folderSummary = new Label { Location = new Point(152, 91), Size = new Size(275, 20), AutoEllipsis = true };
+        colourButton = new Button { Text = "Colour settings\u2026", Location = new Point(12, 118), Size = new Size(130, 28) };
+        colourButton.Click += delegate { ChooseColours(); };
+        colourSummary = new Label { Location = new Point(152, 123), Size = new Size(275, 20), AutoEllipsis = true };
+        look.Controls.AddRange(new Control[] { fontButton, fontSummary, unitsButton, unitsSummary, folderButton, folderSummary, colourButton, colourSummary });
+        Controls.Add(look);
+
+        var layers = Group("Layers", 450, 344, 440, 236);
+        layers.Controls.Add(Caption("Data points", 12, 20, 170));
+        tokenMarking = Drop(190, 20, 230, new[] { "Hide data points", "Show all individual data points", "Show outliers only" });
+        layers.Controls.Add(tokenMarking);
+        addJitter = new CheckBox { Text = "Add jitter to data points", Location = new Point(12, 50), AutoSize = true };
+        layers.Controls.Add(addJitter);
+        layers.Controls.Add(Caption("Averages bar", 12, 80, 170));
+        averages = Drop(190, 80, 230, new[] { "Hide averages bar", "Show means", "Show median values" });
+        layers.Controls.Add(averages);
+        showAverageValues = new CheckBox { Text = "Show values above averages", Location = new Point(12, 110), AutoSize = true };
+        layers.Controls.Add(showAverageValues);
+        layers.Controls.Add(Caption("Most prominent layer", 12, 140, 170));
+        topLayer = Drop(190, 140, 230, new[] { "Averages bar / box plot", "Data points" });
+        layers.Controls.Add(topLayer);
+        showBoxplots = new CheckBox { Text = "Show boxplots", Location = new Point(12, 174), AutoSize = true };
+        showArrows = new CheckBox { Text = "Show arrows", Location = new Point(190, 174), AutoSize = true };
+        spreadLevels = new CheckBox { Text = "Spread comparison levels along the x-axis", Location = new Point(12, 202), AutoSize = true };
+        layers.Controls.Add(showBoxplots);
+        layers.Controls.Add(showArrows);
+        layers.Controls.Add(spreadLevels);
+        Controls.Add(layers);
+
+        Controls.Add(Caption("Save name", 10, 628, 70));
+        saveName = new TextBox { Location = new Point(84, 628), Width = 150 };
+        Controls.Add(saveName);
+        saveButton = new Button { Text = "Save image", Location = new Point(244, 625), Size = new Size(96, 28) };
+        saveButton.Click += delegate { Request(2); };
+        Controls.Add(saveButton);
+        drawButton = new Button { Text = "Draw", Name = "Draw", Location = new Point(520, 625), Size = new Size(90, 28) };
+        drawButton.Click += delegate { Request(1); };
+        Controls.Add(drawButton);
+        drawExitButton = new Button { Text = "Draw && Exit", Name = "DrawAndExit", Location = new Point(616, 625), Size = new Size(100, 28) };
+        drawExitButton.Click += delegate { Request(3); };
+        Controls.Add(drawExitButton);
+        var cancel = new Button { Text = "Cancel", Location = new Point(722, 625), Size = new Size(80, 28), DialogResult = DialogResult.Cancel };
+        Controls.Add(cancel);
+        var help = new Button { Text = "Instructions", Location = new Point(808, 625), Size = new Size(82, 28) };
+        help.Click += delegate { ShowInstructions(); };
+        Controls.Add(help);
+        CancelButton = cancel;
+        AcceptButton = drawButton;
+
+        sequenceFactor.SelectedIndexChanged += delegate
+        {
+            if (!loading)
+            {
+                RefreshLevels(sequenceLevels, sequenceFactor.Text, true);
+                RefreshXAxisOptions();
+            }
+        };
+        comparisonFactor.SelectedIndexChanged += delegate
+        {
+            if (!loading)
+            {
+                RefreshLevels(comparisonLevels, comparisonFactor.Text, true);
+                RefreshXAxisOptions();
+                UpdateSpreadEnabled();
+            }
+        };
+        inputUnits.SelectedIndexChanged += delegate { UnitsChanged(); };
+        sequenceLevels.ItemCheck += delegate { if (!refreshing) BeginInvoke((MethodInvoker)RefreshXAxisOptions); };
+        comparisonLevels.ItemCheck += delegate
+        {
+            if (!refreshing)
+                BeginInvoke((MethodInvoker)delegate { RefreshXAxisOptions(); UpdateSpreadEnabled(); });
+        };
+    }
+
+    private void AddLevelButtons(GroupBox box, CheckedListBox list, int x, int y)
+    {
+        var all = new Button { Text = "All", Location = new Point(x, y), Size = new Size(60, 26) };
+        all.Click += delegate { SetAll(list, true); };
+        var none = new Button { Text = "None", Location = new Point(x + 66, y), Size = new Size(60, 26) };
+        none.Click += delegate { SetAll(list, false); };
+        box.Controls.Add(all);
+        box.Controls.Add(none);
+    }
+
+    private void SetAll(CheckedListBox list, bool state)
+    {
+        for (int i = 0; i < list.Items.Count; i++)
+            list.SetItemChecked(i, state);
+        RefreshXAxisOptions();
+        UpdateSpreadEnabled();
+    }
+
+    private void UpdateSpreadEnabled()
+    {
+        spreadLevels.Enabled = comparisonFactor.Text != None && comparisonLevels.CheckedItems.Count > 1;
+    }
+
+    private void RefreshLevels(CheckedListBox list, string column, bool allChecked)
+    {
+        refreshing = true;
+        list.Items.Clear();
+        int index = table.IndexOf(column);
+        if (index >= 0)
+            foreach (var level in table.Levels(index))
+                list.Items.Add(level, allChecked);
+        refreshing = false;
+    }
+
+    private void LoadInitialValues()
+    {
+        var columns = table.Columns.Where(c => c.Length > 0).ToArray();
+        int firstCategorical = Array.FindIndex(columns, c => !table.IsNumeric(table.IndexOf(c)));
+        if (firstCategorical < 0 && columns.Length > 0)
+            firstCategorical = 0;
+        string sequence = Get("iFactor", "");
+        sequenceFactor.SelectedIndex = Array.IndexOf(columns, sequence);
+        if (sequenceFactor.SelectedIndex < 0)
+            sequenceFactor.SelectedIndex = Math.Max(0, firstCategorical);
+        string comparison = Get("oFactor", "");
+        comparisonFactor.SelectedIndex = comparison.Length == 0 ? 0 : comparisonFactor.Items.IndexOf(comparison);
+        if (comparisonFactor.SelectedIndex < 0)
+            comparisonFactor.SelectedIndex = 0;
+        ChooseFormant(formantA, Get("f1Col", "F1"), 1);
+        ChooseFormant(formantB, Get("f2Col", "F2"), 2);
+        ChooseFormant(formantC, Get("f3Col", "F3"), 3);
+        ChooseFormant(formantD, Get("f4Col", ""), 4);
+
+        int units = GetInt("inputUnits", 1);
+        inputUnits.Items.AddRange(new object[] { "Hertz", "Bark" });
+        inputUnits.SelectedIndex = units == 2 ? 1 : 0;
+        int previousUnits = GetInt("prevInputUnit", units);
+        decimal max = GetNumber("maxFreq", units == 2 ? 18 : 4000);
+        if (units == 1 && previousUnits == 2) max = 3800;
+        if (units == 2 && previousUnits == 1) max = 18;
+        maxFrequency.Value = Clamp(max, maxFrequency);
+        plotHeight.Value = Clamp(GetNumber("plotHeight", 5), plotHeight);
+
+        title.Text = Get("title", "");
+        showLegend.Checked = GetInt("showLegend", 1) != 0;
+        showFormantsInLegend.Checked = GetInt("legendHasFormants", 0) != 0;
+        tokenMarking.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("tokenMarking", 3) - 1));
+        averages.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("showAves", 2) - 1));
+        topLayer.SelectedIndex = Math.Max(0, Math.Min(1, GetInt("dataPointsOnTop", 1) - 1));
+        addJitter.Checked = GetInt("addJitter", 0) != 0;
+        showAverageValues.Checked = GetInt("showAveVals", 1) != 0;
+        showBoxplots.Checked = GetInt("showIQR", 1) != 0;
+        showArrows.Checked = GetInt("drawArrows", 0) != 0;
+        spreadLevels.Checked = GetInt("staggerO", 1) != 0;
+        fontChoice = Math.Max(1, Math.Min(4, GetInt("font_choice", 1)));
+        baseSize = Math.Max(1, Math.Min(6, GetInt("baseSize", 3)));
+        outputUnits = Math.Max(1, Math.Min(6, GetInt("outputUnits", 2)));
+        saveFolder = Get("saveDir", "");
+        saveName.Text = Get("saveName", "LadFormantPlot.png");
+        colourMode = 1;
+    }
+
+    private void ChooseFormant(ComboBox combo, string remembered, int number)
+    {
+        if (remembered.Length > 0 && combo.Items.Contains(remembered))
+        {
+            combo.SelectedItem = remembered;
+            return;
+        }
+        string prefix1 = "f" + number;
+        string prefix2 = "formant" + number;
+        string best = null;
+        foreach (string column in combo.Items)
+        {
+            string normal = Regex.Replace(column.ToLowerInvariant(), "[^a-z0-9]", "");
+            if (normal == prefix1 || normal == prefix2)
+            {
+                combo.SelectedItem = column;
+                return;
+            }
+            if (best == null && (normal.StartsWith(prefix1) || normal.StartsWith(prefix2)))
+                best = column;
+        }
+        if (best != null)
+            combo.SelectedItem = best;
+        else if (number == 1 && combo.Items.Count > 0)
+            combo.SelectedIndex = 0;
+        else if (combo.Items.Count > 0)
+            combo.SelectedIndex = 0;
+    }
+
+    private void UnitsChanged()
+    {
+        if (loading || maxFrequency == null)
+            return;
+        maxFrequency.Value = inputUnits.SelectedIndex == 1 ? 18 : 3800;
+        UpdateFrequencyLabel();
+        RefreshSummaries();
+    }
+
+    private void UpdateFrequencyLabel()
+    {
+        if (maximumFrequencyLabel != null && inputUnits.SelectedIndex >= 0)
+            maximumFrequencyLabel.Text = "Maximum frequency (" + (inputUnits.SelectedIndex == 1 ? "Bark" : "Hz") + ")";
+    }
+
+    private void RefreshXAxisOptions()
+    {
+        if (xAxisLabels == null || sequenceFactor.SelectedIndex < 0)
+            return;
+        string previous = xAxisLabels.SelectedItem as string;
+        var included = table.Rows.Where(RowIncluded).ToList();
+        var sequenceValues = new HashSet<string>(included.Select(r => r[table.IndexOf(sequenceFactor.Text)]));
+        var options = new List<string>();
+        if (sequenceValues.Count > 0)
+        {
+            foreach (string column in table.Columns.Where(c => c.Length > 0))
+            {
+                int index = table.IndexOf(column);
+                var values = new HashSet<string>(included.Select(r => r[index]));
+                if (values.Count == sequenceValues.Count)
+                    options.Add(column);
+            }
+        }
+        if (!options.Contains(sequenceFactor.Text))
+            options.Insert(0, sequenceFactor.Text);
+        xAxisLabels.Items.Clear();
+        xAxisLabels.Items.AddRange(options.Distinct().Cast<object>().ToArray());
+        if (previous != null && xAxisLabels.Items.Contains(previous))
+            xAxisLabels.SelectedItem = previous;
+        else
+            xAxisLabels.SelectedItem = sequenceFactor.Text;
+    }
+
+    private bool RowIncluded(string[] row)
+    {
+        if (!CheckedOrAll(sequenceLevels, row, sequenceFactor.Text))
+            return false;
+        if (comparisonFactor.Text != None && comparisonFactor.Text != sequenceFactor.Text &&
+            !CheckedOrAll(comparisonLevels, row, comparisonFactor.Text))
+            return false;
+        foreach (var filter in filters)
+            if (!filter.Value.Contains(row[table.IndexOf(filter.Key)]))
+                return false;
+        return true;
+    }
+
+    private bool CheckedOrAll(CheckedListBox list, string[] row, string column)
+    {
+        if (list.Items.Count == 0 || list.CheckedItems.Count == 0)
+            return false;
+        if (list.CheckedItems.Count == list.Items.Count)
+            return true;
+        return list.CheckedItems.Contains(row[table.IndexOf(column)]);
+    }
+
+    private Form SmallDialog(string text, int width, int height)
+    {
+        return new Form
+        {
+            Text = text, ClientSize = new Size(width, height), FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false,
+            Font = Font
+        };
+    }
+
+    private static void OkCancel(Form form, int y)
+    {
+        var ok = new Button { Text = "OK", Location = new Point(form.ClientSize.Width - 176, y), Size = new Size(80, 28), DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Cancel", Location = new Point(form.ClientSize.Width - 90, y), Size = new Size(80, 28), DialogResult = DialogResult.Cancel };
+        form.Controls.Add(ok);
+        form.Controls.Add(cancel);
+        form.AcceptButton = ok;
+        form.CancelButton = cancel;
+    }
+
+    private void ChooseFont()
+    {
+        using (var form = SmallDialog("Font", 340, 130))
+        {
+            form.Controls.Add(Caption("Font", 12, 14, 100));
+            var font = Drop(130, 14, 190, FontNames);
+            font.SelectedIndex = fontChoice - 1;
+            form.Controls.Add(font);
+            form.Controls.Add(Caption("Base font size (pt)", 12, 46, 115));
+            var size = Drop(130, 46, 190, FontSizes);
+            size.SelectedIndex = baseSize - 1;
+            form.Controls.Add(size);
+            OkCancel(form, 88);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                fontChoice = font.SelectedIndex + 1;
+                baseSize = size.SelectedIndex + 1;
+                RefreshSummaries();
+            }
+        }
+    }
+
+    private void ChooseOutputUnits()
+    {
+        if (inputUnits.SelectedIndex == 1)
+        {
+            MessageBox.Show(this, "With Bark input, the plot is drawn in Bark. Output units can be chosen when the input units are Hertz.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        using (var form = SmallDialog("Output units", 360, 250))
+        {
+            form.Controls.Add(Caption("Show the plot axes in:", 12, 8, 330));
+            var buttons = new List<RadioButton>();
+            for (int i = 0; i < OutputUnitNames.Length; i++)
+            {
+                var radio = new RadioButton { Text = OutputUnitNames[i], Location = new Point(24, 36 + i * 28), AutoSize = true, Checked = i == outputUnits - 1 };
+                buttons.Add(radio);
+                form.Controls.Add(radio);
+            }
+            OkCancel(form, 210);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                outputUnits = buttons.FindIndex(b => b.Checked) + 1;
+                RefreshSummaries();
+            }
+        }
+    }
+
+    private void ChooseFolder()
+    {
+        using (var dialog = new FolderBrowserDialog())
+        {
+            dialog.Description = "Choose the folder for saved images.";
+            if (saveFolder.Length > 0 && System.IO.Directory.Exists(saveFolder))
+                dialog.SelectedPath = saveFolder;
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                saveFolder = dialog.SelectedPath;
+                RefreshSummaries();
+            }
+        }
+    }
+
+    private void ChooseColours()
+    {
+        using (var form = SmallDialog("Colour settings", 500, 280))
+        {
+            form.Controls.Add(Caption("Changes are applied when you press OK:", 12, 8, 470));
+            var buttons = new List<RadioButton>();
+            for (int i = 0; i < ColourModes.Length; i++)
+            {
+                var radio = new RadioButton { Text = ColourModes[i], Location = new Point(24, 34 + i * 26), AutoSize = true, Checked = i == colourMode - 1 };
+                buttons.Add(radio);
+                form.Controls.Add(radio);
+            }
+            var add = new CheckBox { Text = "Add or change a colour scheme (a Praat window opens)", Location = new Point(24, 200), AutoSize = true, Checked = addColourScheme };
+            form.Controls.Add(add);
+            buttons[5].CheckedChanged += delegate
+            {
+                if (buttons[5].Checked) add.Checked = false;
+                add.Enabled = !buttons[5].Checked;
+            };
+            add.Enabled = !buttons[5].Checked;
+            OkCancel(form, 240);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                colourMode = buttons.FindIndex(b => b.Checked) + 1;
+                addColourScheme = add.Checked;
+                RefreshSummaries();
+                Request(4);
+            }
+        }
+    }
+
+    private void AddFilter()
+    {
+        var used = new HashSet<string>(new[] { sequenceFactor.Text, comparisonFactor.Text, formantA.Text,
+            formantB.Text, formantC.Text, formantD.Text, None });
+        var candidates = table.Columns.Where(c => c.Length > 0 && !used.Contains(c) && !filters.ContainsKey(c)).ToArray();
+        if (candidates.Length == 0)
+        {
+            MessageBox.Show(this, "There are no other columns to filter on.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        using (var form = SmallDialog("Add filter", 380, 380))
+        {
+            form.Controls.Add(Caption("Column", 12, 12, 80));
+            var column = Drop(100, 12, 260, candidates);
+            column.SelectedIndex = 0;
+            form.Controls.Add(column);
+            form.Controls.Add(Caption("Keep rows with these values:", 12, 46, 340));
+            var values = new CheckedListBox { Location = new Point(12, 72), Size = new Size(350, 240), CheckOnClick = true };
+            form.Controls.Add(values);
+            Action fill = delegate
+            {
+                values.Items.Clear();
+                foreach (var level in table.Levels(table.IndexOf(column.Text)))
+                    values.Items.Add(level, true);
+            };
+            column.SelectedIndexChanged += delegate { fill(); };
+            fill();
+            OkCancel(form, 332);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                if (values.CheckedItems.Count == 0)
+                {
+                    MessageBox.Show(this, "Tick at least one value to keep.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                if (values.CheckedItems.Count < values.Items.Count)
+                {
+                    filters[column.Text] = new HashSet<string>(values.CheckedItems.Cast<string>());
+                    RefreshFilterList();
+                    RefreshXAxisOptions();
+                }
+            }
+        }
+    }
+
+    private void RefreshFilterList()
+    {
+        filterList.Items.Clear();
+        foreach (var pair in filters)
+            filterList.Items.Add(pair.Key + ": keeping " + pair.Value.Count + " of " +
+                table.Levels(table.IndexOf(pair.Key)).Count + " values");
+    }
+
+    private void RefreshSummaries()
+    {
+        fontSummary.Text = FontNames[fontChoice - 1] + ", base size " + FontSizes[baseSize - 1] + " pt";
+        bool bark = inputUnits.SelectedIndex == 1;
+        unitsSummary.Text = bark ? "Bark (input and output)" : OutputUnitNames[outputUnits - 1];
+        folderSummary.Text = saveFolder.Length == 0 ? "Default folder" : saveFolder;
+        colourSummary.Text = activeColourMatch ? "Custom colours for this dialog" :
+            ColourModes[colourMode - 1].Split('(')[0].Trim() + (addColourScheme ? "; add or change scheme" : "");
+    }
+
+    private void ShowInstructions()
+    {
+        MessageBox.Show(this,
+            "1. Choose the sequencing factor, optional comparison factor, and up to four formant columns in order.\n" +
+            "2. Tick the levels to include. Use Add filter to restrict other columns.\n" +
+            "3. Set the title, plot height, maximum frequency, x-axis labels and layers.\n" +
+            "4. Use Font, Output units, Save folder and Colour settings for the look of the plot.\n" +
+            "5. Press Draw. The plot appears in Praat's Picture window and this window stays open.\n" +
+            "6. Save image saves the displayed plot. Draw & Exit draws and closes this window.",
+            "AERoPlot: Ladefoged plot", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private string CheckInput(bool coloursOnly)
+    {
+        if (sequenceFactor.SelectedIndex < 0)
+            return "Choose a sequencing factor.";
+        if (comparisonFactor.Text != None && comparisonFactor.Text == sequenceFactor.Text)
+            return "The sequencing and comparison factors must be different.";
+        if (formantA.SelectedIndex < 0)
+            return "Choose at least Formant A.";
+        string[] selectedFormants = { formantA.Text, formantB.SelectedIndex > 0 ? formantB.Text : "",
+            formantC.SelectedIndex > 0 ? formantC.Text : "", formantD.SelectedIndex > 0 ? formantD.Text : "" };
+        bool gap = false;
+        var distinct = new HashSet<string>();
+        foreach (string formant in selectedFormants)
+        {
+            if (formant.Length == 0)
+                gap = true;
+            else if (gap)
+                return "Choose formant columns consecutively from A. Leave later formants as (none).";
+            else if (!distinct.Add(formant))
+                return "Each formant must use a different column.";
+        }
+        if (sequenceLevels.CheckedItems.Count == 0)
+            return "Tick at least one sequencing level.";
+        if (comparisonFactor.Text != None && comparisonFactor.Text != sequenceFactor.Text &&
+            comparisonLevels.CheckedItems.Count == 0)
+            return "Tick at least one comparison level.";
+        if (maxFrequency.Value <= 0 || plotHeight.Value <= 0)
+            return "Maximum frequency and plot height must be greater than zero.";
+        if (saveName.Text.Trim().Length == 0)
+            return "Enter a save name.";
+        return null;
+    }
+
+    private string ColourFactor()
+    {
+        return comparisonFactor.Text == None ? "dummyInner" : comparisonFactor.Text;
+    }
+
+    private void Request(int action)
+    {
+        string problem = action == 2 ? null : CheckInput(action == 4);
+        if (problem != null)
+        {
+            MessageBox.Show(this, problem, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if ((action == 1 || action == 3) && activeColourMatch && ColourFactor() != matchedFactor)
+        {
+            MessageBox.Show(this, "The custom colours were chosen for " + matchedFactor +
+                ". Choose colours again for the current comparison factor before drawing.", Text,
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        string requestFactor = ColourFactor();
+        var lines = new List<string>();
+        Action<string, string> put = delegate (string key, string value) { lines.Add(key + "\t" + Clean(value)); };
+        put("oFactor$", comparisonFactor.Text == None ? "" : comparisonFactor.Text);
+        put("iFactor$", sequenceFactor.Text);
+        put("f1Col$", formantA.Text);
+        put("f2Col$", formantB.SelectedIndex > 0 ? formantB.Text : "");
+        put("f3Col$", formantC.SelectedIndex > 0 ? formantC.Text : "");
+        put("f4Col$", formantD.SelectedIndex > 0 ? formantD.Text : "");
+        put("inputUnits", (inputUnits.SelectedIndex + 1).ToString(CultureInfo.InvariantCulture));
+        put("title$", title.Text);
+        put("maxFreq", Num(maxFrequency.Value));
+        put("plotHeight", Num(plotHeight.Value));
+        put("xAxisFactor$", xAxisLabels.SelectedItem as string ?? sequenceFactor.Text);
+        put("showLegend", showLegend.Checked ? "1" : "0");
+        put("legendHasFormants", showFormantsInLegend.Checked ? "1" : "0");
+        put("tokenMarking", tokenMarking.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+        put("addJitter", addJitter.Checked ? "1" : "0");
+        put("showAves", averages.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+        put("showAveVals", showAverageValues.Checked ? "1" : "0");
+        put("dataPointsOnTop", topLayer.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+        put("showIQR", showBoxplots.Checked ? "1" : "0");
+        put("drawArrows", showArrows.Checked ? "1" : "0");
+        put("staggerO", spreadLevels.Enabled && spreadLevels.Checked ? "1" : "0");
+        put("fontChoice", fontChoice.ToString(CultureInfo.InvariantCulture));
+        put("baseSize", baseSize.ToString(CultureInfo.InvariantCulture));
+        put("outputUnits", inputUnits.SelectedIndex == 1 ? "7" : outputUnits.ToString(CultureInfo.InvariantCulture));
+        put("saveDir$", saveFolder);
+        put("saveName$", saveName.Text.Trim());
+        put("sorting", (action == 4 ? colourMode : 1).ToString(CultureInfo.InvariantCulture));
+        put("changeAddColSch", action == 4 && addColourScheme ? "1" : "0");
+        put("colourSession$", colourSession);
+        AddKeep(lines, sequenceFactor.Text, sequenceLevels);
+        if (comparisonFactor.Text != None && comparisonFactor.Text != sequenceFactor.Text)
+            AddKeep(lines, comparisonFactor.Text, comparisonLevels);
+        foreach (var pair in filters)
+            foreach (var level in pair.Value)
+                lines.Add("keep\t" + Clean(pair.Key) + "\t" + Clean(level));
+
+        string token = Guid.NewGuid().ToString("N");
+        string completion = System.IO.Path.Combine(tempDirectory, "lad-complete-" + token + ".txt");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(tempDirectory, "lad-response-" + token + ".txt"),
+            string.Join("\n", lines.ToArray()) + "\n", new UTF8Encoding(false));
+        string script = "runScript: \"" + async.CallbackScript + "\", \"" + token + "\", " + async.SoundId + ", " + action + "\n";
+        SetBusy(true);
+        var worker = new System.Threading.Thread(delegate ()
+        {
+            string failure = PraatLink.Send(async.PraatProcessId, async.PreferencesDirectory, script);
+            bool cancelled = false;
+            if (action != 2 && failure == null)
+            {
+                try
+                {
+                    int waited = 0;
+                    string result = "";
+                    while (result != "OK" && result != "CANCELLED" &&
+                        PraatLink.IsRunning(async.PraatProcessId) && waited < 600000)
+                    {
+                        if (System.IO.File.Exists(completion))
+                            result = System.IO.File.ReadAllText(completion).Trim();
+                        if (result == "OK" || result == "CANCELLED") break;
+                        System.Threading.Thread.Sleep(200);
+                        waited += 200;
+                    }
+                    if (result != "OK" && result != "CANCELLED")
+                        failure = "The request did not complete. Check Praat for an error.";
+                    else
+                    {
+                        System.IO.File.Delete(completion);
+                        cancelled = result == "CANCELLED";
+                    }
+                    if (IsDisposed)
+                    {
+                        string path = System.IO.Path.Combine(tempDirectory, "lad-colours-" + colourSession + ".txt");
+                        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                    }
+                }
+                catch (System.IO.IOException e) { failure = "Could not read the colour settings result: " + e.Message; }
+                catch (UnauthorizedAccessException e) { failure = "Could not read the colour settings result: " + e.Message; }
+            }
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    SetBusy(false);
+                    if (failure != null)
+                    {
+                        MessageBox.Show(this, failure, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    if (action == 4)
+                    {
+                        if (!cancelled && (colourMode != 1 || addColourScheme))
+                        {
+                            activeColourMatch = colourMode == 5;
+                            matchedFactor = requestFactor;
+                        }
+                        colourMode = 1;
+                        addColourScheme = false;
+                        RefreshSummaries();
+                    }
+                    if (action == 3)
+                    {
+                        DialogResult = DialogResult.OK;
+                        Close();
+                    }
+                });
+            }
+            catch (InvalidOperationException) { }
+        });
+        worker.IsBackground = true;
+        worker.Start();
+    }
+
+    private static void AddKeep(List<string> lines, string column, CheckedListBox list)
+    {
+        if (list.CheckedItems.Count == list.Items.Count)
+            return;
+        foreach (var level in list.CheckedItems.Cast<string>())
+            lines.Add("keep\t" + Clean(column) + "\t" + Clean(level));
+    }
+
+    private void SetBusy(bool value)
+    {
+        busy = value;
+        drawButton.Enabled = !value;
+        drawExitButton.Enabled = !value;
+        saveButton.Enabled = !value;
+        colourButton.Enabled = !value;
+        UseWaitCursor = value;
     }
 
     private void StartParentWatch()

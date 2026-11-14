@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -24,6 +24,8 @@ internal static class Program
             if (args.Length > 0 && args[0] == "TABLE")
                 return TableUI.Run(args);
             if (args.Length > 0 && args[0] == "TABLEPLOT")
+                return TablePlotUI.Run(args);
+            if (args.Length > 0 && args[0] == "TABLELAD")
                 return TablePlotUI.Run(args);
             throw new ArgumentException("The requested interface is not supported.");
         }

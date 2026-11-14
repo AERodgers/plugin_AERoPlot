@@ -14,12 +14,23 @@
 #      Boston MA: Wadsworth Cengage
 
 @checkPraatVersion
-@objsSelected: "Table", "tableID$"
-@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 curLadVersion$ = "1.4.0.0"
 plotPrefix$ = "LAD."
 # Main script loop
 keepGoing = 1
+if variableExists("aeroPrototypeInclude")
+    # Included by a Windows dialog script, which supplies its own settings.
+    keepGoing = 0
+else
+    @getUIMode
+    if getUIMode.mode$ = "windows" and numberOfSelected("Table") = 1
+        runScript: "windowsLadefogedPrototype.praat"
+        keepGoing = 0
+    else
+        @objsSelected: "Table", "tableID$"
+        @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
+    endif
+endif
 while keepGoing
     @defineVars
     if keepGoing = 1

@@ -138,7 +138,7 @@ code only collects settings; shared code validates them and does the work.
    interactively. Dropdown fields take the option text (for example `F1 and F2`
    or `300 dpi`), and tick boxes take 0 or 1. F1-F2, Ladefoged and
    formants-over-time forms are not available yet.
-3. **Windows interface** (Create Table, PitchPlus, Spectrogram and F1-F2 only;
+3. **Windows interface** (Create Table, PitchPlus, Spectrogram, F1-F2 and Ladefoged;
    the default on Windows): see below.
 
 Choose between the Praat and Windows interfaces with **Praat > AERoPlot >
@@ -148,9 +148,17 @@ nothing to choose. Until you choose, Windows uses the Windows interface when it
 is usable. The choice
 is remembered in `data\vars\ui_mode.txt`. If Windows is chosen but not usable
 (not Windows, Praat older than 6.4.60 or the helper has not been built), the
-Praat interface is used silently. Ladefoged and formants-over-time always
-use the Praat interface. F1-F2 uses the Windows interface when one Table is
-selected and the Praat interface otherwise (for example to read a table file).
+Praat interface is used silently. F1-F2 and Ladefoged use the Windows
+interface when one Table is selected and the Praat interface otherwise (for
+example to read a table file). Formants-over-time still uses the Praat
+interface.
+
+The F1-F2 and Ladefoged Windows dialogs share the same appearance, colour,
+image-saving and action controls. Both keep the settings window open for
+redrawing, save the currently displayed plot, and offer **Draw & Exit**.
+The Ladefoged dialog lets you choose a sequencing factor, an optional
+comparison factor, and up to four numeric formant columns. It also includes
+level selection and filters, x-axis labels, plot layers and frequency scale.
 
 When Praat starts on Windows the plug-in also launches the helper once in the
 background, so that the first dialog is not delayed by Windows checking the
@@ -162,10 +170,11 @@ them blank or entering `none` or `null` in any capitalisation. Required fields
 never accept these values, and `0` is not an off value.
 
 Tiers can be given by name or number in Create Table and the PitchPlus and
-Spectrogram forms. The F1-F2, Ladefoged and formants-over-time dialogs accept a
-Table column header or column number in their column fields. If a header is
-itself a number that differs from its position, the number is ambiguous; use
-descriptive headers. A missing column is reported with the list of real headers.
+Spectrogram forms. The native Praat table-plot dialogs accept a column header
+or column number; the Windows table-plot dialogs use dropdowns populated from
+the selected Table's headers. If a header is itself a number that differs from
+its position, the number is ambiguous; use descriptive headers. A missing
+column is reported with the list of real headers.
 
 `tests\interface_helpers.praat` (run with `--pref-dir` set to a new folder and
 that folder as its argument) checks off values, column resolution and the saved
