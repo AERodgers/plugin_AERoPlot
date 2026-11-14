@@ -58,6 +58,19 @@ removeObject: table
 prefs$ = prefs_directory$
 assert prefs$ != ""
 assert preferencesDirectory$ = prefs$
+
+# Readiness decision covers unsupported Praat versions and missing helpers.
+@windowsUIRequirements: 1, "6.4.59", 6, 4, 59, "C:/test/AERoPlotWindowsUI.exe", 1
+assert windowsUIRequirements.ok = 0
+assert index(windowsUIRequirements.reason$, "6.4.60") > 0
+@windowsUIRequirements: 1, "6.4.60", 6, 4, 60, "C:/test/AERoPlotWindowsUI.exe", 0
+assert windowsUIRequirements.ok = 0
+assert windowsUIRequirements.helperMissing = 1
+assert index(windowsUIRequirements.reason$, "AERoPlotWindowsUI.exe") > 0
+@windowsUIRequirements: 0, "6.4.60", 6, 4, 60, "C:/test/AERoPlotWindowsUI.exe", 1
+assert windowsUIRequirements.ok = 0
+assert windowsUIRequirements.reason$ = "The Windows interface is available only on Windows."
+
 aeroNonInteractive = 1
 prefFile$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/ui_mode.txt"
 assert not fileReadable(prefFile$)
@@ -68,10 +81,14 @@ if windowsUIAvailable.ok
     assert getUIMode.preference$ = "windows"
     assert getUIMode.mode$ = "windows"
 else
-    assert getUIMode.preference$ = "praat"
     assert getUIMode.mode$ = "praat"
     assert getUIMode.reason$ != ""
-    assert readFile$(prefFile$) = "praat"
+    if environment$("OS") = "Windows_NT" and windowsUIAvailable.helperMissing
+        assert getUIMode.preference$ = "praat"
+        assert readFile$(prefFile$) = "praat"
+    else
+        assert getUIMode.preference$ = "windows"
+    endif
 endif
 
 @setUIMode: "windows"
@@ -81,9 +98,14 @@ if windowsUIAvailable.ok
     assert getUIMode.preference$ = "windows"
     assert getUIMode.mode$ = "windows"
 else
-    assert getUIMode.preference$ = "praat"
     assert getUIMode.mode$ = "praat"
     assert getUIMode.reason$ != ""
+    if environment$("OS") = "Windows_NT"
+        assert getUIMode.preference$ = "praat"
+        assert readFile$(prefFile$) = "praat"
+    else
+        assert getUIMode.preference$ = "windows"
+    endif
 endif
 
 @setUIMode: "praat"
@@ -96,7 +118,17 @@ writeFile: prefFile$, "  PRAAT " + newline$
 assert getUIMode.preference$ = "praat"
 writeFile: prefFile$, "something else"
 @getUIMode
-assert getUIMode.preference$ = "windows"
+if windowsUIAvailable.ok
+    assert getUIMode.preference$ = "windows"
+else
+    assert getUIMode.mode$ = "praat"
+    if environment$("OS") = "Windows_NT"
+        assert getUIMode.preference$ = "praat"
+        assert readFile$(prefFile$) = "praat"
+    else
+        assert getUIMode.preference$ = "windows"
+    endif
+endif
 deleteFile: prefFile$
 
 writeInfoLine: "Interface helper tests passed."

@@ -44,29 +44,46 @@ procedure getUIMode
 endproc
 
 procedure windowsUIAvailable
+    .isWindows = environment$("OS") = "Windows_NT"
+    .major = 0
+    .minor = 0
+    .patch = 0
+    .exe$ = preferencesDirectory$ +
+    ... "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+    .helperPresent = 0
+    if .isWindows
+        @checkPraatVersion
+        .major = checkPraatVersion.major
+        .minor = checkPraatVersion.minor
+        .patch = checkPraatVersion.patch
+        .helperPresent = fileReadable(.exe$)
+    endif
+    @windowsUIRequirements: .isWindows, praatVersion$, .major, .minor, .patch,
+    ... .exe$, .helperPresent
+    .ok = windowsUIRequirements.ok
+    .helperMissing = windowsUIRequirements.helperMissing
+    .reason$ = windowsUIRequirements.reason$
+endproc
+
+procedure windowsUIRequirements: .isWindows, .version$, .major, .minor, .patch, .exe$, .helperPresent
     .ok = 0
     .helperMissing = 0
     .reason$ = ""
-    if environment$("OS") != "Windows_NT"
+    if not .isWindows
         .reason$ = "The Windows interface is available only on Windows."
     else
-        @checkPraatVersion
-        .recent = checkPraatVersion.major > 6 or
-        ... (checkPraatVersion.major = 6 and (checkPraatVersion.minor > 4 or
-        ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch >= 60)))
+        .recent = .major > 6 or
+        ... (.major = 6 and (.minor > 4 or
+        ... (.minor = 4 and .patch >= 60)))
         if not .recent
             .reason$ = "The Windows interface requires Praat 6.4.60 or newer; this installation is running Praat " +
-            ... praatVersion$ + ". Update Praat, or choose Use Praat interface."
+            ... .version$ + ". Update Praat, or choose Use Praat interface."
+        elsif not .helperPresent
+            .helperMissing = 1
+            .reason$ = "The Windows helper is missing from " + .exe$ +
+            ... ". Reinstall the complete plug-in folder, including windows-ui/bin/AERoPlotWindowsUI.exe."
         else
-            .exe$ = preferencesDirectory$ +
-            ... "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
-            if fileReadable(.exe$)
-                .ok = 1
-            else
-                .helperMissing = 1
-                .reason$ = "The Windows helper is missing from " + .exe$ +
-                ... ". Reinstall the complete plug-in folder, including windows-ui/bin/AERoPlotWindowsUI.exe."
-            endif
+            .ok = 1
         endif
     endif
 endproc

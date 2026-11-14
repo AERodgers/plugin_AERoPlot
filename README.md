@@ -182,9 +182,11 @@ its position, the number is ambiguous; use descriptive headers. A missing
 column is reported with the list of real headers.
 
 `tests\interface_helpers.praat` (run with `--pref-dir` set to a new folder and
-that folder as its argument) checks off values, column resolution and the saved
-preference. `tests\cli_forms_isolated.ps1` runs the command-line forms against
-sample files (`-Praat`, a new `-TestDirectory` and `-SampleDirectory`).
+that folder as its argument) checks off values, column resolution, interface
+preferences, and Windows readiness for unsupported Praat versions, a missing
+helper and non-Windows platforms. `tests\cli_forms_isolated.ps1` runs the
+command-line forms against sample files (`-Praat`, a new `-TestDirectory` and
+`-SampleDirectory`).
 
 The main native Praat dialog procedures for F1-F2, Ladefoged, formants over
 time, and Create Table live in separate `_praat_*_ui.praat` files. PitchPlus and
@@ -316,10 +318,20 @@ drawn. The explicit `windowsPitchPlusPrototype.praat` and
 `windowsSpectrogramPrototype.praat` scripts, used by the tests, and the Create
 Table dialog remain synchronous.
 
-`tests\windows_async_plot_isolated.ps1` checks the asynchronous plot dialog
-(Praat responsive while open, repeated Draw, Draw & Exit, selection restored,
-dialog closing when Praat exits). It takes the same `-Praat` and
-`-TestDirectory` arguments as the other Windows tests.
+`tests\windows_async_plot_isolated.ps1` copies the plug-in runtime files into a
+new preferences folder, loads them normally, and uses the bundled helper
+to check the asynchronous plot dialog (Praat responsive while open, repeated
+Draw, Draw & Exit, selection restored, plot saved, and dialog closing when
+Praat exits). It also captures the live Praat Picture window as
+`praat-picture-window.png` and saves the exported plot for visual inspection.
+Run it from the repository root with a new test directory:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows_async_plot_isolated.ps1 -Praat "C:\Program Files\Praat\Praat.exe" -TestDirectory "C:\temp\aeroplot-clean-install-test"
+```
+
+The test needs an interactive Windows desktop and leaves its isolated profile,
+screenshots and output images in the test directory.
 
 The Windows UI tests in [tests](tests) require Windows, Praat, and an
 interactive desktop. Tests that compile the helper also require the .NET

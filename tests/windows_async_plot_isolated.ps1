@@ -14,19 +14,14 @@ $root = Split-Path -Parent $PSScriptRoot
 $preferences = Join-Path $testRoot 'preferences'
 $plugin = Join-Path $preferences 'plugin_AERoPlot'
 New-Item -ItemType Directory -Path $plugin | Out-Null
-foreach ($folder in 'plotScripts', 'tests', 'windows-ui') {
+foreach ($folder in 'data', 'plotScripts', 'tests', 'windows-ui') {
     Copy-Item -LiteralPath (Join-Path $root $folder) -Destination $plugin -Recurse
 }
-$vars = Join-Path $plugin 'data\vars'
-New-Item -ItemType Directory -Path $vars -Force | Out-Null
-[IO.File]::WriteAllText((Join-Path $vars 'ui_mode.txt'), 'windows', (New-Object Text.UTF8Encoding($false)))
-
-$compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
-$bin = Join-Path $plugin 'windows-ui\bin'
-New-Item -ItemType Directory -Path $bin -Force | Out-Null
-$helper = Join-Path $bin 'AERoPlotWindowsUI.exe'
-& $compiler /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll "/out:$helper" (Join-Path $root 'windows-ui\TableUI.cs') (Join-Path $root 'windows-ui\PlotUI.cs') (Join-Path $root 'windows-ui\TablePlotUI.cs')
-if ($LASTEXITCODE -ne 0) { throw 'Unable to compile the Windows UI helper.' }
+Copy-Item -LiteralPath (Join-Path $root 'setup.praat') -Destination $plugin
+$helper = Join-Path $plugin 'windows-ui\bin\AERoPlotWindowsUI.exe'
+if (-not (Test-Path -LiteralPath $helper)) {
+    throw 'The bundled Windows UI helper was not found in the install package.'
+}
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -41,6 +36,17 @@ public static class AsyncPlotNative {
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr window, StringBuilder name, int length);
     [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wparam, IntPtr lparam, uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr window);
+    [DllImport("user32.dll", SetLastError=true)] public static extern bool PrintWindow(IntPtr window, IntPtr deviceContext, uint flags);
+    [StructLayout(LayoutKind.Sequential)] public struct RECT {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+    [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr window, out RECT rect);
 }
 '@
 
@@ -80,18 +86,74 @@ function Get-Dialog([int]$ProcessId, [string]$Name = $null) {
         [System.Windows.Automation.Condition]::TrueCondition) |
         Where-Object { $_.Current.ProcessId -eq $ProcessId }
     if ($Name) {
-        $match = $windows | Where-Object { $_.Current.Name -eq $Name } | Select-Object -First 1
+        $match = $windows | Where-Object { $_.Current.Name -like $Name } | Select-Object -First 1
         if ($null -ne $match) { return $match }
         foreach ($window in $windows) {
             $match = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants,
                 [System.Windows.Automation.Condition]::TrueCondition) |
-                Where-Object { $_.Current.ProcessId -eq $ProcessId -and $_.Current.Name -eq $Name } |
+                Where-Object { $_.Current.ProcessId -eq $ProcessId -and $_.Current.Name -like $Name } |
                 Select-Object -First 1
             if ($null -ne $match) { return $match }
         }
         return $null
     }
     return $windows | Select-Object -First 1
+}
+function Capture-PictureWindow([int]$ProcessId, [string]$Path) {
+    $window = Get-Dialog $ProcessId '*Picture*'
+    if ($null -eq $window) {
+        throw 'Praat Picture window was not found for the visual regression capture.'
+    }
+    $handle = [IntPtr]$window.Current.NativeWindowHandle
+    [AsyncPlotNative]::ShowWindow($handle, 3) | Out-Null
+    [AsyncPlotNative]::BringWindowToTop($handle) | Out-Null
+    [AsyncPlotNative]::SetForegroundWindow($handle) | Out-Null
+    $window.SetFocus()
+    Start-Sleep -Milliseconds 500
+    $rect = New-Object AsyncPlotNative+RECT
+    if (-not [AsyncPlotNative]::GetWindowRect($handle, [ref]$rect)) {
+        throw 'Could not get the Praat Picture window bounds.'
+    }
+    $x = $rect.Left
+    $y = $rect.Top
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -le 0 -or $height -le 0) {
+        throw 'Praat Picture window has no visible bounds.'
+    }
+    $bitmap = New-Object System.Drawing.Bitmap -ArgumentList @($width, $height)
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $hdc = $graphics.GetHdc()
+        try {
+            $printed = [AsyncPlotNative]::PrintWindow($handle, $hdc, 0)
+        } finally {
+            $graphics.ReleaseHdc($hdc)
+        }
+        if (-not $printed) {
+            $graphics.CopyFromScreen($x, $y, 0, 0, $bitmap.Size,
+                [System.Drawing.CopyPixelOperation]::SourceCopy)
+        }
+        $lightPixels = 0
+        for ($sampleY = 0; $sampleY -lt $height; $sampleY += 8) {
+            for ($sampleX = 0; $sampleX -lt $width; $sampleX += 8) {
+                $pixel = $bitmap.GetPixel($sampleX, $sampleY)
+                if ($pixel.R -ge 240 -and $pixel.G -ge 240 -and $pixel.B -ge 240) {
+                    $lightPixels++
+                }
+            }
+        }
+        if ($lightPixels -lt 50) {
+            throw "Picture window capture contains no plot canvas (light samples: $lightPixels; window: $($window.Current.Name))."
+        }
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+    if ((Get-Item -LiteralPath $Path).Length -lt 5000) {
+        throw 'Praat Picture window screenshot is empty.'
+    }
 }
 function Click-Button($Dialog, [string]$Name, [switch]$NoClick) {
     $button = $null
@@ -134,7 +196,7 @@ try {
     $ready = Join-Path $testRoot 'ready.txt'
     $start = Join-Path $plugin 'tests\async_plot_start.praat'
     $praatProcess = Start-Process -FilePath $praatExe -WorkingDirectory (Join-Path $plugin 'tests') -PassThru `
-        -ArgumentList @('--new-send', '--no-plugins', '--no-pref-files', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"")
+        -ArgumentList @('--new-send', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"")
     $owned.Add($praatProcess)
     Wait-Until { Test-Path -LiteralPath $ready } 'the start script'
 
@@ -223,6 +285,7 @@ try {
     if ($final.Width -ne 2400 -or [Math]::Abs($final.Height - 1280) -gt 1) {
         throw "Unexpected viewport after Draw & Exit: $($final.Width)x$($final.Height)."
     }
+    Capture-PictureWindow $praatProcess.Id (Join-Path $testRoot 'praat-picture-window.png')
     if (-not $praatProcess.Responding) { throw 'Praat is not responding after the dialog closed.' }
 
     # The temporary files must not accumulate.
@@ -232,7 +295,7 @@ try {
     # Closing Praat closes an open dialog.
     Remove-Item -LiteralPath $ready
     $second = Start-Process -FilePath $praatExe -WorkingDirectory (Join-Path $plugin 'tests') -PassThru `
-        -ArgumentList @('--new-send', '--no-plugins', '--no-pref-files', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"")
+        -ArgumentList @('--new-send', "`"--pref-dir=$preferences`"", "`"$start`"", "`"$ready`"")
     $owned.Add($second)
     Wait-Until { Test-Path -LiteralPath $ready } 'the second start script'
     $child2 = $null
