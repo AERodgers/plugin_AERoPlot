@@ -11,6 +11,7 @@ internal sealed class AsyncPlotInfo
     public string PreferencesDirectory;
     public string CallbackScript;
     public int SoundId, GridId, PitchId;
+    public double SoundDurationSeconds;
     public int PraatProcessId;
 }
 
@@ -79,7 +80,11 @@ internal static class PraatLink
         bool created;
         using (var mutex = new System.Threading.Mutex(false, "AERoPlotPraatMessage", out created))
         {
-            try { mutex.WaitOne(30000); } catch (System.Threading.AbandonedMutexException) { }
+            bool acquired;
+            try { acquired = mutex.WaitOne(30000); }
+            catch (System.Threading.AbandonedMutexException) { acquired = true; }
+            if (!acquired)
+                return "Another AERoPlot plot request is still in progress. Wait for it to finish, then press Draw again.";
             try
             {
                 System.IO.File.WriteAllText(System.IO.Path.Combine(preferencesDirectory, "Message.txt"), script, new UTF8Encoding(false));
@@ -102,19 +107,24 @@ internal static class PlotUI
     {
         try
         {
-            if (args.Length != 9 && !(args.Length == 15 && args[9] == "ASYNC"))
+            if (args.Length != 9 && !(args.Length == 16 && args[9] == "ASYNC"))
                 throw new ArgumentException("The plot interface received invalid input.");
             AsyncPlotInfo asyncInfo = null;
-            if (args.Length == 15)
+            if (args.Length == 16)
             {
                 int soundId, gridId, pitchId;
+                double soundDuration;
                 if (!int.TryParse(args[12], out soundId) || !int.TryParse(args[13], out gridId) ||
-                    !int.TryParse(args[14], out pitchId) || !System.IO.Directory.Exists(args[10]) ||
+                    !int.TryParse(args[14], out pitchId) ||
+                    !double.TryParse(args[15], NumberStyles.Float, CultureInfo.InvariantCulture, out soundDuration) ||
+                    soundDuration <= 0 || double.IsNaN(soundDuration) || double.IsInfinity(soundDuration) ||
+                    !System.IO.Directory.Exists(args[10]) ||
                     args[11].IndexOf('"') >= 0)
                     throw new ArgumentException("The plot interface received invalid asynchronous input.");
                 asyncInfo = new AsyncPlotInfo {
                     PreferencesDirectory = args[10], CallbackScript = args[11],
                     SoundId = soundId, GridId = gridId, PitchId = pitchId,
+                    SoundDurationSeconds = soundDuration,
                     PraatProcessId = PraatLink.ParentProcessId()
                 };
                 if (asyncInfo.PraatProcessId <= 0)
@@ -191,6 +201,7 @@ internal sealed class PlotWindow : Form
 
     private readonly string mode;
     private readonly AsyncPlotInfo async;
+    private bool longRecordingConfirmed;
 
     public PlotWindow(string mode, string soundName, string gridName, string tierNames, string intervalTierIds, string titleValue, string resultPath, string[] settings, AsyncPlotInfo asyncInfo)
     {
@@ -218,8 +229,15 @@ internal sealed class PlotWindow : Form
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Controls.Add(root);
+        string sourceDescription = "Sound: " + soundName + (gridName == "-" ? "" : "    TextGrid: " + gridName);
+        if (async != null)
+        {
+            sourceDescription += "    Duration: " + async.SoundDurationSeconds.ToString("0.0", CultureInfo.CurrentCulture) + " s";
+            if (gridName != "-")
+                sourceDescription += Environment.NewLine + "Draws use current data. Close and reopen after changing TextGrid tiers.";
+        }
         root.Controls.Add(new Label {
-            Text = "Sound: " + soundName + (gridName == "-" ? "" : "    TextGrid: " + gridName),
+            Text = sourceDescription,
             AutoSize = true, Padding = new Padding(0, 0, 0, 8), MaximumSize = new Size(600, 0)
         }, 0, 0);
 
@@ -359,6 +377,17 @@ internal sealed class PlotWindow : Form
             return;
         }
 
+        if (async != null && !longRecordingConfirmed && async.SoundDurationSeconds > 60)
+        {
+            string duration = async.SoundDurationSeconds.ToString("0.0", CultureInfo.CurrentCulture);
+            var choice = MessageBox.Show(this,
+                "This recording is " + duration + " seconds long and may take a long time to process. Continue?",
+                "Long recording", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (choice != DialogResult.Yes)
+                return;
+            longRecordingConfirmed = true;
+        }
+
         var values = new List<string>();
         values.Add(Format(smoothing.Value));
         values.Add(Bit(paintSpectrogram.Checked));
@@ -407,6 +436,8 @@ internal sealed class PlotWindow : Form
         var worker = new System.Threading.Thread(delegate ()
         {
             string problem = PraatLink.Send(async.PraatProcessId, async.PreferencesDirectory, script);
+            if (problem != null)
+                problem = CleanupRequestFiles(token, problem);
             try
             {
                 BeginInvoke((MethodInvoker)delegate
@@ -428,6 +459,26 @@ internal sealed class PlotWindow : Form
         });
         worker.IsBackground = true;
         worker.Start();
+    }
+
+    private string CleanupRequestFiles(string token, string problem)
+    {
+        foreach (var prefix in new[] { "plot-response-", "plot-title-" })
+        {
+            try
+            {
+                System.IO.File.Delete(System.IO.Path.Combine(resultDirectory, prefix + token + ".txt"));
+            }
+            catch (System.IO.IOException error)
+            {
+                problem += Environment.NewLine + "Could not remove a temporary plot request file: " + error.Message;
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                problem += Environment.NewLine + "Could not remove a temporary plot request file: " + error.Message;
+            }
+        }
+        return problem;
     }
 
     private void SetBusy(bool busy)

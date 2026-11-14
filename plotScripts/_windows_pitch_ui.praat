@@ -21,6 +21,7 @@ procedure windowsPlotInitialize
         endif
         selectObject: sound
         windowsPlotSoundName$ = selected$("Sound")
+        windowsPlotSoundDuration = Get total duration
         windowsPlotGridName$ = "-"
         if grid
             selectObject: grid
@@ -43,7 +44,7 @@ procedure windowsPlotLaunch
             ... windowsPlotTitleArg$, windowsPlotSettings$,
             ... windowsPlotTempDir$, "ASYNC", preferencesDirectory$,
             ... windowsPlotCallbackScript$, string$(sound), string$(grid),
-            ... string$(pitch_obj)
+            ... string$(pitch_obj), string$(windowsPlotSoundDuration)
 endproc
 
 # Runs inside Praat when the dialog asks for a plot (see windowsPlotCallback.praat).

@@ -291,21 +291,25 @@ Praat pause forms.
 The Windows dialog for PitchPlus and Spectrogram is not modal: Praat stays
 usable while it is open. **Draw** sends a request to Praat, which draws the plot
 in the Picture window; the dialog stays open and its buttons are disabled until
-drawing finishes. **Draw & Exit** draws and then closes the dialog; **Cancel**
-closes it without drawing. The dialog closes by itself if Praat exits. If an
-input object is removed while the dialog is open, Praat reports it on the next
-Draw. After each Draw the Objects selection is restored to what it was and the
-Picture viewport covers the complete image, including any waveform and TextGrid
-tier, at the selected width. Plot settings
-use the existing PitchPlus settings file, so the interfaces share remembered
-general settings.
+drawing finishes. The dialog shows the Sound duration and asks before drawing
+recordings longer than 60 seconds; confirmation applies to later redraws in that
+dialog. **Draw & Exit** draws and then closes the dialog; **Cancel** closes it
+without drawing. The dialog closes by itself if Praat exits. If an input object
+is removed while the dialog is open, Praat reports it on the next Draw. Draws
+use the current contents of the selected objects; close and reopen the dialog
+after changing the TextGrid's tier structure so its tier choices refresh. After
+each Draw the Objects selection is restored and the Picture viewport covers the
+complete image, including any waveform and TextGrid tier, at the selected
+width. Plot settings use the existing PitchPlus settings file, so the
+interfaces share remembered general settings.
 
-Requests travel through Praat's `Message.txt` in its preferences folder, which
-is shared by every sender. Avoid running other tools that message Praat at the
-same time, and avoid starting other scripts while a plot is being drawn. Very
-long recordings are drawn without the long-recording warning in this mode. The
-explicit `windowsPitchPlusPrototype.praat` and `windowsSpectrogramPrototype.praat`
-scripts, used by the tests, and the Create Table dialog remain synchronous.
+Requests travel through Praat's `Message.txt` in its preferences folder. The
+Windows helper serializes its own plot requests and refuses a request if
+another AERoPlot plot is still in progress. Other tools that write to the same
+`Message.txt` do not share that lock, so avoid using them while a plot is being
+drawn. The explicit `windowsPitchPlusPrototype.praat` and
+`windowsSpectrogramPrototype.praat` scripts, used by the tests, and the Create
+Table dialog remain synchronous.
 
 `tests\windows_async_plot_isolated.ps1` checks the asynchronous plot dialog
 (Praat responsive while open, repeated Draw, Draw & Exit, selection restored,
@@ -365,11 +369,11 @@ not the complete AERoPlot output.
 
 Each test instance has its own preferences directory. Praat's Windows messaging
 uses a shared `Message.txt`, so targeting a specific window is not sufficient
-to avoid interference between normal instances or other senders. Safe callback
-delivery, automatic helper lifecycle, simultaneous callbacks using shared
-preferences, and edits to input objects while the dialog is open remain
-unresolved. The Create Table Windows dialog remains synchronous; the PitchPlus
-and Spectrogram dialogs use this mechanism (see above).
+to avoid interference from other senders that do not use the AERoPlot helper's
+request lock. Automatic helper lifecycle and edits to input objects while the
+dialog is open remain areas for further testing. The Create Table Windows
+dialog remains synchronous; the PitchPlus and Spectrogram dialogs use this
+mechanism (see above).
 
 ## Legacy Manual
 

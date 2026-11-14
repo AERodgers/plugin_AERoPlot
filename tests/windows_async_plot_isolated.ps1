@@ -70,15 +70,28 @@ function Send-Script([int]$ProcessId, [string]$Script) {
     if ($window -eq [IntPtr]::Zero) { throw 'Praat shell window not found.' }
     [IO.File]::WriteAllText((Join-Path $preferences 'Message.txt'), $Script, (New-Object Text.UTF8Encoding($false)))
     $result = [IntPtr]::Zero
-    if ([AsyncPlotNative]::SendMessageTimeout($window, 0x8000, [IntPtr]::Zero, [IntPtr]::Zero, 2, 20000, [ref]$result) -eq [IntPtr]::Zero) {
+    if ([AsyncPlotNative]::SendMessageTimeout($window, 0x8000, [IntPtr]::Zero, [IntPtr]::Zero, 2, 120000, [ref]$result) -eq [IntPtr]::Zero) {
         throw 'Praat did not acknowledge the message.'
     }
 }
-function Get-Dialog([int]$ProcessId) {
-    [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+function Get-Dialog([int]$ProcessId, [string]$Name = $null) {
+    $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
         [System.Windows.Automation.Condition]::TrueCondition) |
-        Where-Object { $_.Current.ProcessId -eq $ProcessId } | Select-Object -First 1
+        Where-Object { $_.Current.ProcessId -eq $ProcessId }
+    if ($Name) {
+        $match = $windows | Where-Object { $_.Current.Name -eq $Name } | Select-Object -First 1
+        if ($null -ne $match) { return $match }
+        foreach ($window in $windows) {
+            $match = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+                [System.Windows.Automation.Condition]::TrueCondition) |
+                Where-Object { $_.Current.ProcessId -eq $ProcessId -and $_.Current.Name -eq $Name } |
+                Select-Object -First 1
+            if ($null -ne $match) { return $match }
+        }
+        return $null
+    }
+    return $windows | Select-Object -First 1
 }
 function Click-Button($Dialog, [string]$Name, [switch]$NoClick) {
     $button = $null
@@ -101,7 +114,11 @@ function Get-Report([int]$ProcessId, [string]$Tag) {
     $report = Join-Path $testRoot "$Tag-report.txt"
     $picture = Join-Path $testRoot "$Tag-picture.png"
     $script = (Join-Path $plugin 'tests\async_plot_report.praat').Replace('\', '/')
-    Send-Script $ProcessId ('runScript: "' + $script + '", "' + $report.Replace('\', '/') + '", "' + $picture.Replace('\', '/') + '"' + "`n")
+    try {
+        Send-Script $ProcessId ('runScript: "' + $script + '", "' + $report.Replace('\', '/') + '", "' + $picture.Replace('\', '/') + '"' + "`n")
+    } catch {
+        throw "Failed to request the $Tag report: $($_.Exception.Message)"
+    }
     Wait-Until { (Test-Path -LiteralPath $report) -and (Test-Path -LiteralPath $picture) } "$Tag report"
     Start-Sleep -Milliseconds 500
     $image = [System.Drawing.Image]::FromFile($picture)
@@ -130,16 +147,50 @@ try {
     $dialogProcess = Get-Process -Id $script:child.ProcessId
     $owned.Add($dialogProcess)
     $dialog = $null
-    Wait-Until { $script:dialog = Get-Dialog $dialogProcess.Id; $null -ne $script:dialog } 'the dialog window'
+    $dialogName = 'AERoPlot - PitchPlus (Windows UI prototype)'
+    Wait-Until { $script:dialog = Get-Dialog $dialogProcess.Id $dialogName; $null -ne $script:dialog } 'the dialog window'
     $dialog = $script:dialog
+    $durationLabel = $dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $_.Current.Name -like '*Duration: 61.0 s*' } |
+        Select-Object -First 1
+    if ($null -eq $durationLabel) { throw 'The dialog did not receive the Sound duration.' }
 
     # Praat must stay usable while the dialog is open.
     $before = Get-Report $praatProcess.Id 'before'
     if ($before.Report -notmatch '^1\s+other$') { throw "Unexpected selection before drawing: $($before.Report)" }
     if (-not $praatProcess.Responding) { throw 'Praat is not responding while the dialog is open.' }
 
-    # Draw keeps the dialog open and draws in Praat.
+    # Long recordings require explicit confirmation before drawing.
     Click-Button $dialog 'Draw'
+    $warning = $null
+    try {
+        Wait-Until { $script:warning = Get-Dialog $dialogProcess.Id 'Long recording'; $null -ne $script:warning } 'the long-recording warning'
+    } catch {
+        $names = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+            [System.Windows.Automation.TreeScope]::Children,
+            [System.Windows.Automation.Condition]::TrueCondition) |
+            Where-Object { $_.Current.ProcessId -eq $dialogProcess.Id } |
+            ForEach-Object { $_.Current.Name }
+        throw "Long-recording warning not found. Windows: $($names -join '|')"
+    }
+    $warning = $script:warning
+    Click-Button $warning 'No'
+    $cancelledResponses = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\temp\plot-ui') -Filter 'plot-response-*.txt' -ErrorAction SilentlyContinue)
+    if ($cancelledResponses.Count -ne 0) { throw 'Canceling the long-recording warning sent a plot request.' }
+
+    # Confirming once allows subsequent redraws without another warning.
+    $dialog = $null
+    Wait-Until { $script:dialog = Get-Dialog $dialogProcess.Id $dialogName; $null -ne $script:dialog } 'the plot dialog after warning cancellation'
+    $dialog = $script:dialog
+    Click-Button $dialog 'Draw'
+    $warning = $null
+    Wait-Until { $script:warning = Get-Dialog $dialogProcess.Id 'Long recording'; $null -ne $script:warning } 'the long-recording warning after retry'
+    $warning = $script:warning
+    Click-Button $warning 'Yes'
+    $dialog = $null
+    Wait-Until { $script:dialog = Get-Dialog $dialogProcess.Id $dialogName; $null -ne $script:dialog } 'the plot dialog after warning confirmation'
+    $dialog = $script:dialog
     Wait-Idle $dialog
     $drawn = $null
     Wait-Until {
@@ -166,6 +217,7 @@ try {
         }
         throw $_
     }
+    Wait-Until { $praatProcess.Refresh(); $praatProcess.Responding } 'Praat to respond after Draw & Exit' 30
     $final = Get-Report $praatProcess.Id 'final'
     if ($final.Picture -lt 5000) { throw 'The final plot is empty.' }
     if ($final.Width -ne 2400 -or [Math]::Abs($final.Height - 1280) -gt 1) {
