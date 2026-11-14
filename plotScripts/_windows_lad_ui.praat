@@ -139,6 +139,7 @@ procedure windowsLadApply: .response$
     add_or_change_colour_scheme = changeAddColSch
     @processShared_UIs
 
+    ave$ = ""
     if showAves = 1
         ave$ = "mean"
     elsif showAves = 2
@@ -284,13 +285,15 @@ procedure windowsLadDraw: .tempDir$
         endfor
     endfor
     Remove
-    for o to oLevels
-        for i to iLevels
-            for f to numFormants
-                'ave$'FinPlot[o,i,f] = undefined
+    if showAves > 0
+        for o to oLevels
+            for i to iLevels
+                for f to numFormants
+                    'ave$'FinPlot[o,i,f] = undefined
+                endfor
             endfor
         endfor
-    endfor
+    endif
 
     ellipsisSDs += 1
     showAves += 1

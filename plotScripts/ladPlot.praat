@@ -255,7 +255,7 @@ procedure calcLadAxisIncrements
     ... (1 + staggerO * 0.1) / 2
 
 
-    vertAdjust = 0.15
+    vertAdjust = 0.35
     legendLeftAdjust = 4.02
 
     if inputUnits = 1

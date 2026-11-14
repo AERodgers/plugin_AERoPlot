@@ -1003,6 +1003,7 @@ internal sealed class LadefogedWindow : Form
             xAxisLabels.SelectedIndex = Math.Max(0, Math.Min(xAxisLabels.Items.Count - 1, GetInt("xAxisFactor", 1) - 1));
         UpdateSpreadEnabled();
         UpdateFrequencyLabel();
+        UpdateAverageValuesEnabled();
         StartParentWatch();
         FormClosing += delegate (object sender, FormClosingEventArgs e)
         {
@@ -1083,26 +1084,26 @@ internal sealed class LadefogedWindow : Form
         var numericColumns = columns.Where(c => table.IsNumeric(table.IndexOf(c))).ToArray();
 
         var data = Group("Data", 10, 6, 430, 244);
-        data.Controls.Add(Caption("Sequencing factor (x-axis)", 12, 24, 145));
-        sequenceFactor = Drop(160, 24, 250, columns);
+        data.Controls.Add(Caption("Sequencing factor (x-axis)", 12, 24, 165));
+        sequenceFactor = Drop(180, 24, 230, columns);
         data.Controls.Add(sequenceFactor);
-        data.Controls.Add(Caption("Comparison factor (colour)", 12, 54, 145));
-        comparisonFactor = Drop(160, 54, 250, new[] { None }.Concat(columns));
+        data.Controls.Add(Caption("Comparison factor (colour)", 12, 54, 165));
+        comparisonFactor = Drop(180, 54, 230, new[] { None }.Concat(columns));
         data.Controls.Add(comparisonFactor);
-        data.Controls.Add(Caption("Formant A", 12, 84, 145));
-        formantA = Drop(160, 84, 250, numericColumns);
+        data.Controls.Add(Caption("Formant A", 12, 84, 165));
+        formantA = Drop(180, 84, 230, numericColumns);
         data.Controls.Add(formantA);
-        data.Controls.Add(Caption("Formant B", 12, 114, 145));
-        formantB = Drop(160, 114, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(Caption("Formant B", 12, 114, 165));
+        formantB = Drop(180, 114, 230, new[] { None }.Concat(numericColumns));
         data.Controls.Add(formantB);
-        data.Controls.Add(Caption("Formant C", 12, 144, 145));
-        formantC = Drop(160, 144, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(Caption("Formant C", 12, 144, 165));
+        formantC = Drop(180, 144, 230, new[] { None }.Concat(numericColumns));
         data.Controls.Add(formantC);
-        data.Controls.Add(Caption("Formant D", 12, 174, 145));
-        formantD = Drop(160, 174, 250, new[] { None }.Concat(numericColumns));
+        data.Controls.Add(Caption("Formant D", 12, 174, 165));
+        formantD = Drop(180, 174, 230, new[] { None }.Concat(numericColumns));
         data.Controls.Add(formantD);
-        data.Controls.Add(Caption("Input units", 12, 204, 145));
-        inputUnits = Drop(160, 204, 250, new[] { "Hertz", "Bark" });
+        data.Controls.Add(Caption("Input units", 12, 204, 165));
+        inputUnits = Drop(180, 204, 230, new[] { "Hertz", "Bark" });
         data.Controls.Add(inputUnits);
         Controls.Add(data);
 
@@ -1141,9 +1142,9 @@ internal sealed class LadefogedWindow : Form
         plot.Controls.Add(Caption("Plot height (inches)", 12, 52, 140));
         plotHeight = Number(160, 52, 80, 0.1m, 20, 1);
         plot.Controls.Add(plotHeight);
-        maximumFrequencyLabel = Caption("Maximum frequency", 12, 82, 140);
+        maximumFrequencyLabel = Caption("Max frequency", 12, 82, 155);
         plot.Controls.Add(maximumFrequencyLabel);
-        maxFrequency = Number(160, 82, 100, 1, 20000, 0);
+        maxFrequency = Number(175, 82, 100, 1, 20000, 0);
         plot.Controls.Add(maxFrequency);
         plot.Controls.Add(Caption("X-axis labels from", 12, 112, 140));
         xAxisLabels = Drop(160, 112, 250, new string[0]);
@@ -1178,8 +1179,10 @@ internal sealed class LadefogedWindow : Form
         layers.Controls.Add(addJitter);
         layers.Controls.Add(Caption("Averages bar", 12, 80, 170));
         averages = Drop(190, 80, 230, new[] { "Hide averages bar", "Show means", "Show median values" });
+        averages.Name = "AveragesBar";
         layers.Controls.Add(averages);
         showAverageValues = new CheckBox { Text = "Show values above averages", Location = new Point(12, 110), AutoSize = true };
+        showAverageValues.Name = "ShowAverageValues";
         layers.Controls.Add(showAverageValues);
         layers.Controls.Add(Caption("Most prominent layer", 12, 140, 170));
         topLayer = Drop(190, 140, 230, new[] { "Averages bar / box plot", "Data points" });
@@ -1230,6 +1233,7 @@ internal sealed class LadefogedWindow : Form
             }
         };
         inputUnits.SelectedIndexChanged += delegate { UnitsChanged(); };
+        averages.SelectedIndexChanged += delegate { if (!loading) UpdateAverageValuesEnabled(); };
         sequenceLevels.ItemCheck += delegate { if (!refreshing) BeginInvoke((MethodInvoker)RefreshXAxisOptions); };
         comparisonLevels.ItemCheck += delegate
         {
@@ -1361,7 +1365,15 @@ internal sealed class LadefogedWindow : Form
     private void UpdateFrequencyLabel()
     {
         if (maximumFrequencyLabel != null && inputUnits.SelectedIndex >= 0)
-            maximumFrequencyLabel.Text = "Maximum frequency (" + (inputUnits.SelectedIndex == 1 ? "Bark" : "Hz") + ")";
+            maximumFrequencyLabel.Text = "Max frequency (" + (inputUnits.SelectedIndex == 1 ? "Bark" : "Hz") + ")";
+    }
+
+    private void UpdateAverageValuesEnabled()
+    {
+        bool hasAverage = averages.SelectedIndex > 0;
+        showAverageValues.Enabled = hasAverage;
+        if (!hasAverage)
+            showAverageValues.Checked = false;
     }
 
     private void RefreshXAxisOptions()

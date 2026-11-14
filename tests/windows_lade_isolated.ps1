@@ -27,6 +27,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Unable to compile the Windows UI helper.' }
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -99,6 +100,21 @@ function Click-Button($Dialog, [string]$Name) {
     if ($null -eq $button) { throw "Button '$Name' not found." }
     $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 }
+function Select-AveragesHidden($Dialog) {
+    $combo = $Dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $_.Current.AutomationId -eq 'AveragesBar' } |
+        Select-Object -First 1
+    if ($null -eq $combo) { throw 'The averages bar control was not found.' }
+    $combo.SetFocus()
+    [System.Windows.Forms.SendKeys]::SendWait('{HOME}')
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    Start-Sleep -Milliseconds 200
+    $selected = $combo.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection()
+    if ($selected.Count -ne 1 -or $selected[0].Current.Name -ne 'Hide averages bar') {
+        throw 'The averages bar could not be set to Hide averages bar.'
+    }
+}
 function Wait-Idle($Dialog) {
     Start-Sleep -Milliseconds 700
     $button = $Dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,
@@ -149,6 +165,15 @@ try {
             Where-Object { $_.Current.Name -eq $button -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' }
         if ($null -eq $found) { throw "Expected shared control '$button' was missing." }
     }
+    foreach ($labelName in 'Comparison factor (colour)', 'Max frequency (Hz)') {
+        $label = $dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+            [System.Windows.Automation.Condition]::TrueCondition) |
+            Where-Object { $_.Current.Name -eq $labelName -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Text' } |
+            Select-Object -First 1
+        if ($null -eq $label -or $label.Current.BoundingRectangle.Width -lt 150) {
+            throw "The '$labelName' label is missing or clipped."
+        }
+    }
 
     $before = Get-Report $praatProcess.Id 'before'
     if ($before.Report -notmatch '^1\s+other$') { throw "Unexpected selection before drawing: $($before.Report)" }
@@ -184,9 +209,22 @@ try {
         throw 'The default colour palette was not restored.'
     }
 
+    Select-AveragesHidden $dialog
+    $averageValues = $dialog.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+        [System.Windows.Automation.Condition]::TrueCondition) |
+        Where-Object { $_.Current.AutomationId -eq 'ShowAverageValues' } |
+        Select-Object -First 1
+    if ($null -eq $averageValues -or $averageValues.Current.IsEnabled) {
+        throw 'Average-value labels should be disabled when the averages bar is hidden.'
+    }
+    if ($averageValues.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne
+        [System.Windows.Automation.ToggleState]::Off) {
+        throw 'Average-value labels should be cleared when the averages bar is hidden.'
+    }
+
     Click-Button $dialog 'Draw'
     Wait-Idle $dialog
-    $drawn = Get-Report $praatProcess.Id 'drawn'
+    $drawn = Get-Report $praatProcess.Id 'drawn-without-averages'
     if ($drawn.Picture -le 5000) { throw 'The Ladefoged plot is empty.' }
     if ($drawn.Report -notmatch '^1\s+other$') { throw "Selection was not restored after drawing: $($drawn.Report)" }
 
