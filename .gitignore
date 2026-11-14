@@ -1,1 +1,2 @@
-/windows-ui/bin/
+/windows-ui/bin/*
+!/windows-ui/bin/AERoPlotWindowsUI.exe

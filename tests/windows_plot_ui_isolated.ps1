@@ -25,16 +25,10 @@ $expectedTitle = 'Caf' + [char]0x00e9 + ' regression ~ title'
     "variable`tvalue`r`nimage_title`$`t$expectedTitle`r`n",
     (New-Object Text.UTF8Encoding($false)))
 
-$compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
-if (-not (Test-Path -LiteralPath $compiler)) {
-    throw 'The .NET Framework compiler was not found.'
-}
 $bin = Join-Path $plugin 'windows-ui\bin'
-New-Item -ItemType Directory -Path $bin -Force | Out-Null
 $helper = Join-Path $bin 'AERoPlotWindowsUI.exe'
-& $compiler /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll "/out:$helper" (Join-Path $root 'windows-ui\TableUI.cs') (Join-Path $root 'windows-ui\PlotUI.cs') (Join-Path $root 'windows-ui\TablePlotUI.cs')
-if ($LASTEXITCODE -ne 0) {
-    throw 'Unable to compile the Windows UI helper.'
+if (-not (Test-Path -LiteralPath $helper)) {
+    throw 'The bundled Windows UI helper was not found.'
 }
 
 Add-Type -AssemblyName UIAutomationClient

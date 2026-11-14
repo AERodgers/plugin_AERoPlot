@@ -11,7 +11,8 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
     - The folder name may differ if the ZIP was downloaded from a different branch.
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
-4. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open. This will only happen once.
+4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface.
+5. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open while the Windows helper warms up. This will only happen once.
 
 ## **Functionality**
 
@@ -204,19 +205,19 @@ comparison. It does not yet test the complete table or formant-plot workflows.
 
 These Windows Forms interfaces are **proofs of concept, not a finished
 installer**. They are launched from Praat, while Praat remains responsible for
-processing and drawing. The original Praat dialogs remain available.
+processing and drawing. The original Praat dialogs remain available. The
+prebuilt `windows-ui\bin\AERoPlotWindowsUI.exe` is included in the repository
+download, so end users do not need to build it.
 
-To try this source version on Windows:
+To use the Windows interfaces:
 
 1. Use Praat 6.4.60 or newer. The prototype was tested with Praat 6.4.60.
-2. Before copying the plugin to the Praat preferences folder, double-click
-   `windows-ui\build.cmd` in the extracted plugin folder. It builds the shared
-   Windows dialog helper using the .NET Framework 4 compiler; the compiler must
-   be present. The generated `windows-ui\bin\AERoPlotWindowsUI.exe` is not
-   included in source downloads. If building fails, the original Praat actions
-   remain available.
-3. Copy the complete folder, including `windows-ui\bin`, into the Praat
+2. Copy the complete folder, including `windows-ui\bin`, into the Praat
    preferences folder as described above and restart Praat.
+
+Developers who change the C# helper can regenerate it by running
+`windows-ui\build.cmd`; this requires the .NET Framework 4 compiler. The
+generated helper is intentionally included in downloads for end users.
 
 ### Create Table
 
@@ -316,12 +317,12 @@ Table dialog remain synchronous.
 dialog closing when Praat exits). It takes the same `-Praat` and
 `-TestDirectory` arguments as the other Windows tests.
 
-The Windows UI tests in [tests](tests) require Windows, Praat, and the .NET
-Framework compiler. `tests\windows_plot_ui_isolated.ps1` builds the helper into
-a new isolated preferences folder and automates Table, PitchPlus, Spectrogram,
-redraw, no-TextGrid, title, and cancellation checks. Run it from the repository
-root in an interactive desktop, using a test directory that does not already
-exist:
+The Windows UI tests in [tests](tests) require Windows, Praat, and an
+interactive desktop. Tests that compile the helper also require the .NET
+Framework compiler. `tests\windows_plot_ui_isolated.ps1` exercises the bundled
+helper in a new isolated preferences folder and automates Table, PitchPlus,
+Spectrogram, redraw, no-TextGrid, title, and cancellation checks. Run it from
+the repository root using a test directory that does not already exist:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests\windows_plot_ui_isolated.ps1 -Praat "C:\Program Files\Praat\Praat.exe" -TestDirectory "C:\temp\aeroplot-plot-ui-test"
