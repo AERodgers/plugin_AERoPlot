@@ -20,9 +20,7 @@
 #
 # Some of these form groups of procedures which are to be used together (e.g.,
 # you need to have been using @legend if you want to use @drawLegendLayer).
-# Some procedures are called from with other procedures, e.g. @csvLine2Array
-# if called from @calcEdges. If you wish to used such procedures, make sure you
-# include the full suite and their dependencies.
+# If you use a procedure that calls other procedures, include its dependencies.
 #
 # With a few exceptions, each procedure uses only local variables (prefixed
 # with a dot). Therefore, whenever one procedure is called from inside another,
@@ -824,132 +822,6 @@ procedure dec2hex: .in, .out$
     endwhile
 endproc
 
-procedure calcEdges: .inputTable, .weighting#, .dimensions$
-    # Generates a table of edges (edge length and two vertices) for a complete
-    # graph.
-    # Each vertex is located in n-dimensional space, with coordinates defined
-    # by the table columns listed in the dimensions$ CSV array.
-    # The .weighting# vector performs elementwise multiplication on each set
-    # of coordinates ().
-    # Edge length is then determined by the Euclidean distance between each
-    # vertex number.
-
-    selectObject: .inputTable
-    @csvLine2Array: .dimensions$, "calcEdges.numDims", "calcEdges.dim$"
-    .numRows = Get number of rows
-    .totEdges = .numRows * (.numRows - 1) / 2
-    .table = Create Table with column names:
-                 ... "edgeTable", .totEdges, "node1 node2 edge"
-    .numEdges = 0
-    .curRow# = zero#(.numDims)
-    .curClm# = zero#(.numDims)
-
-    for .row to .numRows
-        selectObject: .inputTable
-        for .curDim to .numDims
-            .curRow#[.curDim] = Get value: .row, .dim$[.curDim]
-        endfor
-        for .clm from 1 to .row - 1
-            selectObject: .inputTable
-            for .curDim to .numDims
-                .curClm#[.curDim] = Get value: .clm, .dim$[.curDim]
-            endfor
-            .curClm# =
-            ... (size(.weighting#) == .numDims) * .curClm# * .weighting# +
-            ... (size(.weighting#) != .numDims) * .curClm#
-            .numEdges += 1
-            selectObject: .table
-            Set numeric value: .numEdges, "node1", .row
-            Set numeric value: .numEdges, "node2", .clm
-            Set numeric value:
-            ... .numEdges, "edge", sum((.curClm# - .curRow#)^2)^0.5
-        endfor
-    endfor
-endproc
-
-procedure calcLongWalk: .table
-    # This attempts to find the least optimal path in a complete graph (i.e.
-    # where all vertices are connected) where the walk must pass through each
-    # once.
-    # It assumes that the least optimal path is the one where -- for each new
-    # edge -- the next vertex visited will be maximally distant from all the
-    # vertices passed previously.
-    # The sum of the distances from the next vertex to all vertices already
-    # passed is used to calculate the efficiency of the path from that vertex.
-    # (NOTE, this is essentially a heuristic and may not be the best approach.)
-    selectObject: .table
-    .totEdges = Get number of rows
-    .numNodes = 0.5 *  (((8 * .totEdges + 1)^0.5) + 1)
-    .visited#  = zero#(.totEdges)
-
-    ### populate first row of .visitedTable
-    Sort rows: "edge"
-    .startAt[1] = Get value: .totEdges, "node1"
-    .journey[1] = Get value: .totEdges, "edge"
-    .stopAt[1] = Get value: .totEdges, "node2"
-    .visited#[.startAt[1]] = 1
-
-    ### main loop
-    for .curStop from 2 to .numNodes
-        .startAt[.curStop] = .stopAt[.curStop - 1]
-        # flag current stop as visited#
-        .visited#[.startAt[.curStop]] = 1
-        .numUnvisited = .numNodes - sum(.visited#)
-        .numVisited = sum(.visited#)
-        # get vector or places to try visiting next and to potentially revisit
-        .tryVisiting# = zero#(.numUnvisited)
-        .returnTo# = zero#(.numVisited - 1)
-        .nextVisit = 0
-        .alreadyVisited = 0
-        for .i to .numNodes
-            if .visited#[.i] and .i != .startAt[.curStop]
-                .alreadyVisited += 1
-                .returnTo#[.alreadyVisited] = .i
-            elsif !.visited#[.i]
-                .nextVisit += 1
-                .tryVisiting#[.nextVisit] = .i
-            endif
-        endfor
-        for .i to .numUnvisited
-            selectObject: .table
-            .vTempTable = Extract rows where:
-            ... "self[""node1""] = .tryVisiting#[.i] or " +
-            ... "self[""node2""] = .tryVisiting#[.i]"
-            .inNode1 = Search column: "node1", string$(.startAt[.curStop])
-            .inNode2 = Search column: "node2", string$(.startAt[.curStop])
-            if .inNode1
-                .totDistance[.i] = Get value: .inNode1, "edge"
-            else
-                .totDistance[.i] = Get value: .inNode2, "edge"
-            endif
-            for .j to .numVisited - 1
-                .inNode1 = Search column: "node1", string$(.returnTo#[.j])
-                .inNode2 = Search column: "node2", string$(.returnTo#[.j])
-                if .inNode1
-                    .totDistance[.i] += Get value: .inNode1, "edge"
-                else
-                    .totDistance[.i] += Get value: .inNode2, "edge"
-                endif
-            endfor
-            removeObject: .vTempTable
-        endfor
-        # choose longest journey
-        .longest = 0
-        .stopAt[.curStop] = 0
-        for .i to .numUnvisited
-            if .totDistance[.i] > .longest
-                .longest = .totDistance[.i]
-                .stopAt[.curStop] = .tryVisiting#[.i]
-            endif
-        endfor
-    endfor
-    # output friendly array name
-    for .i to .numNodes
-        seqColrByDist.clr[.i] = .startAt[.i]
-    endfor
-endproc
-
-
 # Miscellaneous
 procedure date
     # Useful date function to create unique timestamps in date.index (measured
@@ -1052,8 +924,6 @@ procedure setupColours: .dir$, .colrPalFileVar$, .colourPalVar$,
     if maxColDiff
         @seqColrByDist: preferencesDirectory$ +
         ... "/plugin_AERoPlot/data/palettes/",
-        ... .colrPalFileVar$,
-        ... {0,0,0},
         ... "curPalette"
     endif
     if sortByBrightness
@@ -1491,55 +1361,141 @@ procedure bgColr: .fgColr$, .lgt$, .drk$, .colrWgt#, .boundary
 
 endproc
 
-procedure seqColrByDist: .dir$, .paletteFileVar$, .weighting#, .outputRoot$
-    # takes a colour.palette file as input and, using specified weights,
-    # generates a set of output variables ('outputRoot$' + 'Name$'[],
-    # + 'Vector$'[], + 'Size') which sequence the input palette in such a way
-    # that each colour in the sequence is maximally perceptually different from
-    # the all the preceding colours.
-
+procedure seqColrByDist: .dir$, .outputRoot$
+    # Reorder current.palette so colours that are perceptually distinct appear
+    # early and remain well separated from all colours already selected.
     @readInColPal: .dir$, "current.palette", "newSeq$"
-    @colArr2Tbl: newSeqSize, "newSeqVector$"
-    @calcEdges: colArr2Tbl.table, .weighting#, "R,G,B"
-    @calcLongWalk: calcEdges.table
+    if newSeqSize < 1
+        exitScript: "Cannot sort an empty colour palette."
+    endif
+
+    # Convert sRGB values (0..1) to OKLab. OKLab is designed to represent
+    # perceptual colour differences more evenly than RGB.
+    seqColrByDist.labL# = zero#(newSeqSize)
+    seqColrByDist.labA# = zero#(newSeqSize)
+    seqColrByDist.labB# = zero#(newSeqSize)
+    for .i to newSeqSize
+        .rgb$ = newSeqVector$[.i]
+        .rgb# = '.rgb$'
+        .linearRGB# = zero#(3)
+        for .channel to 3
+            .component = .rgb#[.channel]
+            if .component <= 0.04045
+                .linearRGB#[.channel] = .component / 12.92
+            else
+                .linearRGB#[.channel] =
+                    ... ((.component + 0.055) / 1.055)^2.4
+            endif
+        endfor
+
+        # Convert linear RGB to the LMS cone responses used by OKLab.
+        .lCone = 0.4122214708 * .linearRGB#[1] +
+            ... 0.5363325363 * .linearRGB#[2] +
+            ... 0.0514459929 * .linearRGB#[3]
+        .mCone = 0.2119034982 * .linearRGB#[1] +
+            ... 0.6806995451 * .linearRGB#[2] +
+            ... 0.1073969566 * .linearRGB#[3]
+        .sCone = 0.0883024619 * .linearRGB#[1] +
+            ... 0.2817188376 * .linearRGB#[2] +
+            ... 0.6299787005 * .linearRGB#[3]
+        .lRoot = .lCone^(1 / 3)
+        .mRoot = .mCone^(1 / 3)
+        .sRoot = .sCone^(1 / 3)
+
+        seqColrByDist.labL#[.i] =
+            ... 0.2104542553 * .lRoot +
+            ... 0.7936177850 * .mRoot -
+            ... 0.0040720468 * .sRoot
+        seqColrByDist.labA#[.i] =
+            ... 1.9779984951 * .lRoot -
+            ... 2.4285922050 * .mRoot +
+            ... 0.4505937099 * .sRoot
+        seqColrByDist.labB#[.i] =
+            ... 0.0259040371 * .lRoot +
+            ... 0.7827717662 * .mRoot -
+            ... 0.8086757660 * .sRoot
+    endfor
+
+    seqColrByDist.order# = zero#(newSeqSize)
+    seqColrByDist.used# = zero#(newSeqSize)
+    if newSeqSize = 1
+        seqColrByDist.order#[1] = 1
+    else
+        # Start with the most different pair. Iterating in palette order and
+        # only replacing on a strict improvement makes ties deterministic.
+        .greatestDistance = -1
+        for .i from 1 to newSeqSize - 1
+            for .j from .i + 1 to newSeqSize
+                @okLabDistance: .i, .j
+                if okLabDistance.distance > .greatestDistance
+                    .greatestDistance = okLabDistance.distance
+                    .firstColour = .i
+                    .secondColour = .j
+                endif
+            endfor
+        endfor
+        seqColrByDist.order#[1] = .firstColour
+        seqColrByDist.order#[2] = .secondColour
+        seqColrByDist.used#[.firstColour] = 1
+        seqColrByDist.used#[.secondColour] = 1
+
+        # Farthest-first selection: choose the remaining colour whose nearest
+        # already-selected colour is as far away as possible.
+        for .position from 3 to newSeqSize
+            .bestCandidate = 0
+            .bestSeparation = -1
+            for .candidate to newSeqSize
+                if !seqColrByDist.used#[.candidate]
+                    .nearestSelected = 1e30
+                    for .selected to .position - 1
+                        .selectedColour = seqColrByDist.order#[.selected]
+                        @okLabDistance: .candidate, .selectedColour
+                        if okLabDistance.distance < .nearestSelected
+                            .nearestSelected = okLabDistance.distance
+                        endif
+                    endfor
+                    if .nearestSelected > .bestSeparation
+                        .bestSeparation = .nearestSelected
+                        .bestCandidate = .candidate
+                    endif
+                endif
+            endfor
+            if .bestCandidate = 0
+                exitScript: "Could not complete the colour palette ordering."
+            endif
+            seqColrByDist.order#[.position] = .bestCandidate
+            seqColrByDist.used#[.bestCandidate] = 1
+        endfor
+    endif
 
     '.outputRoot$'Size = newSeqSize
     .newNames$ = ""
     for .i to newSeqSize
-        '.outputRoot$'Vector$[.i] = newSeqVector$[.clr[.i]]
-        '.outputRoot$'Name$[.i] = newSeqName$[.clr[.i]]
-        .newNames$ = .newNames$ + '.outputRoot$'Name$[.i] + ","
+        .originalIndex = seqColrByDist.order#[.i]
+        '.outputRoot$'Vector$[.i] = newSeqVector$[.originalIndex]
+        '.outputRoot$'Name$[.i] = newSeqName$[.originalIndex]
+        if .i > 1
+            .newNames$ += ","
+        endif
+        .newNames$ += '.outputRoot$'Name$[.i]
     endfor
-    .newNames$ = left$(.newNames$, length(.newNames$) - 1)
 
     @encodeCB_JS_RGB:
     ... "'.outputRoot$'Vector$", newSeqSize, "seqColrByDist.newJS$"
-
-    writeFileLine: .dir$ + "current.palette", .newJS$
+    writeFileLine: .dir$ + "current.palette", seqColrByDist.newJS$
     appendFileLine: .dir$ + "current.palette", .newNames$
-
-    removeObject: colArr2Tbl.table
-    removeObject: calcEdges.table
 endproc
 
-procedure colArr2Tbl: .size, .vectorVar$
-    # Converts an string array of colour vectors ('.vectorVar$'[]) of .size
-    # and converts them into a table.
-
-    .table = Create Table with column names:
-    ... "colourTable", .size, "vector brightness"
-    Append column: "R"
-    Append column: "G"
-    Append column: "B"
-    for .clm to .size
-        Set string value: .clm, "vector", '.vectorVar$'[.clm]
-        .curVector$ = '.vectorVar$'[.clm]
-        .curVector# = '.curVector$'
-        Set numeric value: .clm, "brightness", mean(.curVector#)
-        Set numeric value: .clm, "R",.curVector#[1]
-        Set numeric value: .clm, "G",.curVector#[2]
-        Set numeric value: .clm, "B",.curVector#[3]
-    endfor
+procedure okLabDistance: .firstColour, .secondColour
+    # Euclidean distance between two colours already converted to OKLab.
+    .deltaL = seqColrByDist.labL#[.firstColour] -
+        ... seqColrByDist.labL#[.secondColour]
+    .deltaA = seqColrByDist.labA#[.firstColour] -
+        ... seqColrByDist.labA#[.secondColour]
+    .deltaB = seqColrByDist.labB#[.firstColour] -
+        ... seqColrByDist.labB#[.secondColour]
+    okLabDistance.distance =
+        ... sqrt(.deltaL^2 + .deltaA^2 + .deltaB^2)
 endproc
 
 

@@ -244,7 +244,7 @@ procedure doLadPlot
         ... table, "x", yList$,
         ... legBlockTolerance, bufferZone, 1, 0, - 1
     endif
-    @drawSharedTitleLayer: left, right, top, bottom, fontL, fontM, title$
+    @drawSharedTitleLayer: left, right, top, bottom + vertAdjust, fontL, fontM, title$
 endproc
 
 

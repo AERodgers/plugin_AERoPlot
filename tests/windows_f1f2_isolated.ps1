@@ -204,8 +204,49 @@ try {
         (Get-FileHash -LiteralPath (Join-Path $testRoot 'brightness-second-picture.png')).Hash) {
         throw 'Redrawing changed the brightness-sorted plot.'
     }
+    # Equal RGB distances make this primary-colour fixture distinguish OKLab
+    # from raw RGB: green and blue are the farthest pair in OKLab.
+    $primaryPalette = @(
+        "['rgb(255,0,0)','rgb(0,255,0)','rgb(0,0,255)']",
+        'red,green,blue'
+    )
+    [IO.File]::WriteAllLines($currentPalette, $primaryPalette, (New-Object Text.UTF8Encoding($false)))
     Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort by maximal perceptual difference'
     Wait-Idle $dialog
+    $primarySorted = @(Get-Content -LiteralPath $currentPalette)
+    if ($primarySorted.Count -ne 2 -or
+        $primarySorted[0] -ne "['rgb(0,255,0)','rgb(0,0,255)','rgb(255,0,0)']" -or
+        $primarySorted[1] -ne 'green,blue,red') {
+        throw "Unexpected OKLab primary-colour order: $($primarySorted -join ' | ')"
+    }
+
+    # Black and white are the farthest pair; dark grey is then farther from
+    # that pair's nearest member than light grey is.
+    $distancePalette = @(
+        "['rgb(0,0,0)','rgb(64,64,64)','rgb(192,192,192)','rgb(255,255,255)']",
+        'black,dark-grey,light-grey,white'
+    )
+    [IO.File]::WriteAllLines($currentPalette, $distancePalette, (New-Object Text.UTF8Encoding($false)))
+    Choose-ColourMode $dialog $dialogProcess.Id 'Re-sort by maximal perceptual difference'
+    Wait-Idle $dialog
+    $distanceSorted = @(Get-Content -LiteralPath $currentPalette)
+    if ($distanceSorted.Count -ne 2 -or $distanceSorted[1] -ne 'black,white,dark-grey,light-grey') {
+        throw "Unexpected farthest-first palette order: $($distanceSorted -join ' | ')"
+    }
+    $sortedColors = @([regex]::Matches($distanceSorted[0], 'rgb\(\d+,\d+,\d+\)') | ForEach-Object { $_.Value })
+    $expectedColorByName = @{
+        'black' = 'rgb(0,0,0)'
+        'dark-grey' = 'rgb(64,64,64)'
+        'light-grey' = 'rgb(192,192,192)'
+        'white' = 'rgb(255,255,255)'
+    }
+    $sortedNames = $distanceSorted[1] -split ','
+    if ($sortedColors.Count -ne $sortedNames.Count) { throw 'Perceptual sorting changed or lost an RGB colour.' }
+    for ($i = 0; $i -lt $sortedNames.Count; $i++) {
+        if ($expectedColorByName[$sortedNames[$i]] -ne $sortedColors[$i]) {
+            throw 'Perceptual sorting separated a colour from its name.'
+        }
+    }
     $sortedPalette = Get-Content -LiteralPath $currentPalette -Raw
     foreach ($tag in 'difference-first', 'difference-second') {
         Click-Button $dialog 'Draw'
