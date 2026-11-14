@@ -7,12 +7,14 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
 
 1. Download this repository as a ZIP and unzip it.
 
-2. Copy the extracted **plugin_AERoPlot** folder and *all* its contents into the **Praat preferences folder**.  
-    - The folder name may differ if the ZIP was downloaded from a different branch.
+2. Make sure the extracted folder is named exactly **plugin_AERoPlot**. A ZIP
+   downloaded from a branch may add a suffix to the folder name; rename it if
+   needed. Copy the complete folder, including `windows-ui\bin`, into the
+   **Praat preferences folder**.
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
 4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface. If the helper is missing, AERoPlot explains what is unavailable and continues with the native interface.
-5. **Note:** The first time you open Praat after installing the plug-in, it may take up to 10 seconds to open while the Windows helper warms up. This will only happen once.
+5. On Windows, the helper warms up in the background when Praat starts, so Praat remains usable. A Windows dialog opened before warm-up finishes may take a few seconds to appear.
 
 ## **Functionality**
 
@@ -165,9 +167,8 @@ The Ladefoged dialog lets you choose a sequencing factor, an optional
 comparison factor, and up to four numeric formant columns. It also includes
 level selection and filters, x-axis labels, plot layers and frequency scale.
 
-When Praat starts on Windows the plug-in also launches the helper once in the
-background, so that the first dialog is not delayed by Windows checking the
-program.
+When Praat starts on Windows the plug-in launches the helper in the background
+so Windows can check and load it before the first dialog is opened.
 
 Optional text fields (such as the duration tier, title and
 TextGrid in the PitchPlus and Spectrogram forms) are switched off by leaving

@@ -185,7 +185,7 @@
     elsif variableExists("aeroWindowsPlotUI")
         windowsPlotUI = aeroWindowsPlotUI
     else
-        # Use the saved interface preference; fall back silently to Praat.
+        # Use Windows when selected and available; otherwise use Praat.
         @getUIMode
         windowsPlotUI = getUIMode.mode$ = "windows"
         asyncPlotLaunch = windowsPlotUI
