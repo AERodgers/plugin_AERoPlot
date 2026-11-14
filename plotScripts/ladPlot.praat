@@ -267,7 +267,8 @@ procedure calcLadAxisIncrements
     endif
 
     # set frame variables
-    left = 0.7
+    # Reserve room for the far-side y-axis title in the Picture window.
+    left = 1.0
     top = 0.54
     right = left + plotWidth
     bottom = top + plotHeight
