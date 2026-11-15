@@ -1037,7 +1037,10 @@ procedure changeAddColSch: .dir$, .fileVar$
             comment: .comment$
         myChoice = endPause: "Exit", "Continue", 2, 1
         if myChoice = 1
-            if variableExists("aeroLadColourRequest")
+            if variableExists("aeroFoTColourRequest")
+                @windowsFoTCancelColours
+                exit
+            elsif variableExists("aeroLadColourRequest")
                 @windowsLadCancelColours
                 exit
             elsif variableExists("aeroColourRequest")
@@ -1129,7 +1132,10 @@ procedure makeNewColSeq: .colourNames$, .colourVector$, .arraySize,
                 endfor
         .myChoice = endPause: "Exit", "Revert to Original", "Continue", 2, 1
         if .myChoice = 1
-            if variableExists("aeroLadColourRequest")
+            if variableExists("aeroFoTColourRequest")
+                @windowsFoTCancelColours
+                exit
+            elsif variableExists("aeroLadColourRequest")
                 @windowsLadCancelColours
                 exit
             elsif variableExists("aeroColourRequest")
@@ -1228,7 +1234,10 @@ procedure matchCol2Level: .table, .altColrMatch, .paletteRt$, .factorRt$
         comment: "NOTE: Avoid using the same colour for different levels."
         .myChoice = endPause: "Exit", "Continue", 2, 1
         if .myChoice = 1
-            if variableExists("aeroLadColourRequest")
+            if variableExists("aeroFoTColourRequest")
+                @windowsFoTCancelColours
+                exit
+            elsif variableExists("aeroLadColourRequest")
                 @windowsLadCancelColours
                 exit
             elsif variableExists("aeroColourRequest")

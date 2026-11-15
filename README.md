@@ -141,7 +141,7 @@ code only collects settings; shared code validates them and does the work.
    interactively. Dropdown fields take the option text (for example `F1 and F2`
    or `300 dpi`), and tick boxes take 0 or 1. F1-F2, Ladefoged and
    formants-over-time forms are not available yet.
-3. **Windows interface** (Create Table, PitchPlus, Spectrogram, F1-F2 and Ladefoged;
+3. **Windows interface** (Create Table, PitchPlus, Spectrogram, F1-F2, Ladefoged and Formants-over-time;
    the default on Windows): see below.
 
 Choose between the Praat and Windows interfaces with **Praat > AERoPlot >
@@ -155,17 +155,20 @@ remembering that fallback to avoid repeated warnings. When the bundled helper
 is missing on Windows, the same explanation is shown even before an interface
 has been selected. After fixing the issue, choose **Use Windows interface** to
 re-enable it; that menu command reports the specific prerequisite that is
-missing. F1-F2 and Ladefoged use the Windows
+missing. F1-F2, Ladefoged and Formants-over-time use the Windows
 interface when one Table is selected and the Praat interface otherwise (for
-example to read a table file). Formants-over-time still uses the Praat
-interface.
+example to read a table file).
 
-The F1-F2 and Ladefoged Windows dialogs share the same appearance, colour,
-image-saving and action controls. Both keep the settings window open for
+The three Windows table-plot dialogs share appearance, colour,
+image-saving and action controls. They keep the settings window open for
 redrawing, save the currently displayed plot, and offer **Draw & Exit**.
 The Ladefoged dialog lets you choose a sequencing factor, an optional
 comparison factor, and up to four numeric formant columns. It also includes
 level selection and filters, x-axis labels, plot layers and frequency scale.
+The Formants-over-time dialog adds a numeric time column, an optional
+repetition column and a reference element. If a reference is selected, each
+included comparison group and repetition must have exactly one reference time.
+The reference element can be excluded from the plotted sequencing levels.
 
 When Praat starts on Windows the plug-in launches the helper in the background
 so Windows can check and load it before the first dialog is opened.
@@ -188,6 +191,8 @@ preferences, and Windows readiness for unsupported Praat versions, a missing
 helper and non-Windows platforms. `tests\cli_forms_isolated.ps1` runs the
 command-line forms against sample files (`-Praat`, a new `-TestDirectory` and
 `-SampleDirectory`).
+`tests\windows_fot_isolated.ps1` exercises the Windows Formants-over-time dialog,
+including drawing and saving, with `-Praat` and a new `-TestDirectory`.
 
 The main native Praat dialog procedures for F1-F2, Ladefoged, formants over
 time, and Create Table live in separate `_praat_*_ui.praat` files. PitchPlus and

@@ -1,7 +1,7 @@
 @windowsUIAvailable
 if windowsUIAvailable.ok
     @setUIMode: "windows"
-    @showUIModeMessage: "AERoPlot will use Windows dialogs for Create Table, PitchPlus and Spectrogram on Sounds, and F1-F2 and Ladefoged on one selected Table. " +
+    @showUIModeMessage: "AERoPlot will use Windows dialogs for Create Table, PitchPlus and Spectrogram on Sounds, and F1-F2, Ladefoged and Formants-over-time on one selected Table. " +
     ... "Other features keep the standard Praat windows."
 else
     @setUIMode: "praat"

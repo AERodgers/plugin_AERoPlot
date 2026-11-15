@@ -24,6 +24,7 @@ Copy-Item -LiteralPath (Join-Path $root 'tests') -Destination $plugin -Recurse
 New-Item -ItemType Directory -Path (Join-Path $plugin 'data\temp') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $plugin 'data\vars') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $plugin 'data\palettes') -Force | Out-Null
+[IO.File]::WriteAllText((Join-Path $plugin 'data\vars\ui_mode.txt'), 'praat', (New-Object Text.UTF8Encoding($false)))
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes

@@ -120,9 +120,9 @@ internal static class TablePlotUI
         var table = PlotTable.Load(tablePath);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        if (args[0] == "TABLELAD")
+        if (args[0] == "TABLELAD" || args[0] == "TABLEFOT")
         {
-            using (var window = new LadefogedWindow(table, settings, args[2], info))
+            using (var window = new LadefogedWindow(table, settings, args[2], info, args[0] == "TABLEFOT"))
                 window.ShowDialog();
         }
         else
@@ -961,49 +961,62 @@ internal sealed class LadefogedWindow : Form
     private readonly AsyncPlotInfo async;
     private readonly Dictionary<string, string> initial;
     private readonly string tableName;
+    private readonly bool formantsOverTime;
+    private readonly string requestPrefix;
     private readonly string colourSession = Guid.NewGuid().ToString("N");
     private readonly Dictionary<string, HashSet<string>> filters = new Dictionary<string, HashSet<string>>();
 
     private ComboBox sequenceFactor, comparisonFactor, formantA, formantB, formantC, formantD;
     private ComboBox inputUnits, xAxisLabels, tokenMarking, averages, topLayer;
+    private ComboBox timeColumn, repetitionColumn, coreLevel, ellipses;
     private CheckedListBox sequenceLevels, comparisonLevels;
     private ListBox filterList;
     private TextBox title, saveName;
     private NumericUpDown maxFrequency, plotHeight;
+    private NumericUpDown plotWidth;
     private CheckBox showLegend, showFormantsInLegend, addJitter, showAverageValues, showBoxplots, showArrows, spreadLevels;
     private Label fontSummary, unitsSummary, folderSummary, colourSummary, maximumFrequencyLabel;
     private Button drawButton, drawExitButton, saveButton, colourButton;
     private int fontChoice, baseSize, outputUnits, colourMode;
     private bool addColourScheme, loading = true, refreshing, busy, activeColourMatch;
+    private bool hasDrawn;
     private string saveFolder, matchedFactor;
 
-    public LadefogedWindow(PlotTable table, Dictionary<string, string> initial, string tempDirectory, AsyncPlotInfo async)
+    public LadefogedWindow(PlotTable table, Dictionary<string, string> initial, string tempDirectory, AsyncPlotInfo async, bool formantsOverTime)
     {
         this.table = table;
         this.initial = initial;
         this.tempDirectory = tempDirectory;
         this.async = async;
+        this.formantsOverTime = formantsOverTime;
+        requestPrefix = formantsOverTime ? "fot" : "lad";
         tableName = Get("tableName", "Table");
-        Text = "AERoPlot: Ladefoged plot (" + tableName + ")";
+        Text = "AERoPlot: " + (formantsOverTime ? "Formants-over-time" : "Ladefoged") + " plot (" + tableName + ")";
         Font = SystemFonts.MessageBoxFont;
         AutoScaleMode = AutoScaleMode.Font;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(900, 660);
+        ClientSize = new Size(900, formantsOverTime ? 720 : 660);
         BuildControls();
         LoadInitialValues();
+        if (formantsOverTime) saveButton.Enabled = false;
         loading = false;
         RefreshSummaries();
         RefreshLevels(sequenceLevels, sequenceFactor.Text, true);
         RefreshLevels(comparisonLevels, comparisonFactor.Text, true);
         RefreshXAxisOptions();
-        if (xAxisLabels.Items.Count > 0)
+        if (formantsOverTime)
+        {
+            xAxisLabels.SelectedIndex = Math.Max(0, Math.Min(xAxisLabels.Items.Count - 1, GetInt("timeRelativeTo", 0)));
+            coreLevel.SelectedIndex = Math.Max(0, Math.Min(coreLevel.Items.Count - 1, GetInt("coreLevel", 1) - 1));
+        }
+        else if (xAxisLabels.Items.Count > 0)
             xAxisLabels.SelectedIndex = Math.Max(0, Math.Min(xAxisLabels.Items.Count - 1, GetInt("xAxisFactor", 1) - 1));
-        UpdateSpreadEnabled();
+        if (!formantsOverTime) UpdateSpreadEnabled();
         UpdateFrequencyLabel();
-        UpdateAverageValuesEnabled();
+        if (!formantsOverTime) UpdateAverageValuesEnabled();
         StartParentWatch();
         FormClosing += delegate (object sender, FormClosingEventArgs e)
         {
@@ -1016,8 +1029,16 @@ internal sealed class LadefogedWindow : Form
         };
         FormClosed += delegate
         {
-            string path = System.IO.Path.Combine(tempDirectory, "lad-colours-" + colourSession + ".txt");
-            try { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); }
+            string path = System.IO.Path.Combine(tempDirectory, requestPrefix + "-colours-" + colourSession + ".txt");
+            try
+            {
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                if (formantsOverTime)
+                {
+                    path = System.IO.Path.Combine(tempDirectory, "fot-view-" + colourSession + ".txt");
+                    if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                }
+            }
             catch (System.IO.IOException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             catch (UnauthorizedAccessException e) { MessageBox.Show(e.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         };
@@ -1083,12 +1104,12 @@ internal sealed class LadefogedWindow : Form
         var columns = table.Columns.Where(c => c.Length > 0).ToArray();
         var numericColumns = columns.Where(c => table.IsNumeric(table.IndexOf(c))).ToArray();
 
-        var data = Group("Data", 10, 6, 430, 244);
+        var data = Group("Data", 10, 6, 430, formantsOverTime ? 304 : 244);
         data.Controls.Add(Caption("Sequencing factor (x-axis)", 12, 24, 165));
         sequenceFactor = Drop(180, 24, 230, columns);
         data.Controls.Add(sequenceFactor);
         data.Controls.Add(Caption("Comparison factor (colour)", 12, 54, 165));
-        comparisonFactor = Drop(180, 54, 230, new[] { None }.Concat(columns));
+        comparisonFactor = Drop(180, 54, 230, formantsOverTime ? columns : new[] { None }.Concat(columns));
         data.Controls.Add(comparisonFactor);
         data.Controls.Add(Caption("Formant A", 12, 84, 165));
         formantA = Drop(180, 84, 230, numericColumns);
@@ -1105,11 +1126,23 @@ internal sealed class LadefogedWindow : Form
         data.Controls.Add(Caption("Input units", 12, 204, 165));
         inputUnits = Drop(180, 204, 230, new[] { "Hertz", "Bark" });
         data.Controls.Add(inputUnits);
+        if (formantsOverTime)
+        {
+            data.Controls.Add(Caption("Time column", 12, 234, 165));
+            timeColumn = Drop(180, 234, 230, numericColumns);
+            timeColumn.Name = "TimeColumn";
+            data.Controls.Add(timeColumn);
+            data.Controls.Add(Caption("Repetition column (optional)", 12, 264, 165));
+            repetitionColumn = Drop(180, 264, 230, new[] { None }.Concat(columns));
+            repetitionColumn.Name = "RepetitionColumn";
+            data.Controls.Add(repetitionColumn);
+        }
         Controls.Add(data);
 
-        var include = Group("Include", 10, 256, 430, 354);
+        var include = Group("Include", 10, formantsOverTime ? 316 : 256, 430, 354);
         include.Controls.Add(Caption("Sequencing levels", 12, 20, 190));
         sequenceLevels = new CheckedListBox { Location = new Point(12, 46), Size = new Size(196, 128), CheckOnClick = true };
+        if (formantsOverTime) sequenceLevels.Name = "SequenceLevels";
         include.Controls.Add(sequenceLevels);
         include.Controls.Add(Caption("Comparison levels", 220, 20, 190));
         comparisonLevels = new CheckedListBox { Location = new Point(220, 46), Size = new Size(196, 128), CheckOnClick = true };
@@ -1146,13 +1179,21 @@ internal sealed class LadefogedWindow : Form
         plot.Controls.Add(maximumFrequencyLabel);
         maxFrequency = Number(175, 82, 100, 1, 20000, 0);
         plot.Controls.Add(maxFrequency);
-        plot.Controls.Add(Caption("X-axis labels from", 12, 112, 140));
+        plot.Controls.Add(Caption(formantsOverTime ? "Time relative to" : "X-axis labels from", 12, 112, 140));
         xAxisLabels = Drop(160, 112, 250, new string[0]);
+        if (formantsOverTime) xAxisLabels.Name = "ReferenceElement";
         plot.Controls.Add(xAxisLabels);
         showLegend = new CheckBox { Text = "Show legend", Location = new Point(12, 144), AutoSize = true };
         showFormantsInLegend = new CheckBox { Text = "Show formants in legend", Location = new Point(160, 144), AutoSize = true };
         plot.Controls.Add(showLegend);
-        plot.Controls.Add(showFormantsInLegend);
+        if (formantsOverTime)
+        {
+            plot.Controls.Add(Caption("Width", 250, 52, 48));
+            plotWidth = Number(302, 52, 80, 0.1m, 20, 1);
+            plot.Controls.Add(plotWidth);
+        }
+        else
+            plot.Controls.Add(showFormantsInLegend);
         Controls.Add(plot);
 
         var look = Group("Appearance", 450, 188, 440, 150);
@@ -1173,43 +1214,67 @@ internal sealed class LadefogedWindow : Form
 
         var layers = Group("Layers", 450, 344, 440, 236);
         layers.Controls.Add(Caption("Data points", 12, 20, 170));
-        tokenMarking = Drop(190, 20, 230, new[] { "Hide data points", "Show all individual data points", "Show outliers only" });
+        tokenMarking = Drop(190, 20, 230, formantsOverTime
+            ? new[] { "Hide data points" }.Concat(columns).Concat(new[] { "X symbol" })
+            : new[] { "Hide data points", "Show all individual data points", "Show outliers only" });
         layers.Controls.Add(tokenMarking);
         addJitter = new CheckBox { Text = "Add jitter to data points", Location = new Point(12, 50), AutoSize = true };
         layers.Controls.Add(addJitter);
-        layers.Controls.Add(Caption("Averages bar", 12, 80, 170));
-        averages = Drop(190, 80, 230, new[] { "Hide averages bar", "Show means", "Show median values" });
-        averages.Name = "AveragesBar";
-        layers.Controls.Add(averages);
-        showAverageValues = new CheckBox { Text = "Show values above averages", Location = new Point(12, 110), AutoSize = true };
-        showAverageValues.Name = "ShowAverageValues";
-        layers.Controls.Add(showAverageValues);
+        if (formantsOverTime)
+        {
+            layers.Controls.Add(Caption("Core level", 12, 80, 170));
+            coreLevel = Drop(190, 80, 230, new string[0]);
+            coreLevel.Name = "CoreLevel";
+            layers.Controls.Add(coreLevel);
+            layers.Controls.Add(Caption("Ellipses", 12, 110, 170));
+            ellipses = Drop(190, 110, 230, new[] { "No ellipses", "One standard deviation", "Two standard deviations" });
+            layers.Controls.Add(ellipses);
+        }
+        else
+        {
+            layers.Controls.Add(Caption("Averages bar", 12, 80, 170));
+            averages = Drop(190, 80, 230, new[] { "Hide averages bar", "Show means", "Show median values" });
+            averages.Name = "AveragesBar";
+            layers.Controls.Add(averages);
+            showAverageValues = new CheckBox { Text = "Show values above averages", Location = new Point(12, 110), AutoSize = true };
+            showAverageValues.Name = "ShowAverageValues";
+            layers.Controls.Add(showAverageValues);
+        }
         layers.Controls.Add(Caption("Most prominent layer", 12, 140, 170));
-        topLayer = Drop(190, 140, 230, new[] { "Averages bar / box plot", "Data points" });
+        topLayer = Drop(190, 140, 230, new[] { formantsOverTime ? "Mean values" : "Averages bar / box plot", "Data points" });
         layers.Controls.Add(topLayer);
         showBoxplots = new CheckBox { Text = "Show boxplots", Location = new Point(12, 174), AutoSize = true };
         showArrows = new CheckBox { Text = "Show arrows", Location = new Point(190, 174), AutoSize = true };
         spreadLevels = new CheckBox { Text = "Spread comparison levels along the x-axis", Location = new Point(12, 202), AutoSize = true };
-        layers.Controls.Add(showBoxplots);
-        layers.Controls.Add(showArrows);
-        layers.Controls.Add(spreadLevels);
+        if (formantsOverTime)
+        {
+            showArrows.Text = "Show connecting lines";
+            layers.Controls.Add(showArrows);
+        }
+        else
+        {
+            layers.Controls.Add(showBoxplots);
+            layers.Controls.Add(showArrows);
+            layers.Controls.Add(spreadLevels);
+        }
         Controls.Add(layers);
 
-        Controls.Add(Caption("Save name", 10, 628, 70));
-        saveName = new TextBox { Location = new Point(84, 628), Width = 150 };
+        int bottomOffset = formantsOverTime ? 60 : 0;
+        Controls.Add(Caption("Save name", 10, 628 + bottomOffset, 70));
+        saveName = new TextBox { Location = new Point(84, 628 + bottomOffset), Width = 150 };
         Controls.Add(saveName);
-        saveButton = new Button { Text = "Save image", Location = new Point(244, 625), Size = new Size(96, 28) };
+        saveButton = new Button { Text = "Save image", Location = new Point(244, 625 + bottomOffset), Size = new Size(96, 28) };
         saveButton.Click += delegate { Request(2); };
         Controls.Add(saveButton);
-        drawButton = new Button { Text = "Draw", Name = "Draw", Location = new Point(520, 625), Size = new Size(90, 28) };
+        drawButton = new Button { Text = "Draw", Name = "Draw", Location = new Point(520, 625 + bottomOffset), Size = new Size(90, 28) };
         drawButton.Click += delegate { Request(1); };
         Controls.Add(drawButton);
-        drawExitButton = new Button { Text = "Draw && Exit", Name = "DrawAndExit", Location = new Point(616, 625), Size = new Size(100, 28) };
+        drawExitButton = new Button { Text = "Draw && Exit", Name = "DrawAndExit", Location = new Point(616, 625 + bottomOffset), Size = new Size(100, 28) };
         drawExitButton.Click += delegate { Request(3); };
         Controls.Add(drawExitButton);
-        var cancel = new Button { Text = "Cancel", Location = new Point(722, 625), Size = new Size(80, 28), DialogResult = DialogResult.Cancel };
+        var cancel = new Button { Text = "Cancel", Location = new Point(722, 625 + bottomOffset), Size = new Size(80, 28), DialogResult = DialogResult.Cancel };
         Controls.Add(cancel);
-        var help = new Button { Text = "Instructions", Location = new Point(808, 625), Size = new Size(82, 28) };
+        var help = new Button { Text = "Instructions", Location = new Point(808, 625 + bottomOffset), Size = new Size(82, 28) };
         help.Click += delegate { ShowInstructions(); };
         Controls.Add(help);
         CancelButton = cancel;
@@ -1229,16 +1294,17 @@ internal sealed class LadefogedWindow : Form
             {
                 RefreshLevels(comparisonLevels, comparisonFactor.Text, true);
                 RefreshXAxisOptions();
-                UpdateSpreadEnabled();
+                if (!formantsOverTime) UpdateSpreadEnabled();
             }
         };
         inputUnits.SelectedIndexChanged += delegate { UnitsChanged(); };
-        averages.SelectedIndexChanged += delegate { if (!loading) UpdateAverageValuesEnabled(); };
+        if (!formantsOverTime)
+            averages.SelectedIndexChanged += delegate { if (!loading) UpdateAverageValuesEnabled(); };
         sequenceLevels.ItemCheck += delegate { if (!refreshing) BeginInvoke((MethodInvoker)RefreshXAxisOptions); };
         comparisonLevels.ItemCheck += delegate
         {
             if (!refreshing)
-                BeginInvoke((MethodInvoker)delegate { RefreshXAxisOptions(); UpdateSpreadEnabled(); });
+                BeginInvoke((MethodInvoker)delegate { RefreshXAxisOptions(); if (!formantsOverTime) UpdateSpreadEnabled(); });
         };
     }
 
@@ -1257,7 +1323,7 @@ internal sealed class LadefogedWindow : Form
         for (int i = 0; i < list.Items.Count; i++)
             list.SetItemChecked(i, state);
         RefreshXAxisOptions();
-        UpdateSpreadEnabled();
+        if (!formantsOverTime) UpdateSpreadEnabled();
     }
 
     private void UpdateSpreadEnabled()
@@ -1290,10 +1356,12 @@ internal sealed class LadefogedWindow : Form
         comparisonFactor.SelectedIndex = comparison.Length == 0 ? 0 : comparisonFactor.Items.IndexOf(comparison);
         if (comparisonFactor.SelectedIndex < 0)
             comparisonFactor.SelectedIndex = 0;
+        if (formantsOverTime && comparisonFactor.Text == sequenceFactor.Text && comparisonFactor.Items.Count > 1)
+            comparisonFactor.SelectedIndex = sequenceFactor.SelectedIndex == 0 ? 1 : 0;
         ChooseFormant(formantA, Get("f1Col", "F1"), 1);
-        ChooseFormant(formantB, Get("f2Col", "F2"), 2);
-        ChooseFormant(formantC, Get("f3Col", "F3"), 3);
-        ChooseFormant(formantD, Get("f4Col", ""), 4);
+        ChooseFormant(formantB, FormantSetting("f2Col", "F2"), 2);
+        ChooseFormant(formantC, FormantSetting("f3Col", "F3"), 3);
+        ChooseFormant(formantD, FormantSetting("f4Col", ""), 4);
 
         int units = GetInt("inputUnits", 1);
         inputUnits.Items.AddRange(new object[] { "Hertz", "Bark" });
@@ -1304,33 +1372,61 @@ internal sealed class LadefogedWindow : Form
         if (units == 2 && previousUnits == 1) max = 18;
         maxFrequency.Value = Clamp(max, maxFrequency);
         plotHeight.Value = Clamp(GetNumber("plotHeight", 5), plotHeight);
+        if (formantsOverTime)
+        {
+            plotWidth.Value = Clamp(GetNumber("plotWidth", 3), plotWidth);
+            string time = Get("timeCol", "");
+            if (!timeColumn.Items.Contains(time))
+                time = timeColumn.Items.Cast<string>().FirstOrDefault(c =>
+                    c.Equals(sequenceFactor.Text + "_t", StringComparison.OrdinalIgnoreCase));
+            if (time == null || !timeColumn.Items.Contains(time))
+                time = timeColumn.Items.Cast<string>().FirstOrDefault(c =>
+                    c.Equals("time", StringComparison.OrdinalIgnoreCase) ||
+                    c.Equals("t", StringComparison.OrdinalIgnoreCase) ||
+                    c.EndsWith("_t", StringComparison.OrdinalIgnoreCase));
+            if (time != null && timeColumn.Items.Contains(time))
+                timeColumn.SelectedItem = time;
+            else if (timeColumn.Items.Count > 0)
+                timeColumn.SelectedIndex = 0;
+            string repetition = Get("repFactor", "");
+            repetitionColumn.SelectedItem = repetitionColumn.Items.Contains(repetition) ? repetition : None;
+        }
 
         title.Text = Get("title", "");
         showLegend.Checked = GetInt("showLegend", 1) != 0;
         showFormantsInLegend.Checked = GetInt("legendHasFormants", 0) != 0;
-        tokenMarking.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("tokenMarking", 3) - 1));
-        averages.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("showAves", 2) - 1));
+        tokenMarking.SelectedIndex = Math.Max(0, Math.Min(tokenMarking.Items.Count - 1, GetInt("tokenMarking", formantsOverTime ? 1 : 3) - 1));
+        if (formantsOverTime)
+            ellipses.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("ellipsisSDs", 1) - 1));
+        else
+            averages.SelectedIndex = Math.Max(0, Math.Min(2, GetInt("showAves", 2) - 1));
         topLayer.SelectedIndex = Math.Max(0, Math.Min(1, GetInt("dataPointsOnTop", 1) - 1));
         addJitter.Checked = GetInt("addJitter", 0) != 0;
-        showAverageValues.Checked = GetInt("showAveVals", 1) != 0;
+        if (!formantsOverTime) showAverageValues.Checked = GetInt("showAveVals", 1) != 0;
         showBoxplots.Checked = GetInt("showIQR", 1) != 0;
-        showArrows.Checked = GetInt("drawArrows", 0) != 0;
+        showArrows.Checked = GetInt(formantsOverTime ? "showLines" : "drawArrows", formantsOverTime ? 1 : 0) != 0;
         spreadLevels.Checked = GetInt("staggerO", 1) != 0;
         fontChoice = Math.Max(1, Math.Min(4, GetInt("font_choice", 1)));
         baseSize = Math.Max(1, Math.Min(6, GetInt("baseSize", 3)));
         outputUnits = Math.Max(1, Math.Min(6, GetInt("outputUnits", 2)));
         saveFolder = Get("saveDir", "");
-        saveName.Text = Get("saveName", "LadFormantPlot.png");
+        saveName.Text = Get("saveName", formantsOverTime ? "Formants_over_Time.png" : "LadFormantPlot.png");
         colourMode = 1;
     }
 
     private void ChooseFormant(ComboBox combo, string remembered, int number)
     {
+        if (formantsOverTime && number > 1 && remembered.Length == 0)
+        {
+            combo.SelectedIndex = 0;
+            return;
+        }
         if (remembered.Length > 0 && combo.Items.Contains(remembered))
         {
             combo.SelectedItem = remembered;
             return;
         }
+
         string prefix1 = "f" + number;
         string prefix2 = "formant" + number;
         string best = null;
@@ -1351,6 +1447,14 @@ internal sealed class LadefogedWindow : Form
             combo.SelectedIndex = 0;
         else if (combo.Items.Count > 0)
             combo.SelectedIndex = 0;
+    }
+
+    private string FormantSetting(string key, string fallback)
+    {
+        string value;
+        if (formantsOverTime && initial.TryGetValue(key, out value))
+            return value;
+        return Get(key, fallback);
     }
 
     private void UnitsChanged()
@@ -1380,6 +1484,24 @@ internal sealed class LadefogedWindow : Form
     {
         if (xAxisLabels == null || sequenceFactor.SelectedIndex < 0)
             return;
+        if (formantsOverTime)
+        {
+            string reference = xAxisLabels.SelectedItem as string;
+            string core = coreLevel.SelectedItem as string;
+            xAxisLabels.Items.Clear();
+            coreLevel.Items.Clear();
+            xAxisLabels.Items.Add(None);
+            coreLevel.Items.Add(None);
+            foreach (var level in sequenceLevels.Items.Cast<string>())
+                xAxisLabels.Items.Add(level);
+            foreach (var level in sequenceLevels.CheckedItems.Cast<string>())
+                coreLevel.Items.Add(level);
+            xAxisLabels.SelectedIndex = reference != null && xAxisLabels.Items.Contains(reference)
+                ? xAxisLabels.Items.IndexOf(reference) : 0;
+            coreLevel.SelectedIndex = core != null && coreLevel.Items.Contains(core)
+                ? coreLevel.Items.IndexOf(core) : 0;
+            return;
+        }
         string previous = xAxisLabels.SelectedItem as string;
         var included = table.Rows.Where(RowIncluded).ToList();
         var sequenceValues = new HashSet<string>(included.Select(r => r[table.IndexOf(sequenceFactor.Text)]));
@@ -1408,6 +1530,11 @@ internal sealed class LadefogedWindow : Form
     {
         if (!CheckedOrAll(sequenceLevels, row, sequenceFactor.Text))
             return false;
+        return RowIncludedWithoutSequence(row);
+    }
+
+    private bool RowIncludedWithoutSequence(string[] row)
+    {
         if (comparisonFactor.Text != None && comparisonFactor.Text != sequenceFactor.Text &&
             !CheckedOrAll(comparisonLevels, row, comparisonFactor.Text))
             return false;
@@ -1544,6 +1671,11 @@ internal sealed class LadefogedWindow : Form
     {
         var used = new HashSet<string>(new[] { sequenceFactor.Text, comparisonFactor.Text, formantA.Text,
             formantB.Text, formantC.Text, formantD.Text, None });
+        if (formantsOverTime)
+        {
+            used.Add(timeColumn.Text);
+            used.Add(repetitionColumn.Text);
+        }
         var candidates = table.Columns.Where(c => c.Length > 0 && !used.Contains(c) && !filters.ContainsKey(c)).ToArray();
         if (candidates.Length == 0)
         {
@@ -1605,6 +1737,17 @@ internal sealed class LadefogedWindow : Form
 
     private void ShowInstructions()
     {
+        if (formantsOverTime)
+        {
+            MessageBox.Show(this,
+                "Choose the comparison and sequencing factors, time column and formant columns. " +
+                "Choose a repetition column if each group contains repeated tokens.\n\n" +
+                "Select the levels and filters to include. Optionally choose a reference element: each group " +
+                "and repetition must have exactly one reference time.\n\n" +
+                "Set the plot appearance and layers, then press Draw. Save image saves the displayed plot.",
+                Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
         MessageBox.Show(this,
             "1. Choose the sequencing factor, optional comparison factor, and up to four formant columns in order.\n" +
             "2. Tick the levels to include. Use Add filter to restrict other columns.\n" +
@@ -1619,6 +1762,10 @@ internal sealed class LadefogedWindow : Form
     {
         if (sequenceFactor.SelectedIndex < 0)
             return "Choose a sequencing factor.";
+        if (formantsOverTime && comparisonFactor.SelectedIndex < 0)
+            return "Choose a comparison factor.";
+        if (formantsOverTime && timeColumn.SelectedIndex < 0)
+            return "Choose a numeric time column.";
         if (comparisonFactor.Text != None && comparisonFactor.Text == sequenceFactor.Text)
             return "The sequencing and comparison factors must be different.";
         if (formantA.SelectedIndex < 0)
@@ -1645,6 +1792,34 @@ internal sealed class LadefogedWindow : Form
             return "Maximum frequency and plot height must be greater than zero.";
         if (saveName.Text.Trim().Length == 0)
             return "Enter a save name.";
+        if (formantsOverTime && plotWidth.Value <= 0)
+            return "Plot width must be greater than zero.";
+        if (formantsOverTime && !table.Rows.Any(RowIncluded))
+            return "No rows remain after filtering.";
+        if (formantsOverTime && xAxisLabels.SelectedIndex > 0)
+        {
+            int groupColumn = table.IndexOf(comparisonFactor.Text);
+            int sequenceColumn = table.IndexOf(sequenceFactor.Text);
+            int repetition = repetitionColumn.Text == None ? -1 : table.IndexOf(repetitionColumn.Text);
+            int time = table.IndexOf(timeColumn.Text);
+            var groups = new Dictionary<Tuple<string, string>, int>();
+            foreach (var row in table.Rows.Where(RowIncludedWithoutSequence))
+            {
+                var key = Tuple.Create(row[groupColumn] ?? "", repetition < 0 ? "" : row[repetition] ?? "");
+                int count;
+                groups.TryGetValue(key, out count);
+                if (row[sequenceColumn] == xAxisLabels.Text) count++;
+                groups[key] = count;
+                double value;
+                if (!double.TryParse(row[time], NumberStyles.Float, CultureInfo.InvariantCulture, out value) ||
+                    double.IsNaN(value) || double.IsInfinity(value))
+                    return "All included time values must be numeric and defined when using a reference element.";
+            }
+            foreach (var group in groups)
+                if (group.Value != 1)
+                    return "Each comparison group and repetition needs exactly one reference time. " +
+                        "Check the selected reference, repetition column and filters.";
+        }
         return null;
     }
 
@@ -1677,17 +1852,28 @@ internal sealed class LadefogedWindow : Form
         put("f2Col$", formantB.SelectedIndex > 0 ? formantB.Text : "");
         put("f3Col$", formantC.SelectedIndex > 0 ? formantC.Text : "");
         put("f4Col$", formantD.SelectedIndex > 0 ? formantD.Text : "");
+        if (formantsOverTime)
+        {
+            put("timeCol$", timeColumn.Text);
+            put("repFactor$", repetitionColumn.Text == None ? "" : repetitionColumn.Text);
+            put("referenceLevel$", xAxisLabels.SelectedIndex > 0 ? xAxisLabels.Text : "");
+            put("coreLevelName$", coreLevel.SelectedIndex > 0 ? coreLevel.Text : "");
+            put("plotWidth", Num(plotWidth.Value));
+            put("ellipsisSDs", ellipses.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+            put("showLines", showArrows.Checked ? "1" : "0");
+        }
         put("inputUnits", (inputUnits.SelectedIndex + 1).ToString(CultureInfo.InvariantCulture));
         put("title$", title.Text);
         put("maxFreq", Num(maxFrequency.Value));
         put("plotHeight", Num(plotHeight.Value));
-        put("xAxisFactor$", xAxisLabels.SelectedItem as string ?? sequenceFactor.Text);
+        if (!formantsOverTime)
+            put("xAxisFactor$", xAxisLabels.SelectedItem as string ?? sequenceFactor.Text);
         put("showLegend", showLegend.Checked ? "1" : "0");
         put("legendHasFormants", showFormantsInLegend.Checked ? "1" : "0");
         put("tokenMarking", tokenMarking.SelectedIndex.ToString(CultureInfo.InvariantCulture));
         put("addJitter", addJitter.Checked ? "1" : "0");
-        put("showAves", averages.SelectedIndex.ToString(CultureInfo.InvariantCulture));
-        put("showAveVals", showAverageValues.Checked ? "1" : "0");
+        put("showAves", formantsOverTime ? "0" : averages.SelectedIndex.ToString(CultureInfo.InvariantCulture));
+        put("showAveVals", !formantsOverTime && showAverageValues.Checked ? "1" : "0");
         put("dataPointsOnTop", topLayer.SelectedIndex.ToString(CultureInfo.InvariantCulture));
         put("showIQR", showBoxplots.Checked ? "1" : "0");
         put("drawArrows", showArrows.Checked ? "1" : "0");
@@ -1708,8 +1894,8 @@ internal sealed class LadefogedWindow : Form
                 lines.Add("keep\t" + Clean(pair.Key) + "\t" + Clean(level));
 
         string token = Guid.NewGuid().ToString("N");
-        string completion = System.IO.Path.Combine(tempDirectory, "lad-complete-" + token + ".txt");
-        System.IO.File.WriteAllText(System.IO.Path.Combine(tempDirectory, "lad-response-" + token + ".txt"),
+        string completion = System.IO.Path.Combine(tempDirectory, requestPrefix + "-complete-" + token + ".txt");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(tempDirectory, requestPrefix + "-response-" + token + ".txt"),
             string.Join("\n", lines.ToArray()) + "\n", new UTF8Encoding(false));
         string script = "runScript: \"" + async.CallbackScript + "\", \"" + token + "\", " + async.SoundId + ", " + action + "\n";
         SetBusy(true);
@@ -1741,8 +1927,13 @@ internal sealed class LadefogedWindow : Form
                     }
                     if (IsDisposed)
                     {
-                        string path = System.IO.Path.Combine(tempDirectory, "lad-colours-" + colourSession + ".txt");
+                        string path = System.IO.Path.Combine(tempDirectory, requestPrefix + "-colours-" + colourSession + ".txt");
                         if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                        if (formantsOverTime)
+                        {
+                            path = System.IO.Path.Combine(tempDirectory, "fot-view-" + colourSession + ".txt");
+                            if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                        }
                     }
                 }
                 catch (System.IO.IOException e) { failure = "Could not read the colour settings result: " + e.Message; }
@@ -1752,6 +1943,8 @@ internal sealed class LadefogedWindow : Form
             {
                 BeginInvoke((MethodInvoker)delegate
                 {
+                    if (failure == null && (action == 1 || action == 3))
+                        hasDrawn = true;
                     SetBusy(false);
                     if (failure != null)
                     {
@@ -1795,7 +1988,7 @@ internal sealed class LadefogedWindow : Form
         busy = value;
         drawButton.Enabled = !value;
         drawExitButton.Enabled = !value;
-        saveButton.Enabled = !value;
+        saveButton.Enabled = !value && (!formantsOverTime || hasDrawn);
         colourButton.Enabled = !value;
         UseWaitCursor = value;
     }

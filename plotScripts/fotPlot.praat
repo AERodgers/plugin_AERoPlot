@@ -10,12 +10,22 @@
 # github:    github.com/AERodgers
 
 @checkPraatVersion
-@objsSelected: "Table", "tableID$"
-@purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
 curFoTVersion$ = "1.5.0.0"
 plotPrefix$ = "FOT."
 # Main script loop
 keepGoing = 1
+if variableExists("aeroPrototypeInclude")
+    keepGoing = 0
+else
+    @getUIMode
+    if getUIMode.mode$ = "windows" and numberOfSelected("Table") = 1
+        runScript: "windowsFoTPrototype.praat"
+        keepGoing = 0
+    else
+        @objsSelected: "Table", "tableID$"
+        @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
+    endif
+endif
 while keepGoing
     @defineVars
     if keepGoing = 1
