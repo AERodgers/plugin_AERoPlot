@@ -191,8 +191,8 @@ preferences, and Windows readiness for unsupported Praat versions, a missing
 helper and non-Windows platforms. `tests\cli_forms_isolated.ps1` runs the
 command-line forms against sample files (`-Praat`, a new `-TestDirectory` and
 `-SampleDirectory`).
-`tests\windows_fot_isolated.ps1` exercises the Windows Formants-over-time dialog,
-including drawing and saving, with `-Praat` and a new `-TestDirectory`.
+`tests\windows_fot_isolated.ps1` exercises the bundled Windows Formants-over-time
+dialog, including drawing and saving, with `-Praat` and a new `-TestDirectory`.
 
 The main native Praat dialog procedures for F1-F2, Ladefoged, formants over
 time, and Create Table live in separate `_praat_*_ui.praat` files. PitchPlus and

@@ -18,12 +18,8 @@ $vars = Join-Path $plugin 'data\vars'
 New-Item -ItemType Directory -Path $vars -Force | Out-Null
 [IO.File]::WriteAllText((Join-Path $vars 'ui_mode.txt'), 'windows', (New-Object Text.UTF8Encoding($false)))
 
-$compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
-$bin = Join-Path $plugin 'windows-ui\bin'
-New-Item -ItemType Directory -Path $bin -Force | Out-Null
-$helper = Join-Path $bin 'AERoPlotWindowsUI.exe'
-& $compiler /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Drawing.dll /reference:System.Windows.Forms.dll "/out:$helper" (Join-Path $root 'windows-ui\TableUI.cs') (Join-Path $root 'windows-ui\PlotUI.cs') (Join-Path $root 'windows-ui\TablePlotUI.cs')
-if ($LASTEXITCODE -ne 0) { throw 'Unable to compile the Windows UI helper.' }
+$helper = Join-Path $plugin 'windows-ui\bin\AERoPlotWindowsUI.exe'
+if (-not (Test-Path -LiteralPath $helper)) { throw 'The bundled Windows UI helper was not found.' }
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
