@@ -119,6 +119,8 @@ PitchPlus, Spectrogram and optional formant extraction from a TextGrid warn befo
 
 For formants-over-time plots with relative time, each combination of main factor and repetition must have exactly one row for the chosen reference element. If repetitions are present, provide a repetition column; missing or duplicate reference times are reported instead of producing incorrectly aligned data.
 
+Formants-over-time ellipses describe each comparison-factor and sequencing-factor group separately for each formant. Display jitter does not change their centres or spread.
+
 The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus interactive PitchPlus and Spectrogram smoke tests. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the plot smoke tests from Praat's GUI; their settings windows require choosing **Draw**, **Draw & Exit**, or **Cancel**.
 
 On Windows, run `tests\table_tier_references_isolated.ps1` with `-Praat` and a

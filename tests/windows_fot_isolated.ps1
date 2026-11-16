@@ -14,6 +14,7 @@ foreach ($folder in 'plotScripts', 'tests', 'windows-ui', 'example') {
     Copy-Item -LiteralPath (Join-Path $root $folder) -Destination $plugin -Recurse
 }
 Copy-Item -LiteralPath (Join-Path $plugin 'tests\fot_reference_prepare.praat') -Destination (Join-Path $plugin 'plotScripts')
+Copy-Item -LiteralPath (Join-Path $plugin 'tests\fot_ellipses.praat') -Destination (Join-Path $plugin 'plotScripts')
 $vars = Join-Path $plugin 'data\vars'
 New-Item -ItemType Directory -Path $vars -Force | Out-Null
 [IO.File]::WriteAllText((Join-Path $vars 'ui_mode.txt'), 'windows', (New-Object Text.UTF8Encoding($false)))
@@ -23,6 +24,7 @@ if (-not (Test-Path -LiteralPath $helper)) { throw 'The bundled Windows UI helpe
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Drawing
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -34,6 +36,12 @@ public static class FoTNative {
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wparam, IntPtr lparam);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr window, StringBuilder name, int length);
     [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wparam, IntPtr lparam, uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll", SetLastError=true)] public static extern bool PrintWindow(IntPtr window, IntPtr deviceContext, uint flags);
+    [StructLayout(LayoutKind.Sequential)] public struct RECT {
+        public int Left, Top, Right, Bottom;
+    }
+    [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr window, out RECT rect);
 }
 '@
 function Wait-Until([scriptblock]$Condition, [string]$What, [int]$Seconds = 30) {
@@ -112,6 +120,24 @@ function Get-Report([int]$ProcessId, [string]$Tag) {
     Send-Script $ProcessId ('runScript: "' + $script + '", "' + $report.Replace('\', '/') + '", "' + $picture.Replace('\', '/') + '"' + "`n")
     Wait-Until { (Test-Path -LiteralPath $report) -and (Test-Path -LiteralPath $picture) } "$Tag report"
     return @{ Report = (Get-Content -LiteralPath $report -Raw).Trim(); Picture = (Get-Item -LiteralPath $picture).Length }
+}
+function Capture-PictureWindow([int]$ProcessId, [string]$Path) {
+    $window = Get-Window $ProcessId '*Picture*'
+    if ($null -eq $window) { throw 'Praat Picture window not found.' }
+    $handle = [IntPtr]$window.Current.NativeWindowHandle
+    [FoTNative]::ShowWindow($handle, 3) | Out-Null
+    Start-Sleep -Milliseconds 500
+    $rect = New-Object FoTNative+RECT
+    if (-not [FoTNative]::GetWindowRect($handle, [ref]$rect)) { throw 'Could not get Picture window bounds.' }
+    $bitmap = New-Object Drawing.Bitmap ($rect.Right - $rect.Left), ($rect.Bottom - $rect.Top)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $hdc = $graphics.GetHdc()
+        try {
+            if (-not [FoTNative]::PrintWindow($handle, $hdc, 0)) { throw 'Could not capture Picture window.' }
+        } finally { $graphics.ReleaseHdc($hdc) }
+        $bitmap.Save($Path, [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
 
 $owned = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
@@ -196,6 +222,7 @@ try {
     $drawn = Get-Report $praatProcess.Id 'drawn'
     if ($drawn.Picture -le 5000) { throw 'The formants-over-time plot is empty.' }
     if ($drawn.Report -notmatch '^1\s+other$') { throw "Selection was not restored: $($drawn.Report)" }
+    Capture-PictureWindow $praatProcess.Id (Join-Path $testRoot 'praat-picture-window.png')
     $objects = (Get-Content -LiteralPath $ready -Raw).Trim() -split '\s+'
     $original = Join-Path $testRoot 'original-times.txt'
     $check = 'selectObject: ' + $objects[0] + "`n" +
@@ -227,6 +254,21 @@ try {
     Wait-Until { @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\AERoPlot_Images') -Filter '*.png' -ErrorAction SilentlyContinue).Count -ge 1 } 'the saved image'
     $saved = @(Get-ChildItem -LiteralPath (Join-Path $plugin 'data\AERoPlot_Images') -Filter '*.png')[0]
     if ($saved.Length -lt 5000) { throw 'The saved image is empty.' }
+
+    $ellipseActual = Join-Path $testRoot 'ellipses-actual.png'
+    $ellipseJittered = Join-Path $testRoot 'ellipses-jittered.png'
+    $ellipseExpected = Join-Path $testRoot 'ellipses-expected.png'
+    $ellipseScript = (Join-Path $plugin 'plotScripts\fot_ellipses.praat').Replace('\', '/')
+    Send-Script $praatProcess.Id ('runScript: "' + $ellipseScript + '", "' +
+        $ellipseActual.Replace('\', '/') + '", "' + $ellipseJittered.Replace('\', '/') + '", "' +
+        $ellipseExpected.Replace('\', '/') + '"' + "`n")
+    Wait-Until { Test-Path -LiteralPath $ellipseExpected } 'the grouped ellipse images'
+    $expectedHash = (Get-FileHash -LiteralPath $ellipseExpected).Hash
+    foreach ($image in $ellipseActual, $ellipseJittered) {
+        if ((Get-FileHash -LiteralPath $image).Hash -ne $expectedHash) {
+            throw 'Ellipses do not match unjittered comparison-by-sequence groups.'
+        }
+    }
 
     Select-ComboIndex $dialog 'ReferenceElement' 0
     Click-Button $dialog 'Draw'

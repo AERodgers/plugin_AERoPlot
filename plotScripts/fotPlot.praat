@@ -267,7 +267,8 @@ procedure calcFOTAxisIncrements
     endif
 
     # set frame variables
-    left = 0.7
+    # Leave room for the far-side y-axis label in the live Picture window.
+    left = 1.0
     top = 0.54
     right = left + plotWidth
     bottom = top + plotHeight
@@ -524,11 +525,14 @@ endproc
 
 procedure drawEllipses
     for o to oLevels
-        selectObject: plotTable[o]
         for i to iLevels
             curInner$ = iLevel$[i]
-            # Only draw plots where plot table exists!
             if possRows.matrix##[o,i] and stDevFAct[o, i, 1] != undefined
+                # Praat 6.4.60 ignores the condition in "Draw ellipses where".
+                # Extract the group explicitly, before any display-only jitter.
+                selectObject: table
+                ellipseTable = Extract rows where:
+                ... "self$[oFactor$] = oLevel$[o] and self$[iFactor$] = curInner$"
                 curTCol$ = timeCol$ + "DrawValue"
                 for f to numFormants
                     curFCol$ = f'f'Col$ + "DrawValue"
@@ -540,20 +544,19 @@ procedure drawEllipses
                     else
                         Colour:  oColour$[o,2]
                     endif
-                    nowarn Draw ellipses where: curTCol$, minT, maxT,
+                    nowarn Draw ellipses: curTCol$, minT, maxT,
                     ... curFCol$, minF, maxF,
                     ... oFactor$,
-                    ... ellipsisSDs, 0, "no",
-                    ... "self$[iFactor$] = curInner$"
+                    ... ellipsisSDs, 0, "no"
                     curFCol$ = f'f'Col$ + "DrawValue"
                     Line width: 2
                     Colour: oColour$[o,4]
-                    nowarn Draw ellipses where: curTCol$, minT, maxT,
+                    nowarn Draw ellipses: curTCol$, minT, maxT,
                     ... curFCol$, minF, maxF,
                     ... oFactor$,
-                    ... ellipsisSDs, 0, "no",
-                    ... "self$[iFactor$] = curInner$"
+                    ... ellipsisSDs, 0, "no"
                 endfor
+                removeObject: ellipseTable
             endif
         endfor
     endfor
