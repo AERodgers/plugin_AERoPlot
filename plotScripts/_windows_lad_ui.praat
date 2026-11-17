@@ -5,7 +5,7 @@ procedure windowsLadLaunch
     if environment$("OS") != "Windows_NT"
         exitScript: "The Windows interface only runs on Windows. Use the Praat interface instead."
     endif
-    .exe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+    .exe$ = "../windows-ui/bin/AERoPlotWindowsUI.exe"
     if not fileReadable(.exe$)
         exitScript: "The Windows interface has not been built. Use the Praat interface instead."
     endif

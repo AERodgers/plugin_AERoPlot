@@ -25,6 +25,7 @@ else
         keepGoing = 0
     else
         @objsSelected: "Table", "tableID$"
+        @checkDirectoryStructure
         @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
     endif
 endif
@@ -574,6 +575,8 @@ procedure defineVars
     endif
     @readVars: preferencesDirectory$ +
     ... "/plugin_AERoPlot/data/vars/", "f1f1Plot.var"
+    @resolveExamplePath: tableID$, "AER_NI_I.txt"
+    tableID$ = resolveExamplePath.resolved$
     @readSharedSaveFolder
     @getGenAxisVars
 
@@ -587,8 +590,7 @@ procedure createF1F2Vars:
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "f1f2Version$", tab$, curF1f2Version$
     appendFileLine: .address$, "plotSize", tab$, 5
-    appendFileLine: .address$, "tableID$", tab$,
-    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
+    appendFileLine: .address$, "tableID$", tab$, "../example/AER_NI_I.txt"
     appendFileLine: .address$, "oFactor$", tab$, "Context"
     appendFileLine: .address$, "iFactor$", tab$, "Element"
     appendFileLine: .address$, "useInnerFactor", tab$, 1

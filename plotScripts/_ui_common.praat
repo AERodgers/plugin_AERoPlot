@@ -48,8 +48,7 @@ procedure windowsUIAvailable
     .major = 0
     .minor = 0
     .patch = 0
-    .exe$ = preferencesDirectory$ +
-    ... "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+    .exe$ = "../windows-ui/bin/AERoPlotWindowsUI.exe"
     .helperPresent = 0
     if .isWindows
         @checkPraatVersion
@@ -80,11 +79,20 @@ procedure windowsUIRequirements: .isWindows, .version$, .major, .minor, .patch, 
             ... .version$ + ". Update Praat, or choose Use Praat interface."
         elsif not .helperPresent
             .helperMissing = 1
-            .reason$ = "The Windows helper is missing from " + .exe$ +
-            ... ". Reinstall the complete plug-in folder, including windows-ui/bin/AERoPlotWindowsUI.exe."
+            .reason$ = "The Windows helper is missing from the installed plug-in folder. Reinstall the complete plug-in folder, including windows-ui/bin/AERoPlotWindowsUI.exe."
         else
             .ok = 1
         endif
+    endif
+endproc
+
+procedure resolveExamplePath: .path$, .file$
+    .resolved$ = .path$
+    if not fileReadable(.path$) and
+    ... index(.path$, "plugin_AERoPlot") > 0 and
+    ... index(.path$, "example") > 0 and
+    ... right$(.path$, length(.file$)) = .file$
+        .resolved$ = "../example/" + .file$
     endif
 endproc
 

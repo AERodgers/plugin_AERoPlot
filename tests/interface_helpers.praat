@@ -58,6 +58,16 @@ removeObject: table
 prefs$ = prefs_directory$
 assert prefs$ != ""
 assert preferencesDirectory$ = prefs$
+assert fileReadable("../windows-ui/bin/AERoPlotWindowsUI.exe")
+@resolveExamplePath: "C:/Users/old/Praat/plugin_AERoPlot/example/AER_NI_I.txt", "AER_NI_I.txt"
+assert resolveExamplePath.resolved$ = "../example/AER_NI_I.txt"
+assert fileReadable(resolveExamplePath.resolved$)
+@resolveExamplePath: "my/custom/table.txt", "AER_NI_I.txt"
+assert resolveExamplePath.resolved$ = "my/custom/table.txt"
+@resolveExamplePath: "C:/user/custom/AER_NI_I.txt", "AER_NI_I.txt"
+assert resolveExamplePath.resolved$ = "C:/user/custom/AER_NI_I.txt"
+@checkDirectoryStructure
+assert folderExists(preferencesDirectory$ + "/plugin_AERoPlot/data/temp")
 
 # Readiness decision covers unsupported Praat versions and missing helpers.
 @windowsUIRequirements: 1, "6.4.59", 6, 4, 59, "C:/test/AERoPlotWindowsUI.exe", 1
@@ -133,5 +143,6 @@ deleteFile: prefFile$
 
 writeInfoLine: "Interface helper tests passed."
 
+include ../plotScripts/_aeroplotFns.praat
 include ../plotScripts/_genFnBank.praat
 include ../plotScripts/_ui_common.praat

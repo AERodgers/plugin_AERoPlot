@@ -17,6 +17,7 @@ if not variableExists("aeroPrototypeInclude")
     else
         firstPass = 1
         @objsSelected: "Sound,TextGrid", "ui.soundID$,ui.gridID$"
+        @checkDirectoryStructure
         @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
         @main
     endif
@@ -536,6 +537,10 @@ procedure defineVars
         ui.lowestTier$ = ""
         ui.otherTiers$ = ""
     endif
+    @resolveExamplePath: ui.gridID$, "AER_NI_I.textgrid"
+    ui.gridID$ = resolveExamplePath.resolved$
+    @resolveExamplePath: ui.soundID$, "AER_NI_I.wav"
+    ui.soundID$ = resolveExamplePath.resolved$
 
 endproc
 
@@ -543,14 +548,13 @@ procedure initialiseVars: .address$
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "main.version$", tab$, main.curVersion$
     appendFileLine: .address$, "ui.gridID$", tab$,
-    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.textgrid"
+    ... "../example/AER_NI_I.textgrid"
     appendFileLine: .address$, "ui.lowestTier$", tab$, "Comparible.target.int"
     appendFileLine: .address$, "ui.otherTiers$", tab$,
     ... "Speaker,Section,Phenomenon,Broad,Narrow,Comment"
     appendFileLine: .address$, "ui.baseTierTimeOnly", tab$, 1
        appendFileLine: .address$, "ui.output$", tab$, "aer_ni_i"
-    appendFileLine: .address$, "ui.soundID$", tab$, preferencesDirectory$ +
-    ... "/plugin_AERoPlot/example/AER_NI_I.wav"
+    appendFileLine: .address$, "ui.soundID$", tab$, "../example/AER_NI_I.wav"
     appendFileLine: .address$, "ui.formants2tabulate", tab$, 4
     appendFileLine: .address$, "ui.numFormants", tab$, 5
     appendFileLine: .address$, "ui.formantTier$", tab$, ""

@@ -7,7 +7,7 @@ procedure windowsPlotInitialize
         ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch < 60)))
             exitScript: "The Windows plot UI prototype requires Praat 6.4.60 or newer. Use the original Praat action instead."
         endif
-        windowsPlotUIExe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+        windowsPlotUIExe$ = "../windows-ui/bin/AERoPlotWindowsUI.exe"
         if not fileReadable(windowsPlotUIExe$)
             exitScript: "The Windows plot UI has not been built. See the prototype instructions in the AERoPlot README."
         endif

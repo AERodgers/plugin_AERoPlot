@@ -10,11 +10,17 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
 2. Make sure the extracted folder is named exactly **plugin_AERoPlot**. A ZIP
    downloaded from a branch may add a suffix to the folder name; rename it if
    needed. Copy the complete folder, including `windows-ui\bin`, into the
-   **Praat preferences folder**.
+   location from which Praat loads plug-ins (usually the **Praat preferences
+   folder**).
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
 4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface. If the helper is missing, AERoPlot explains what is unavailable and continues with the native interface.
 5. On Windows, the helper warms up in the background when Praat starts, so Praat remains usable. A Windows dialog opened before warm-up finishes may take a few seconds to appear.
+
+Bundled files such as the Windows helper and example data are found relative to
+the installed plug-in folder. User settings, palettes, and temporary files are
+stored in Praat's preferences folder, which can be different from the plug-in
+folder.
 
 ## **Functionality**
 
@@ -255,8 +261,8 @@ download, so end users do not need to build it.
 To use the Windows interfaces:
 
 1. Use Praat 6.4.60 or newer. The prototype was tested with Praat 6.4.60.
-2. Copy the complete folder, including `windows-ui\bin`, into the Praat
-   preferences folder as described above and restart Praat.
+2. Copy the complete folder, including `windows-ui\bin`, into Praat's
+   plug-in location as described above and restart Praat.
 
 Developers who change the C# helper can regenerate it by running
 `windows-ui\build.cmd`; this requires the .NET Framework 4 compiler. The

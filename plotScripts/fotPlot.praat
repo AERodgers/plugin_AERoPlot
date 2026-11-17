@@ -23,6 +23,7 @@ else
         keepGoing = 0
     else
         @objsSelected: "Table", "tableID$"
+        @checkDirectoryStructure
         @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
     endif
 endif
@@ -71,8 +72,7 @@ while keepGoing
     changeAddColSch = 0
     tokenMarking += 1
     dataPointsOnTop += 1
-    timeRelativeTo -= (tableID$ ==
-    ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt")
+    timeRelativeTo -= (tableID$ == "../example/AER_NI_I.txt")
 
     keepGoing = plotUses
     firstPass = 0
@@ -157,8 +157,7 @@ endproc
 procedure makeTimeRelativeMenu
     if keepGoing = 1
         timeRelativeTo = timeRelativeTo +
-        ... (tableID$ == preferencesDirectory$ +
-        ... "/plugin_AERoPlot/example/AER_NI_I.txt")
+        ... (tableID$ == "../example/AER_NI_I.txt")
         @hideObjs: "table", preferencesDirectory$ +
         ... "/plugin_AERoPlot/data/temp/", "hiddenTx"
         optText$ = "Make time relative to"
@@ -661,6 +660,8 @@ procedure defineVars
     endif
     @readVars:
     ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "fotPlot.var"
+    @resolveExamplePath: tableID$, "AER_NI_I.txt"
+    tableID$ = resolveExamplePath.resolved$
     @readSharedSaveFolder
     @getGenAxisVars
     @overwriteVars
@@ -677,8 +678,7 @@ endproc
 procedure createFoTVars: .address$
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "fotVersion$", tab$, curFoTVersion$
-    appendFileLine: .address$, "tableID$", tab$,
-        ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
+    appendFileLine: .address$, "tableID$", tab$, "../example/AER_NI_I.txt"
     appendFileLine: .address$, "timeCol$", tab$, "Element_t"
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"

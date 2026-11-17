@@ -28,6 +28,7 @@ else
         keepGoing = 0
     else
         @objsSelected: "Table", "tableID$"
+        @checkDirectoryStructure
         @purgeDirFiles: preferencesDirectory$ + "/plugin_AERoPlot/data/temp"
     endif
 endif
@@ -724,6 +725,8 @@ procedure defineVars
     endif
     @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/",
            ... "ladPlot.var"
+    @resolveExamplePath: tableID$, "AER_NI_I.txt"
+    tableID$ = resolveExamplePath.resolved$
     @readSharedSaveFolder
     @getGenAxisVars
     @overwriteVars
@@ -733,8 +736,7 @@ procedure createLadVars: .address$
 
     writeFileLine: .address$, "variable", tab$, "value"
     appendFileLine: .address$, "ladVersion$", tab$, curLadVersion$
-    appendFileLine: .address$, "tableID$", tab$,
-            ... preferencesDirectory$ + "/plugin_AERoPlot/example/AER_NI_I.txt"
+    appendFileLine: .address$, "tableID$", tab$, "../example/AER_NI_I.txt"
     appendFileLine: .address$, "xAxisFactor", tab$, 1
     appendFileLine: .address$, "f1Col$", tab$, "F1"
     appendFileLine: .address$, "f2Col$", tab$, "F2"

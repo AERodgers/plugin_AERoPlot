@@ -15,7 +15,7 @@ procedure runWindowsTablePrototype
     ... (checkPraatVersion.minor = 4 and checkPraatVersion.patch < 60)))
         exitScript: "The Windows interface requires Praat 6.4.60 or newer. Choose Praat > AERoPlot > Use Praat interface instead."
     endif
-    wtExe$ = preferencesDirectory$ + "/plugin_AERoPlot/windows-ui/bin/AERoPlotWindowsUI.exe"
+    wtExe$ = "../windows-ui/bin/AERoPlotWindowsUI.exe"
     if not fileReadable(wtExe$)
         exitScript: "The Windows interface has not been built. See the Windows interface instructions in the AERoPlot README."
     endif
