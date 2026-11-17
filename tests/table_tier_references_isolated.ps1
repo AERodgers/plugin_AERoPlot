@@ -24,10 +24,24 @@ $source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'inc
 $source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_formant_average.praat'))
 $source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
 [IO.File]::WriteAllText((Join-Path $scripts 'table_formant_average.praat'), $source, (New-Object Text.UTF8Encoding($false)))
+$source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_intensity.praat'))
+$source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
+[IO.File]::WriteAllText((Join-Path $scripts 'table_intensity.praat'), $source, (New-Object Text.UTF8Encoding($false)))
+$source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_settings_migration.praat'))
+$source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
+[IO.File]::WriteAllText((Join-Path $scripts 'table_settings_migration.praat'), $source, (New-Object Text.UTF8Encoding($false)))
+$source = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'table_intensity_main.praat'))
+$source = $source.Replace('include ../plotScripts/nestedTiers2Table.praat', 'include nestedTiers2Table.praat')
+[IO.File]::WriteAllText((Join-Path $scripts 'table_intensity_main.praat'), $source, (New-Object Text.UTF8Encoding($false)))
+$preferences = Join-Path $testRoot 'preferences'
+New-Item -ItemType Directory -Path $preferences | Out-Null
 
 $cases = @(
     @{ Script='table_tier_references.praat'; Marker='Table tier reference tests passed.'; Args=@() },
-    @{ Script='table_formant_average.praat'; Marker='Formant averaging test passed.'; Args=@() }
+    @{ Script='table_formant_average.praat'; Marker='Formant averaging test passed.'; Args=@() },
+    @{ Script='table_intensity.praat'; Marker='Table intensity tests passed.'; Args=@() },
+    @{ Script='table_intensity_main.praat'; Marker='Table intensity main tests passed.'; Args=@() },
+    @{ Script='table_settings_migration.praat'; Marker='Table settings migration tests passed.'; Args=@() }
 )
 if ($SampleTextGrid -ne '') {
     if (-not (Test-Path -LiteralPath $SampleTextGrid)) {
@@ -39,7 +53,7 @@ foreach ($case in $cases) {
     $stdout = Join-Path $testRoot ($case.Script + '.stdout.txt')
     $stderr = Join-Path $testRoot ($case.Script + '.stderr.txt')
     $script = Join-Path $scripts $case.Script
-    $arguments = @('--no-plugins', '--no-pref-files', '--run', "`"$script`"")
+    $arguments = @('--FULL-TRUST', '--no-plugins', '--no-pref-files', "`"--pref-dir=$preferences`"", '--run', "`"$script`"")
     foreach ($arg in $case.Args) { $arguments += "`"$arg`"" }
     $process = Start-Process -FilePath $Praat -ArgumentList $arguments -PassThru -Wait `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr

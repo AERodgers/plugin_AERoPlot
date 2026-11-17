@@ -13,7 +13,6 @@ procedure ui
             # present object selection options only if the user has not already
             # selected appropriate objects from the objects window.
             if !overwriteVars.all
-                comment: "TEXTGRID INFORMATION"
                 sentence: "Textgrid address or object number", .gridID$
                 sentence: "Sound file address or object number", .soundID$
             else
@@ -23,18 +22,35 @@ procedure ui
             endif
 
             sentence: "New table name", .output$
-            comment: "Enter tier names or numbers."
             sentence: "Base tier", .lowestTier$
             sentence: "Other tiers to process (separated by commas)",
             ... .otherTiers$
             boolean: "Base tier times only", .baseTierTimeOnly
 
-            comment: "OPTIONAL DURATION"
-            comment: "Adds a [tierName]_dur column (seconds) with the length of the"
-            comment: "interval of this tier that contains each row. Leave blank for none."
             sentence: "Duration tier", .vowelDur$
+            sentence: "Duration tier 2", .duration2$
+            sentence: "Duration tier 3", .duration3$
 
-            comment: "OPTIONAL FORMANT PROCESSING"
+            sentence: "Intensity tier 1 (dB, 1 decimal)", .intensityTier1$
+            optionMenu: "Intensity statistic 1", .intensityMethod1
+                option: "Mean (energy)"
+                option: "Midpoint"
+                option: "Minimum"
+                option: "Maximum"
+            sentence: "Intensity tier 2", .intensityTier2$
+            optionMenu: "Intensity statistic 2", .intensityMethod2
+                option: "Mean (energy)"
+                option: "Midpoint"
+                option: "Minimum"
+                option: "Maximum"
+            sentence: "Intensity tier 3", .intensityTier3$
+            optionMenu: "Intensity statistic 3", .intensityMethod3
+                option: "Mean (energy)"
+                option: "Midpoint"
+                option: "Minimum"
+                option: "Maximum"
+            positive: "Intensity pitch floor (Hz)", .intensityPitch
+
             optionMenu: "Formants to tabulate", .formants2tabulate
                 option: "None"
                 option: "F1"
@@ -46,9 +62,6 @@ procedure ui
                 option: "Hertz"
                 option: "Bark"
 
-            comment: "Formants are measured at each base tier point, or averaged"
-            comment: "across each base tier interval."
-            comment: "Parameters for ""To Formant (Burg)..."""
             real: "Time step (s)", .timeStep
             natural: "Maximum formant (Hz)", .maxFormantHz
             positive: "Number of formants (for formant estimation)",
@@ -57,7 +70,9 @@ procedure ui
             positive: "Pre emphasis from (Hz)", .preEmph
 
 
-        comment:  .comment$
+        if .comment$ != ""
+            comment: .comment$
+        endif
         .myChoice = endPause: "Exit", "Instructions", "Convert to Table", 3, 1
         # respond to .myChoice
         if .myChoice = 1
@@ -98,6 +113,15 @@ procedure ui
 
     .formantTier$ = ""
     .vowelDur$ = duration_tier$
+    .duration2$ = duration_tier_2$
+    .duration3$ = duration_tier_3$
+    .intensityTier1$ = intensity_tier_1$
+    .intensityTier2$ = intensity_tier_2$
+    .intensityTier3$ = intensity_tier_3$
+    .intensityMethod1 = intensity_statistic_1
+    .intensityMethod2 = intensity_statistic_2
+    .intensityMethod3 = intensity_statistic_3
+    .intensityPitch = intensity_pitch_floor
 
     .maxNumFormants = .formants2tabulate - 1
     .scale = frequency_scale
@@ -124,8 +148,7 @@ procedure instructions
     '.a$' "     (including folder info and the file extension "".textGrid"")"
     '.a$' "     into the box ""Textgrid address or object number""."
     '.a$' "  2. ""Sound file address or object number"" is the same for the"
-    '.a$' "     sound file. (NOTE: if you do not want to estimate formant"
-    '.a$' "     values, you can leave this blank.)"
+    '.a$' "     sound file. Leave blank only if no acoustic measurements are needed."
     '.a$' "  3. Enter the name the output table in ""New table name""."
     '.a$' ""
     '.a$' "HOW TO CHOOSE THE BASE TIER AND OTHER TIERS"
@@ -161,9 +184,19 @@ procedure instructions
     '.a$' ""
     '.a$' "DURATION"
     '.a$' "--------"
-    '.a$' "To include a duration, enter an interval tier in ""Duration tier""."
+    '.a$' "To include durations, enter up to three interval tiers."
     '.a$' "The table gets a column [tierName]_dur (in seconds) holding the"
     '.a$' "length of the interval of that tier containing each row."
+    '.a$' ""
+    '.a$' "INTENSITY"
+    '.a$' "---------"
+    '.a$' "Choose up to three intensity tiers. Point tiers are measured at each"
+    '.a$' "point. Interval tiers use the chosen mean, midpoint, minimum or maximum."
+    '.a$' "Mean is calculated by averaging intensity in energy units."
+    '.a$' "Results are rounded to 0.1 dB, relative to 20 micropascals."
+    '.a$' "Absolute sound pressure levels require a calibrated recording."
+    '.a$' "A base interval with multiple intensity points is ambiguous; use"
+    '.a$' "the point tier as the base tier to get one row per point."
     '.a$' ""
     '.a$' "To estimate formant values:"
     '.a$' "  6. Input the speech waveform and analysis parameter data."

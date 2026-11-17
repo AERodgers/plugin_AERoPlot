@@ -46,30 +46,44 @@ procedure main
         ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
     endif
 
+    @ensureTableMeasurementDefaults
+
     @getObject: ui.gridID$, "textGrid", "main"
     @getSoundIfAny
-    if not variableExists("aeroWindowsTableSettings")
-        # A bad tier setting must not leave copies in the Objects list. The
-        # command line reports it and stops; the pause window asks again.
-        aeroSoftErrors = 1
+    # A bad tier setting must not leave copies in the Objects list.
+    aeroSoftErrors = 1
+    @resolveTableTierSettings: .textGrid
+    while resolveTableTierSettings.error$ != ""
+        .message$ = resolveTableTierSettings.error$
+        @removeCopies: .textGrid, .sound
+        if variableExists("aeroNonInteractive") or variableExists("aeroWindowsTableSettings")
+            exitScript: .message$
+        endif
+        ui.notice$ = .message$
+        @ui
+        @writeVars:
+        ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+        @getObject: ui.gridID$, "textGrid", "main"
+        @getSoundIfAny
         @resolveTableTierSettings: .textGrid
-        while resolveTableTierSettings.error$ != ""
-            .message$ = resolveTableTierSettings.error$
-            @removeCopies: .textGrid, .sound
-            if variableExists("aeroNonInteractive")
-                exitScript: .message$
-            endif
-            ui.notice$ = .message$
-            @ui
-            @writeVars:
-            ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
-            @getObject: ui.gridID$, "textGrid", "main"
-            @getSoundIfAny
-            @resolveTableTierSettings: .textGrid
-        endwhile
-        aeroSoftErrors = 0
+    endwhile
+    aeroSoftErrors = 0
+    if (ui.formants2tabulate > 1 or ui.intensityTier1$ != "" or
+    ... ui.intensityTier2$ != "" or ui.intensityTier3$ != "") and not .sound
+        @removeCopies: .textGrid, .sound
+        exitScript: "A Sound is required for formant or intensity extraction."
     endif
-    if ui.formants2tabulate > 1
+    if ui.intensityTier1$ != "" or ui.intensityTier2$ != "" or ui.intensityTier3$ != ""
+        selectObject: .sound
+        .soundDuration = Get total duration
+        if .soundDuration < 6.4 / ui.intensityPitch
+            @removeCopies: .textGrid, .sound
+            exitScript: "The Sound is too short for intensity extraction at this pitch floor. " +
+            ... "Its duration must be at least 6.4 divided by the intensity pitch floor."
+        endif
+    endif
+    if ui.formants2tabulate > 1 or ui.intensityTier1$ != "" or
+    ... ui.intensityTier2$ != "" or ui.intensityTier3$ != ""
         @warnLongRecording: .sound
         if not warnLongRecording.proceed
             @removeCopies: .textGrid, .sound
@@ -81,7 +95,7 @@ procedure main
     ... "'ui.lowestTier$','ui.otherTiers$'",
     ...  ui.output$
     # decide time columns for
-    if ui.formants2tabulate
+    if ui.formants2tabulate > 1
         if tiers2Table.isIntTier[1]
             .tColTiers$ = "'ui.lowestTier$'_tmin,'ui.lowestTier$'_tmax"
         else
@@ -95,6 +109,9 @@ procedure main
         ... ui.windowLen,
         ... ui.preEmph,
         ... .scale$[ui.scale]
+    endif
+    if ui.intensityTier1$ != "" or ui.intensityTier2$ != "" or ui.intensityTier3$ != ""
+        @tableIntensity: .sound, .textGrid, 'ui.output$', ui.lowestTier$
     endif
 
 
@@ -113,7 +130,7 @@ procedure main
     # ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
 endproc
 
-# The Sound is only needed for formants; a blank entry means none.
+# The Sound is needed for formants and intensity; a blank entry means none.
 procedure getSoundIfAny
     main.sound = 0
     if ui.soundID$ != ""
@@ -149,6 +166,7 @@ endproc
 
 ## CONVERSION OF NESTED TEXTGRID TO TABLE
 procedure resolveTableTierSettings: .textGrid
+    @ensureTableMeasurementDefaults
     .error$ = ""
     # Older settings may hold a point tier for formant times; formants are now
     # always measured on the base tier, so it is ignored.
@@ -184,18 +202,75 @@ procedure resolveTableTierSettings: .textGrid
             .resolved$ += resolveTierReference.name$
         endif
     endfor
-    .newDur$ = ui.vowelDur$
-    if .error$ = "" and ui.vowelDur$ != ""
-        @resolveTierReference: .textGrid, ui.vowelDur$, "Duration tier", "interval"
-        .error$ = resolveTierReference.error$
-        .newDur$ = resolveTierReference.name$
+    .durationVar$[1] = "ui.vowelDur$"
+    .durationVar$[2] = "ui.duration2$"
+    .durationVar$[3] = "ui.duration3$"
+    for .i to 3
+        .var$ = .durationVar$[.i]
+        .newDur$[.i] = '.var$'
+        @isOffValue: .newDur$[.i]
+        if isOffValue.off
+            .newDur$[.i] = ""
+        elsif .error$ = ""
+            @resolveTierReference: .textGrid, .newDur$[.i], "Duration tier " + string$(.i), "interval"
+            .error$ = resolveTierReference.error$
+            .newDur$[.i] = resolveTierReference.name$
+            if .error$ = ""
+                for .j to .i - 1
+                    if .newDur$[.j] = .newDur$[.i]
+                        .error$ = "Choose each duration tier only once."
+                        @settingError: .error$
+                    endif
+                endfor
+            endif
+        endif
+    endfor
+    for .i to 3
+        .var$ = "ui.intensityTier" + string$(.i) + "$"
+        .newIntensity$[.i] = '.var$'
+        @isOffValue: .newIntensity$[.i]
+        if isOffValue.off
+            .newIntensity$[.i] = ""
+        elsif .error$ = ""
+            @resolveTierReference: .textGrid, .newIntensity$[.i], "Intensity tier " + string$(.i), "any"
+            .error$ = resolveTierReference.error$
+            .newIntensity$[.i] = resolveTierReference.name$
+            .intensityTier[.i] = resolveTierReference.tier
+            if .error$ = ""
+                for .j to .i - 1
+                    if .newIntensity$[.j] = .newIntensity$[.i]
+                        .error$ = "Choose each intensity tier only once."
+                        @settingError: .error$
+                    endif
+                endfor
+            endif
+            if .error$ = ""
+                @validateIntensityMapping: .textGrid, .baseTier, .intensityTier[.i]
+                .error$ = validateIntensityMapping.error$
+            endif
+            .var$ = "ui.intensityMethod" + string$(.i)
+            .method = '.var$'
+            if .error$ = "" and (.method < 1 or .method > 4 or .method != floor(.method))
+                .error$ = "Choose a valid intensity statistic."
+                @settingError: .error$
+            endif
+        endif
+    endfor
+    if .error$ = "" and ui.intensityPitch <= 0
+        .error$ = "Intensity pitch floor must be positive."
+        @settingError: .error$
     endif
     # Settings are only replaced by their resolved names when all are valid, so
     # an interface can show the user's original entries again.
     if .error$ = ""
         ui.lowestTier$ = .newBase$
         ui.otherTiers$ = .resolved$
-        ui.vowelDur$ = .newDur$
+        for .i to 3
+            .var$ = .durationVar$[.i]
+            '.var$' = .newDur$[.i]
+            .var$ = "ui.intensityTier" + string$(.i) + "$"
+            '.var$' = .newIntensity$[.i]
+        endfor
     endif
 endproc
 
@@ -258,6 +333,182 @@ procedure tierNested: .grid, .base, .other
             .i += 1
         endwhile
     endif
+endproc
+
+# A measurement tier must not supply several values for one base-tier row.
+procedure validateIntensityMapping: .grid, .base, .tier
+    .error$ = ""
+    selectObject: .grid
+    .baseName$ = Get tier name: .base
+    @tableBaseTimes: .grid, .baseName$
+    for .i to tableBaseTimes.count
+        @findTableMeasurement: .grid, .tier, tableBaseTimes.start[.i], tableBaseTimes.end[.i]
+        if findTableMeasurement.count > 1
+            .error$ = "Intensity tier has multiple points matching base row " +
+            ... string$(.i) + ". Use the point tier as the base tier."
+            @settingError: .error$
+            .i = tableBaseTimes.count
+        endif
+    endfor
+endproc
+
+# Intervals must contain the entire row; a point at a shared boundary belongs
+# to the interval on its right, as in Praat's Get interval at time.
+procedure findTableMeasurement: .grid, .tier, .start, .end
+    .count = 0
+    .from = undefined
+    .to = undefined
+    selectObject: .grid
+    .interval = Is interval tier: .tier
+    if .interval
+        .index = Get interval at time: .tier, (.start + .end) / 2
+        if .index > 0
+            .label$ = Get label of interval: .tier, .index
+            .from = Get start time of interval: .tier, .index
+            .to = Get end time of interval: .tier, .index
+            if .label$ != "" and .start >= .from - 1e-9 and .end <= .to + 1e-9
+                .count = 1
+            endif
+        endif
+    else
+        .number = Get number of points: .tier
+        .lowerTime = .start
+        .upperTime = .end
+        if .start = .end
+            .lowerTime -= 1e-9
+            .upperTime += 1e-9
+        endif
+        .low = 1
+        .high = .number + 1
+        while .low < .high
+            .mid = floor((.low + .high) / 2)
+            .time = Get time of point: .tier, .mid
+            if .time < .lowerTime
+                .low = .mid + 1
+            else
+                .high = .mid
+            endif
+        endwhile
+        .i = .low
+        while .i <= .number
+            .time = Get time of point: .tier, .i
+            if .time > .upperTime
+                .i = .number + 1
+            else
+                .label$ = Get label of point: .tier, .i
+                if .label$ != ""
+                    if .start = .end
+                        .inside = abs(.time - .start) < 1e-9
+                    else
+                        .inside = .time >= .start and .time < .end
+                    endif
+                    if .inside
+                        .count += 1
+                        .from = .time
+                        .to = .time
+                    endif
+                endif
+                .i += 1
+            endif
+        endwhile
+    endif
+endproc
+
+procedure tableBaseTimes: .grid, .base$
+    @resolveTierNumber: .grid, .base$, "Base tier", "any"
+    .tier = resolveTierNumber.tier
+    .interval = resolveTierNumber.interval
+    selectObject: .grid
+    .count = 0
+    if .interval
+        .number = Get number of intervals: .tier
+    else
+        .number = Get number of points: .tier
+    endif
+    for .i to .number
+        if .interval
+            .label$ = Get label of interval: .tier, .i
+        else
+            .label$ = Get label of point: .tier, .i
+        endif
+        if .label$ != ""
+            .count += 1
+            if .interval
+                .start[.count] = Get start time of interval: .tier, .i
+                .end[.count] = Get end time of interval: .tier, .i
+            else
+                .start[.count] = Get time of point: .tier, .i
+                .end[.count] = .start[.count]
+            endif
+        endif
+    endfor
+endproc
+
+procedure tableIntensity: .sound, .grid, .table, .base$
+    selectObject: .sound
+    .soundStart = Get starting time
+    .soundEnd = Get end time
+    .intensity = To Intensity: ui.intensityPitch, 0, "yes"
+    @tableBaseTimes: .grid, .base$
+    .methodName$[1] = "mean"
+    .methodName$[2] = "midpoint"
+    .methodName$[3] = "minimum"
+    .methodName$[4] = "maximum"
+    for .i to 3
+        .var$ = "ui.intensityTier" + string$(.i) + "$"
+        .tierName$ = '.var$'
+        if .tierName$ != ""
+            .var$ = "ui.intensityMethod" + string$(.i)
+            .method = '.var$'
+            @resolveTierNumber: .grid, .tierName$, "Intensity tier", "any"
+            .tier = resolveTierNumber.tier
+            .interval = resolveTierNumber.interval
+            .column$ = .tierName$ + "_intensity_dB"
+            if .interval
+                .column$ = .tierName$ + "_intensity_" + .methodName$[.method] + "_dB"
+            endif
+            selectObject: .table
+            Append column: .column$
+            .rows = Get number of rows
+            if .rows != tableBaseTimes.count
+                exitScript: "Base-tier rows do not match the TextGrid; cannot extract intensity."
+            endif
+            .missing = 0
+            for .row to .rows
+                .start = tableBaseTimes.start[.row]
+                .end = tableBaseTimes.end[.row]
+                @findTableMeasurement: .grid, .tier, .start, .end
+                .value = undefined
+                if findTableMeasurement.count = 1
+                    .from = findTableMeasurement.from
+                    .to = findTableMeasurement.to
+                    if .from >= .soundStart and .to <= .soundEnd
+                        selectObject: .intensity
+                        if not .interval or .method = 2
+                            .value = Get value at time: (.from + .to) / 2, "Cubic"
+                        elsif .method = 1
+                            .value = Get mean: .from, .to, "energy"
+                        elsif .method = 3
+                            .value = Get minimum: .from, .to, "Parabolic"
+                        else
+                            .value = Get maximum: .from, .to, "Parabolic"
+                        endif
+                    endif
+                endif
+                if .value = undefined
+                    .missing += 1
+                else
+                    .value = round(.value * 10) / 10
+                endif
+                selectObject: .table
+                Set numeric value: .row, .column$, .value
+            endfor
+            if .missing > 0
+                appendInfoLine: "Warning: " + string$(.missing) + " rows have undefined intensity for tier """ + .tierName$ + """."
+            endif
+        endif
+    endfor
+    removeObject: .intensity
 endproc
 
 procedure tiers2Table:
@@ -396,16 +647,21 @@ procedure tiers2Table:
 
 
     # Duration (in seconds) of the interval of the chosen tier that contains each row.
-    if ui.vowelDur$ != ""
+    @ensureTableMeasurementDefaults
+    .durationVar$[1] = "ui.vowelDur$"
+    .durationVar$[2] = "ui.duration2$"
+    .durationVar$[3] = "ui.duration3$"
+    for .durationIndex to 3
+      .var$ = .durationVar$[.durationIndex]
+      .durationTier$ = '.var$'
+      if .durationTier$ != ""
         selectObject: .gridTable
-
         .durTable = Extract rows where column (text):
         ... "tier",
         ... "is equal to",
-        ... ui.vowelDur$
-
+        ... .durationTier$
         .num_rows = Get number of rows
-        .durCol$ = ui.vowelDur$ + "_dur"
+        .durCol$ = .durationTier$ + "_dur"
         selectObject: '.output$'
         Append column: .durCol$
         for .i to .num_rows
@@ -422,7 +678,8 @@ procedure tiers2Table:
             ... "endif"
         endfor
         removeObject: .durTable
-    endif
+      endif
+    endfor
 
     removeObject: .gridTable
 endproc
@@ -530,6 +787,8 @@ procedure defineVars
     endif
     @readVars: preferencesDirectory$ +
     ... "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    @ensureTableMeasurementDefaults
+    @ensureTableMeasurementSettings
     @overwriteVars
 
     if (ui.soundID$ != x_ui.soundID$) or (ui.gridID$ != x_ui.gridID$)
@@ -542,6 +801,54 @@ procedure defineVars
     @resolveExamplePath: ui.soundID$, "AER_NI_I.wav"
     ui.soundID$ = resolveExamplePath.resolved$
 
+endproc
+
+# Supply defaults for older settings files and for callers that use the shared
+# conversion procedures without opening a dialog.
+procedure ensureTableMeasurementDefaults
+    if not variableExists("ui.duration2$")
+        ui.duration2$ = ""
+    endif
+    if not variableExists("ui.duration3$")
+        ui.duration3$ = ""
+    endif
+    for .i to 3
+        .var$ = "ui.intensityTier" + string$(.i) + "$"
+        if not variableExists(.var$)
+            '.var$' = ""
+        endif
+        .var$ = "ui.intensityMethod" + string$(.i)
+        if not variableExists(.var$)
+            '.var$' = 1
+        endif
+    endfor
+    if not variableExists("ui.intensityPitch")
+        ui.intensityPitch = 100
+    endif
+endproc
+
+procedure ensureTableMeasurementSettings
+    .file$ = preferencesDirectory$ + "/plugin_AERoPlot/data/vars/tier2Table.var"
+    .variables$ = "ui.duration2$,ui.duration3$,ui.intensityTier1$,ui.intensityTier2$,ui.intensityTier3$," +
+    ... "ui.intensityMethod1,ui.intensityMethod2,ui.intensityMethod3,ui.intensityPitch"
+    @csvLine2Array: .variables$, "ensureTableMeasurementSettings.count", "ensureTableMeasurementSettings.names$"
+    .added = 0
+    for .i to .count
+        .found = 0
+        for .j to tier2TableNumVars
+            if tier2TableVar$[.j] = .names$[.i]
+                .found = 1
+            endif
+        endfor
+        if not .found
+            .var$ = .names$[.i]
+            appendFileLine: .file$, .var$, tab$, '.var$'
+            .added = 1
+        endif
+    endfor
+    if .added
+        @readVars: preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "tier2Table.var"
+    endif
 endproc
 
 procedure initialiseVars: .address$

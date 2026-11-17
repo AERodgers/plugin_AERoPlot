@@ -42,7 +42,7 @@ internal static class Program
 internal static class TableUI
 {
     // Arguments: TABLE, Sound name, TextGrid name, tiers (one "I" or "P", a tab, then the name per line),
-    // and 12 tab-separated initial values (see TableWindow).
+    // and 12 legacy or 21 current tab-separated initial values (see TableWindow).
     public static int Run(string[] args)
     {
         if (args.Length != 5)
@@ -58,11 +58,14 @@ internal static class TableUI
             tiers.Add(new TableWindow.Tier { Id = id, Name = parts[1], Interval = parts[0] == "I", Nested = parts[2] });
         }
         var initial = args[4].Split('\t');
-        if (initial.Length != 12)
+        if (initial.Length != 12 && initial.Length != 21)
             throw new ArgumentException("The table interface received incomplete settings.");
+        bool legacyProtocol = initial.Length == 12;
+        if (initial.Length == 12)
+            initial = initial.Concat(new[] { "0", "0", "0", "0", "0", "1", "1", "1", "100" }).ToArray();
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        using (var window = new TableWindow(args[1], args[2], tiers, initial))
+        using (var window = new TableWindow(args[1], args[2], tiers, initial, legacyProtocol))
         {
             if (window.ShowDialog() == DialogResult.OK)
                 Console.Write(window.Result);
@@ -88,15 +91,23 @@ internal sealed class TableWindow : Form
     private const int ColumnWidth = 400;
 
     private readonly List<Tier> tiers;
+    private readonly bool legacyProtocol;
     private readonly HashSet<int> checkedIds = new HashSet<int>();
     private bool refreshing;
+    private bool refreshingOptionalTiers;
     private readonly TextBox tableName = new TextBox();
     private readonly ComboBox baseTier = new ComboBox();
     private readonly CheckedListBox otherTiers = new CheckedListBox();
     private readonly CheckBox baseTimesOnly = new CheckBox();
     private readonly ComboBox formants = new ComboBox();
     private readonly ComboBox scale = new ComboBox();
-    private readonly ComboBox durationTier = new ComboBox();
+    private readonly ComboBox[] durationTiers = { new ComboBox(), new ComboBox(), new ComboBox() };
+    private readonly ComboBox[] intensityTiers = { new ComboBox(), new ComboBox(), new ComboBox() };
+    private readonly ComboBox[] intensityMethods = { new ComboBox(), new ComboBox(), new ComboBox() };
+    private readonly Control[] durationRows = new Control[3];
+    private readonly Control[] intensityRows = new Control[3];
+    private readonly Control[] intensityMethodRows = new Control[3];
+    private readonly NumericUpDown intensityPitch;
     private readonly NumericUpDown timeStep;
     private readonly NumericUpDown maximumFormant;
     private readonly NumericUpDown numberOfFormants;
@@ -106,12 +117,12 @@ internal sealed class TableWindow : Form
     private readonly Control burgPanel;
     public string Result { get; private set; }
 
-    // Initial values: name, base tier number, other tier numbers (or "-"), base times only (0/1),
-    // formants (1-5), duration tier number (0 = none), scale (1-2),
-    // time step, maximum formant, number of formants, window length, pre-emphasis.
-    public TableWindow(string sound, string grid, List<Tier> tierList, string[] initial)
+    // Initial values: the 12 legacy fields followed by duration tiers 2-3, intensity tiers 1-3,
+    // intensity methods 1-3, and intensity pitch (Hz).
+    public TableWindow(string sound, string grid, List<Tier> tierList, string[] initial, bool legacy)
     {
         tiers = tierList;
+        legacyProtocol = legacy;
         Text = "AERoPlot - Create Table";
         Name = "TableSettings";
         StartPosition = FormStartPosition.CenterScreen;
@@ -177,9 +188,35 @@ internal sealed class TableWindow : Form
         left.Controls.Add(baseTimesOnly);
 
         left.Controls.Add(Heading("Duration (optional)"));
-        FillDurationCombo(Parse(initial[5]));
-        left.Controls.Add(durationTier);
-        left.Controls.Add(Note("Adds a [tier]_dur column (seconds): the length of the interval of this tier that contains each row."));
+        left.Controls.Add(Note("Adds one [tier]_dur column (seconds) for each selected interval tier."));
+        for (int i = 0; i < durationTiers.Length; i++)
+        {
+            FillTierCombo(durationTiers[i], true, i == 0 ? Parse(initial[5]) : Parse(initial[11 + i]));
+            durationTiers[i].Name = "DurationTier" + (i + 1).ToString(CultureInfo.InvariantCulture);
+            durationRows[i] = Pair("Duration tier " + (i + 1).ToString(CultureInfo.InvariantCulture), durationTiers[i], 145);
+            left.Controls.Add(durationRows[i]);
+            durationTiers[i].SelectedIndexChanged += delegate { UpdateOptionalTierRows(); };
+        }
+
+        left.Controls.Add(Heading("Intensity (optional)"));
+        left.Controls.Add(Note("Intensity is in dB, rounded to 1 decimal. Absolute sound pressure levels require a calibrated recording. Interval tiers use the chosen statistic; point tiers use point intensity. Pitch floor is in Hz."));
+        for (int i = 0; i < intensityTiers.Length; i++)
+        {
+            FillTierCombo(intensityTiers[i], false, Parse(initial[14 + i]));
+            intensityTiers[i].Name = "IntensityTier" + (i + 1).ToString(CultureInfo.InvariantCulture);
+            intensityMethods[i].DropDownStyle = ComboBoxStyle.DropDownList;
+            intensityMethods[i].Width = 255;
+            intensityMethods[i].Name = "IntensityMethod" + (i + 1).ToString(CultureInfo.InvariantCulture);
+            intensityMethods[i].Items.AddRange(new object[] { "Mean", "Midpoint", "Minimum", "Maximum" });
+            intensityMethods[i].SelectedIndex = Clamp(Parse(initial[17 + i]), 1, 4) - 1;
+            intensityRows[i] = Pair("Intensity tier " + (i + 1).ToString(CultureInfo.InvariantCulture), intensityTiers[i], 145);
+            intensityMethodRows[i] = Pair("Interval statistic", intensityMethods[i], 145);
+            left.Controls.Add(intensityRows[i]);
+            left.Controls.Add(intensityMethodRows[i]);
+            intensityTiers[i].SelectedIndexChanged += delegate { UpdateOptionalTierRows(); };
+        }
+        intensityPitch = Numeric(initial[20], 0.001m, 20000, 3, 1, "IntensityPitch");
+        left.Controls.Add(Pair("Intensity pitch floor (Hz)", intensityPitch, 145));
 
         right.Controls.Add(Heading("Formant processing (optional)"));
         formants.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -228,6 +265,7 @@ internal sealed class TableWindow : Form
         CancelButton = cancel;
 
         UpdateControls();
+        UpdateOptionalTierRows();
         int maximumHeight = Screen.FromPoint(Cursor.Position).WorkingArea.Height - 60;
         int height = Math.Max(left.PreferredSize.Height, right.PreferredSize.Height) + 110;
         ClientSize = new Size(2 * (ColumnWidth + 20) + 50, Math.Max(360, Math.Min(height, maximumHeight)));
@@ -289,19 +327,51 @@ internal sealed class TableWindow : Form
         };
     }
 
-    private void FillDurationCombo(int selectedId)
+    private void FillTierCombo(ComboBox combo, bool intervalsOnly, int selectedId)
     {
-        durationTier.DropDownStyle = ComboBoxStyle.DropDownList;
-        durationTier.Width = ColumnWidth;
-        durationTier.Name = "DurationTier";
-        durationTier.Items.Add(new Tier { Id = 0, Name = "(none)" });
-        durationTier.SelectedIndex = 0;
-        foreach (var tier in tiers.Where(t => t.Interval))
+        combo.DropDownStyle = ComboBoxStyle.DropDownList;
+        combo.Width = 255;
+        combo.Items.Add(new Tier { Id = 0, Name = "(none)" });
+        combo.SelectedIndex = 0;
+        foreach (var tier in tiers.Where(t => !intervalsOnly || t.Interval))
         {
-            int index = durationTier.Items.Add(tier);
+            int index = combo.Items.Add(tier);
             if (tier.Id == selectedId)
-                durationTier.SelectedIndex = index;
+                combo.SelectedIndex = index;
         }
+    }
+
+    private static int SelectedTierId(ComboBox combo)
+    {
+        return combo.SelectedItem == null ? 0 : ((Tier)combo.SelectedItem).Id;
+    }
+
+    private void UpdateOptionalTierRows()
+    {
+        if (refreshingOptionalTiers)
+            return;
+        refreshingOptionalTiers = true;
+        for (int i = 1; i < durationRows.Length; i++)
+        {
+            bool precedingDurationSelected = SelectedTierId(durationTiers[i - 1]) != 0;
+            durationRows[i].Visible = precedingDurationSelected;
+            if (!precedingDurationSelected)
+                durationTiers[i].SelectedIndex = 0;
+        }
+        for (int i = 1; i < intensityRows.Length; i++)
+        {
+            bool precedingIntensitySelected = SelectedTierId(intensityTiers[i - 1]) != 0;
+            intensityRows[i].Visible = precedingIntensitySelected;
+            if (!precedingIntensitySelected)
+                intensityTiers[i].SelectedIndex = 0;
+        }
+        for (int i = 0; i < intensityMethodRows.Length; i++)
+        {
+            int id = SelectedTierId(intensityTiers[i]);
+            intensityMethodRows[i].Visible = id != 0;
+            intensityMethods[i].Enabled = id != 0 && tiers[id - 1].Interval;
+        }
+        refreshingOptionalTiers = false;
     }
 
     // Tiers that sit inside the base tier would only give empty columns, so they are not offered.
@@ -343,7 +413,8 @@ internal sealed class TableWindow : Form
             "Choose the base tier: the table has one row for each interval or point on it. " +
             "Tick the other tiers whose labels you want as extra columns; every base-tier item must lie inside them. Tiers that sit inside the base tier would only give empty columns, so they are not listed. " +
             "For one row per point inside a longer segment, use the finest point tier as the base tier." + Environment.NewLine + Environment.NewLine +
-            "Duration adds a [tier]_dur column (seconds) with the length of the interval of the chosen tier that contains each row." + Environment.NewLine + Environment.NewLine +
+            "Each selected duration tier adds a [tier]_dur column (seconds) with the length of the interval of that tier that contains each row. Additional tier slots appear after choosing the preceding tier." + Environment.NewLine + Environment.NewLine +
+            "Intensity adds a column for each selected tier, in dB relative to 20 micropascals and rounded to 1 decimal. Absolute sound pressure levels require a calibrated recording. Interval tiers use the selected mean, midpoint, minimum, or maximum statistic; point tiers always use intensity at the point. The pitch floor is shared by all intensity measurements." + Environment.NewLine + Environment.NewLine +
             "Formants are measured with To Formant (Burg). A point base tier gives the value at each point; an interval base tier gives the mean of the defined values across the interval. " +
             "The number of formants for estimation always refers to the maximum formant ceiling, even when fewer formants are tabulated.",
             "Create Table - instructions", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -359,7 +430,8 @@ internal sealed class TableWindow : Form
             return;
         }
         int formantCount = formants.SelectedIndex + 1;
-        int duration = ((Tier)durationTier.SelectedItem).Id;
+        int[] durationIds = durationTiers.Select(SelectedTierId).ToArray();
+        int[] intensityIds = intensityTiers.Select(SelectedTierId).ToArray();
         var indexes = new List<string>();
         foreach (Tier tier in otherTiers.CheckedItems)
             indexes.Add(tier.Id.ToString(CultureInfo.InvariantCulture));
@@ -367,11 +439,20 @@ internal sealed class TableWindow : Form
             "OK", name, (baseTier.SelectedIndex + 1).ToString(CultureInfo.InvariantCulture),
             indexes.Count == 0 ? "-" : String.Join(",", indexes.ToArray()),
             baseTimesOnly.Checked ? "1" : "0", formantCount.ToString(CultureInfo.InvariantCulture),
-            duration.ToString(CultureInfo.InvariantCulture),
+            durationIds[0].ToString(CultureInfo.InvariantCulture),
             (scale.SelectedIndex + 1).ToString(CultureInfo.InvariantCulture),
             Format(timeStep.Value), Format(maximumFormant.Value), Format(numberOfFormants.Value),
-            Format(windowLength.Value), Format(preEmphasis.Value)
+            Format(windowLength.Value), Format(preEmphasis.Value),
+            durationIds[1].ToString(CultureInfo.InvariantCulture), durationIds[2].ToString(CultureInfo.InvariantCulture),
+            intensityIds[0].ToString(CultureInfo.InvariantCulture), intensityIds[1].ToString(CultureInfo.InvariantCulture),
+            intensityIds[2].ToString(CultureInfo.InvariantCulture),
+            (intensityMethods[0].SelectedIndex + 1).ToString(CultureInfo.InvariantCulture),
+            (intensityMethods[1].SelectedIndex + 1).ToString(CultureInfo.InvariantCulture),
+            (intensityMethods[2].SelectedIndex + 1).ToString(CultureInfo.InvariantCulture),
+            Format(intensityPitch.Value)
         };
+        if (legacyProtocol)
+            fields.RemoveRange(13, fields.Count - 13);
         Result = String.Join(" ", fields.ToArray()) + "\n";
         DialogResult = DialogResult.OK;
         Close();

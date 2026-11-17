@@ -15,7 +15,17 @@ To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is reco
     - [Click on this link](https://praat.org/manual/preferences_folder.html) for guidelines on how to locate this folder on your computer.
 3. Restart Praat.
 4. On Windows, Praat 6.4.60 or newer uses the included Windows helper automatically. No compiler or separate helper installation is required. Older versions continue to use Praat's native interface. If the helper is missing, AERoPlot explains what is unavailable and continues with the native interface.
-5. On Windows, the helper warms up in the background when Praat starts, so Praat remains usable. A Windows dialog opened before warm-up finishes may take a few seconds to appear.
+5. On Windows with Praat 6, the helper warms up in the background at startup.
+   In Praat 7 and later it starts only when needed, so the first Windows dialog
+   may take a few seconds to appear.
+
+Praat 7 asks for permission when a script writes files or launches the Windows
+helper. Different AERoPlot functions may run different scripts and therefore
+show separate prompts. **Allow once** permits only the requested action; the
+full-trust choice grants the named script and scripts it calls much broader
+access. Choose it only if you trust them. To use native dialogs instead of the
+Windows helper, select **Praat > AERoPlot > Use Praat interface**; Praat may
+still ask permission for file operations.
 
 Bundled files such as the Windows helper and example data are found relative to
 the installed plug-in folder. User settings, palettes, and temporary files are
@@ -98,8 +108,11 @@ Create Table turns the labels of a TextGrid into one table row per item of the
   Segment). Each base item takes the label of the item that contains it, and each
   tier becomes a column. Tiers that lie inside the base tier would give empty
   columns, so they are not offered (Windows) or are rejected with a message.
-* **Duration tier** (optional): any interval tier. It adds a `[tierName]_dur`
-  column in seconds with the length of the interval containing each row.
+* **Duration tiers** (optional): select up to three interval tiers. Each adds
+  a `[tierName]_dur` column in seconds for the interval containing each row.
+* **Intensity tiers** (optional): select up to three point or interval tiers.
+  Point tiers give intensity at the point. For each interval tier choose mean,
+  midpoint, minimum or maximum intensity.
 * **Formants** (optional): measured on the base tier, at each point for a point
   tier, or averaged over the interval for an interval tier.
 
@@ -112,10 +125,27 @@ before continuing. Duplicate tier names also need to be made unique.
 Formants are measured on the base tier: at each point for a point tier, or as
 the mean of the defined values (in the chosen Hertz or Bark scale) across the
 interval for an interval tier. To get one row per point inside a longer
-segment, use the finest point tier as the base tier. The optional **Duration
-tier** (any interval tier) adds a `[tierName]_dur` column in seconds, holding
-the length of the interval that contains each row. Older saved settings for the
-separate point-tier field are ignored.
+segment, use the finest point tier as the base tier. Select both the vowel and
+syllable interval tiers to include their durations, for example. Existing
+single-duration settings remain valid; older saved settings for the separate
+formant point-tier field are ignored.
+
+Intensity requires a Sound. The selected tier must give at most one measurement
+per base row: if an interval base contains multiple points on an intensity tier,
+choose that point tier as the base instead. An interval measurement must contain
+the complete base item. Points on an interval boundary belong to the interval
+on their right. A missing match or undefined measurement is left undefined and
+reported in the Info window. Intensity is calculated using Praat's
+`To Intensity` with the selected pitch floor (default 100 Hz), automatic time
+step and mean subtraction. Interval means are energy averages in dB; extrema
+use parabolic interpolation, and point and midpoint values use cubic
+interpolation. Values are rounded to one decimal place in dB relative to
+20 micropascals; absolute sound pressure levels require a calibrated recording.
+The resulting columns identify the tier and statistic, such as
+`vowel_intensity_mean_dB` or `points_intensity_dB`.
+The Praat dialog shows all three duration and intensity slots at once; the
+Windows dialog reveals additional slots as they are selected. The native dialog
+is tall and may not fit on shorter displays.
 
 When both a Sound and TextGrid are selected, both interfaces offer separate dropdowns for the interval tier used to crop the plot to its first and last non-empty intervals, and the tier shown with the spectrogram. Point tiers are available for display but not cropping. Choose **Do not crop** to use the full Sound duration, or **No TextGrid** in the display menu to hide the tier. The boundary checkbox controls dotted extensions of tier boundaries or points over the plot; separators in the tier itself remain visible. The TextGrid font can be selected independently; **Times** uses Praat's Times serif face. Axis and TextGrid text use 12 pt, and the title uses 16 pt. Without a selected TextGrid, the TextGrid controls are hidden and the full Sound duration is used. The interfaces share remembered general settings and the boundary checkbox; TextGrid tier selections and font are not remembered between runs. Existing PitchPlotPlus or C3PoGram settings are migrated on first use, leaving the old settings file intact. Spectrogram does not change PitchPlus's contour or spectrogram-toggle preferences.
 

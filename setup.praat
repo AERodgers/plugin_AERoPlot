@@ -18,8 +18,9 @@ if environment$("OS") = "Windows_NT"
     Add menu command: "Objects", "Praat", "--", "AERoPlot", 1, ""
     Add menu command: "Objects", "Praat", "Use Praat interface", "AERoPlot", 1, "plotScripts/usePraatUI.praat"
     Add menu command: "Objects", "Praat", "Use Windows interface", "AERoPlot", 1, "plotScripts/useWindowsUI.praat"
-    # Wake the helper in the background so the first dialog opens quickly.
-    if fileReadable("windows-ui/bin/AERoPlotWindowsUI.exe")
+    # Praat 7 asks for trust before launching the helper; do so only on demand.
+    praatMajor = number(left$(praatVersion$, index(praatVersion$, ".") - 1))
+    if praatMajor < 7 and fileReadable("windows-ui/bin/AERoPlotWindowsUI.exe")
         nocheck asynchronous runSubprocess: "windows-ui/bin/AERoPlotWindowsUI.exe", "WARMUP"
     endif
 endif
