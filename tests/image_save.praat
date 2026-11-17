@@ -6,9 +6,26 @@ if folderExists(test_folder$)
     exitScript: "Choose a test folder that does not already exist."
 endif
 
+createFolder: test_folder$
+sharedSaveFolderFile$ = test_folder$ + "/shared-save-folder.txt"
 saveDir$ = ""
 @useDefaultSaveFolder
 assert saveDir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/AERoPlot_Images"
+saveDir$ = "legacy plot-specific folder"
+@readSharedSaveFolder
+assert saveDir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/AERoPlot_Images"
+
+saveDir$ = test_folder$
+@setSharedSaveFolder
+assert fileReadable(sharedSaveFolderFile$)
+saveDir$ = "legacy plot-specific folder"
+@readSharedSaveFolder
+assert saveDir$ = test_folder$
+saveDir$ = ""
+@setSharedSaveFolder
+assert saveDir$ = preferencesDirectory$ + "/plugin_AERoPlot/data/AERoPlot_Images"
+assert not fileReadable(sharedSaveFolderFile$)
+
 saveDir$ = test_folder$
 @useDefaultSaveFolder
 assert saveDir$ = test_folder$

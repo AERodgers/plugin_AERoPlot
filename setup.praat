@@ -38,6 +38,7 @@ Add action command: "Sound", 1, "TextGrid", 1, "", 0, " ", "", 0, ""
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "AERoPlot", "", 0, ""
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "PitchPlus", "AERoPlot", 0, "plotScripts/pitch_plus.praat"
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Spectrogram", "AERoPlot", 0, "plotScripts/spectro_plus.praat"
+Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Line spectrum", "AERoPlot", 0, "plotScripts/lineSpectrum.praat"
 Add action command: "Sound", 1, "TextGrid", 1, "", 0, "Create Table", "AERoPlot", 0, "plotScripts/nestedTiers2Table.praat"
 
 ## AERoPlot Sound
@@ -45,3 +46,4 @@ Add action command: "Sound", 1, "", 0, "", 0, " ", "", 0, ""
 Add action command: "Sound", 1, "", 0, "", 0, "AERoPlot", "", 0, ""
 Add action command: "Sound", 1, "", 0, "", 0, "PitchPlus", "AERoPlot", 0, "plotScripts/pitch_plus.praat"
 Add action command: "Sound", 1, "", 0, "", 0, "Spectrogram", "AERoPlot", 0, "plotScripts/spectro_plus.praat"
+Add action command: "Sound", 1, "", 0, "", 0, "Line spectrum", "AERoPlot", 0, "plotScripts/lineSpectrum.praat"

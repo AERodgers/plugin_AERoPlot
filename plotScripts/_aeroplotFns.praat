@@ -150,6 +150,40 @@ procedure useDefaultSaveFolder
     endif
 endproc
 
+procedure readSharedSaveFolder
+    # The override keeps tests out of the user's preferences.
+    .file$ = preferencesDirectory$ + "/plugin_AERoPlot/data/sharedSaveFolder.txt"
+    if variableExists("sharedSaveFolderFile$")
+        if sharedSaveFolderFile$ != ""
+            .file$ = sharedSaveFolderFile$
+        endif
+    endif
+    if fileReadable(.file$)
+        saveDir$ = readFile$(.file$)
+        saveDir$ = replace$(saveDir$, newline$, "", 0)
+    else
+        saveDir$ = ""
+    endif
+    @useDefaultSaveFolder
+endproc
+
+procedure setSharedSaveFolder
+    .file$ = preferencesDirectory$ + "/plugin_AERoPlot/data/sharedSaveFolder.txt"
+    if variableExists("sharedSaveFolderFile$")
+        if sharedSaveFolderFile$ != ""
+            .file$ = sharedSaveFolderFile$
+        endif
+    endif
+    if saveDir$ = ""
+        @useDefaultSaveFolder
+        if fileReadable(.file$)
+            deleteFile: .file$
+        endif
+    else
+        writeFileLine: .file$, saveDir$
+    endif
+endproc
+
 procedure prepareImageSave: .dir$, .name$
     .dir$ = replace$(.dir$, "\", "/", 0)
     if .dir$ = "" or (left$(.dir$, 1) != "/" and mid$(.dir$, 2, 2) != ":/")
@@ -458,7 +492,7 @@ procedure processShared_UIs
     altColrMatch = sorting = 5
     sorting = (sorting <= 2) * sorting + (sorting > 2)
     saveDir$ = save_folder$
-    @useDefaultSaveFolder
+    @setSharedSaveFolder
     saveName$ = save_name$
     #quality = very_high_quality
     changeAddColSch = add_or_change_colour_scheme

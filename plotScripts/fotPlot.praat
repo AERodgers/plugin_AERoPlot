@@ -661,7 +661,7 @@ procedure defineVars
     endif
     @readVars:
     ... preferencesDirectory$ + "/plugin_AERoPlot/data/vars/", "fotPlot.var"
-    @useDefaultSaveFolder
+    @readSharedSaveFolder
     @getGenAxisVars
     @overwriteVars
 

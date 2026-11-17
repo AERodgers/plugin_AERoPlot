@@ -1,6 +1,6 @@
 # AERoPlot - a Praat plug-in for plotting data
 
-AERoPlot allows you to generate elegant plots from data in Praat. It can create four types of figure.
+AERoPlot allows you to generate elegant plots from data in Praat.
 
 ## **Download and installation**
 To use it, [download Praat](https://www.praat.org). Praat 6.2.0 or later is recommended. The plugin's version check accepts Praat 6.0.60 or later, but compatibility with all older versions has not been verified.
@@ -33,6 +33,31 @@ Possible secondary parameters include:
 It can also draw the **intensity contour** alone or just the **spectrogram (and waveform)** without any contour.
 
 **Spectrogram** always draws a spectrogram and offers a simplified interface without contour settings. It supports the same waveform and TextGrid options as PitchPlus.
+
+### **Line spectrum**
+
+Select a Sound, optionally with a TextGrid, and choose **AERoPlot > Line
+spectrum**. Choose FFT, LPC, or both. With a TextGrid, select a point tier:
+each labelled point produces a separate plot, while blank or whitespace-only
+labels are ignored. Without a TextGrid, analyse the whole Sound or enter a
+specific time in seconds.
+
+For time slices, the analysis window is the effective Gaussian window length;
+the Sound must extend at least one window length on either side of every
+selected time. FFT and LPC use the nearest frames of Praat's spectrogram and
+autocorrelation LPC analyses, respectively. The whole-sound FFT uses the
+complete Sound; whole-sound LPC uses one Gaussian frame spanning the Sound
+(its effective window length is half the Sound duration). LPC coefficients
+set to 0 use the sampling-rate-based choice from the original script.
+Maximum frequency cannot exceed the Sound's Nyquist frequency.
+
+FFT is black and LPC is blue when both are shown. Their dB axes are independent;
+automatic ranges or separately specified manual ranges can be used to adjust
+their vertical alignment. Both share the frequency axis. Choose **Save**,
+**Skip**, or **Cancel** after each plot. A filename uses the Sound object name
+and point label; whole-sound and time plots use a descriptive suffix. Existing
+files are not overwritten. This workflow uses the Praat interface on all
+platforms, including when the Windows interface is selected.
  
 ### **Plots from data tables**
 
@@ -50,7 +75,7 @@ In Praat's Objects window:
 * Select both the Sound and TextGrid objects
 * Use **Create Table** to convert the nested TextGrid tiers to a data table
 * Select the **Table** to access the F1-F2, Ladefoged, and Formants-over-time plots under **AERoPlot**.
-* Select a **Sound** to access **PitchPlus** or **Spectrogram**, or select a Sound and TextGrid to include a TextGrid tier.
+* Select a **Sound** to access **PitchPlus**, **Spectrogram**, or **Line spectrum**; select a Sound and TextGrid to use a tier.
 (Note this is more suited to short sound files rather than the full sample data files.)
 
 ### How Create Table reads a nested TextGrid
@@ -94,7 +119,7 @@ You can also practise using the formant Datasets from the Literature, which are 
 
 
 ## Saving Images
-The F1-F2, Ladefoged, and Formants-over-time plots save PNG images, when requested, to `plugin_AERoPlot/data/AERoPlot_Images` inside your [Praat preferences folder](https://praat.org/manual/preferences_folder.html). The **Save folder** field accepts an absolute path and is remembered separately for each plot type; leave it blank to restore the default. Existing saved folder settings are retained until changed or cleared. Missing folders are created when saving, and existing image files are preserved by adding a numbered suffix. The **Save name** field is a filename, not a path; `.png` is added if needed.
+The F1-F2, Ladefoged, Formants-over-time and Line spectrum plots save PNG images, when requested, to `plugin_AERoPlot/data/AERoPlot_Images` inside your [Praat preferences folder](https://praat.org/manual/preferences_folder.html). Their **Save folder** field accepts an absolute path and shares the most recently specified folder across these plot types; leave it blank to restore the default. Missing folders are created when saving, and existing image files are preserved by adding a numbered suffix. The table plots' **Save name** field is a filename, not a path; `.png` is added if needed.
 
 PitchPlus and Spectrogram draw in Praat's Picture window; use the Picture window's save or export commands to save them.
 
@@ -121,19 +146,23 @@ For formants-over-time plots with relative time, each combination of main factor
 
 Formants-over-time ellipses describe each comparison-factor and sequencing-factor group separately for each formant. Display jitter does not change their centres or spread.
 
-The Praat scripts in [tests](tests) provide batch tests for shared helpers and image saving, plus interactive PitchPlus and Spectrogram smoke tests. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the plot smoke tests from Praat's GUI; their settings windows require choosing **Draw**, **Draw & Exit**, or **Cancel**.
+The Praat scripts in [tests](tests) provide batch tests for shared helpers, image saving and line-spectrum analysis, plus interactive plot smoke tests. For batch tests, put Praat's options before the script filename, for example `Praat --no-plugins --no-pref-files --run tests/shared_helpers.praat`; these flags avoid loading installed plug-ins or changing preferences. The image-save test also takes an absolute path to a test folder that does not yet exist, for example `Praat --no-plugins --no-pref-files --run tests/image_save.praat C:\temp\aeroplot-image-test`, and leaves its test files there for inspection and removal. Run the plot smoke tests from Praat's GUI; their settings windows require choosing **Draw**, **Draw & Exit**, or **Cancel**.
 
 On Windows, run `tests\table_tier_references_isolated.ps1` with `-Praat` and a
 new `-TestDirectory` to check tier name and number resolution, ambiguity and
 type errors, and vowel duration extraction. The runner also accepts an optional
 `-SampleTextGrid` argument for the documented 35-row sample regression.
+`tests\line_spectrum_ui_isolated.ps1` takes the same `-Praat` and new
+`-TestDirectory` arguments and checks the native dialogs, per-image decisions,
+filenames and shared save folder on an interactive Windows desktop.
 
 ### Interfaces
 
 Every workflow has the same functions behind up to three interfaces. Interface
 code only collects settings; shared code validates them and does the work.
 
-1. **Praat interface**: the native pause windows. It is the fallback
+1. **Praat interface**: the native pause windows. Line spectrum currently uses
+   this interface only. It is the fallback
    whenever another interface cannot be used, and the default everywhere except
    on Windows.
 2. **Command-line interface**: `plotScripts\cli_table.praat`,
